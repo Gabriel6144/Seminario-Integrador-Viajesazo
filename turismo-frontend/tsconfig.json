@@ -1,0 +1,15 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.node.json" }
+  ],
+  // El tsconfig raíz es un "solution file": sin compilerOptions no resuelve los paths. shadcn lee
+  // este archivo para resolver el alias `@/`, así que si falta acá el CLI no encuentra dónde
+  // escribir los componentes y cae en crear una carpeta literal llamada "@".
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  }
+}

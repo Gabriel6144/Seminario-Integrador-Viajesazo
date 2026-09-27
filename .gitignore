@@ -1,0 +1,34 @@
+# Raíz: ignora la caché y el tooling que no es código del proyecto
+node_modules/
+
+# Artefactos de build (cada proyecto los ignora también, pero que queden explícitos acá)
+target/
+dist/
+*.class
+
+# Tooling del IDE/agente. El AGENTS.md del backend dice ignorarlo: se autologuea y no
+# es parte del proyecto.
+.github/modernize/
+
+# Editores
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.settings/
+.classpath
+.project
+
+# Maven wrapper: el wrapper es `distributionType=only-script`, así que no necesita jar
+.mvn/wrapper/maven-wrapper.jar
+
+# H2
+*.mv.db
+*.trace.db
+
+# Logs y temporal
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db

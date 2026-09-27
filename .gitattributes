@@ -1,0 +1,40 @@
+# Normaliza los finales de línea en el repositorio, no en el working tree.
+# Los archivos ya están en LF; esto evita que un clon en Windows muestre un diff entero
+# de CRLF en cada archivo.
+
+# La regla global va PRIMERO: todo lo que Git detecte como texto se guarda con LF.
+* text=auto eol=lf
+
+# mvnw.cmd es un script de Windows que se ejecuta directamente (o con `call`) desde cmd.exe.
+# cmd.exe lee los .cmd con el final de línea del sistema, así que necesita CRLF sí o sí.
+# mvnw (el de Unix) queda con LF por la regla global.
+mvnw.cmd text eol=crlf
+
+# Archivos que se versionan como binarios: Git no debe buscarles diferencias ni
+# convertirlos. Se listan explícitamente porque el proyecto usa imágenes (URLs en data.sql
+# y /public) y fuentes de shadcn/ui.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.bmp binary
+*.svgz binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.eot binary
+*.pdf binary
+*.zip binary
+*.jar binary
+*.war binary
+*.gz binary
+*.7z binary
+*.mp4 binary
+*.mp3 binary
+
+# package-lock.json se versiona como texto, pero sin conversión de fin de línea: npm en
+# Windows lo escribe con CRLF y convertirlo genera conflictos de tres vías en los merges.
+package-lock.json -text
