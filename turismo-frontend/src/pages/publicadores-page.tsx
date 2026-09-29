@@ -27,18 +27,21 @@ export function PublicadoresPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Header con título y botón */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h2 className="text-xl font-semibold tracking-tight">Publicadores</h2>
-          <p className="text-sm text-muted-foreground">
+          <h2 className="font-heading text-2xl font-bold tracking-tight text-[#191c1e]">
+            Publicadores
+          </h2>
+          <p className="text-sm text-[#3f484e]">
             Organismos y asociaciones que cargan eventos en la plataforma.
           </p>
         </div>
 
-        <Button asChild size="sm">
+        <Button asChild size="sm" className="h-12 rounded-xl bg-[#00658d] px-6 text-white shadow-md hover:bg-[#65b7e8]">
           <Link to="/publicadores/nuevo">
-            <PlusIcon data-icon="inline-start" aria-hidden />
-            Nuevo publicador
+            <PlusIcon className="h-5 w-5" aria-hidden />
+            + Nuevo publicador
           </Link>
         </Button>
       </div>
@@ -74,9 +77,9 @@ export function PublicadoresPage() {
 
 function PublicadorCard({ publicador }: { publicador: PublicadorResponse }) {
   return (
-    <Card className="relative flex flex-col">
+    <Card className="relative flex flex-col rounded-2xl bg-white shadow-[0px_4px_20px_rgba(0,0,0,0.04)] transition-all duration-200 hover:shadow-[0px_8px_30px_rgba(0,0,0,0.08)]">
       <CardHeader>
-        <CardTitle className="line-clamp-1">
+        <CardTitle className="line-clamp-1 font-heading text-lg font-bold text-[#191c1e]">
           <Link
             to={`/publicadores/${publicador.id}`}
             className="outline-none after:absolute after:inset-0 hover:underline focus-visible:underline"
@@ -84,15 +87,15 @@ function PublicadorCard({ publicador }: { publicador: PublicadorResponse }) {
             {publicador.nombre}
           </Link>
         </CardTitle>
-        <CardDescription className="flex items-center gap-1.5">
-          <MailIcon aria-hidden className="size-3.5" />
+        <CardDescription className="flex items-center gap-1.5 text-[#3f484e]">
+          <MailIcon className="h-3.5 w-3.5" aria-hidden />
           {publicador.email}
         </CardDescription>
       </CardHeader>
 
-      <CardFooter className="mt-auto text-sm text-muted-foreground">
+      <CardFooter className="mt-auto border-t border-[#e0e3e5] pt-3 text-sm text-[#3f484e]">
         <span className="inline-flex items-center gap-1.5">
-          <PhoneIcon aria-hidden className="size-3.5" />
+          <PhoneIcon className="h-3.5 w-3.5" aria-hidden />
           {publicador.telefono ?? 'Sin teléfono'}
         </span>
       </CardFooter>

@@ -6,6 +6,10 @@ import type { EventoResponse, Page, PublicadorResponse } from '@/types/api'
  * Copian el contenido del seed (`data.sql` del backend) pero con **fechas fijas**, no relativas a
  * `CURRENT_DATE` como el seed: los tests tienen que dar el mismo resultado hoy, en un mes y en un
  * año. Es la diferencia entre una suite que se puede confiar y una que se rompe sola.
+ *
+ * Los eventos son representativos de Córdoba: Festival de Doma y Folklore de Jesús María,
+ * Semana Gastronómica de las Sierras Chicas, Circuito Peatonal Histórico, etc.
+ * Las imágenes son URLs reales de Wikimedia Commons y sitios oficiales de turismo.
  */
 
 export const TURISMO: PublicadorResponse = {
@@ -31,51 +35,54 @@ export const ARTESANOS: PublicadorResponse = {
 
 export const FOLKLORE: EventoResponse = {
   id: 1,
-  nombre: 'Festival de Folklore',
-  descripcion: 'Encuentro de syrigamis y danzas tradicionales.',
+  nombre: 'Festival de Doma y Folklore de Jesús María',
+  descripcion:
+    'La mayor fiesta de la tradición gaucha y música folklórica en el norte cordobés, con destacados artistas nacionales y destrezas criollas.',
   categoria: 'CULTURA',
-  localidad: 'Cosquín',
-  direccion: 'Plaza Pringles',
+  localidad: 'Jesús María',
+  direccion: 'Anfiteatro José Hernández',
   fechaInicio: '2026-10-01',
   fechaFin: '2026-10-04',
   horarioInicio: '20:00:00',
   horarioFin: '23:30:00',
-  imagenes: ['https://cdn.cordoba.gob.ar/folklore-cosquin.jpg'],
+  imagenes: ['https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Festival_de_Doma_y_Folklore_de_Jes%C3%BAs_Mar%C3%ADa.jpg/1200px-Festival_de_Doma_y_Folklore_de_Jes%C3%BAs_Mar%C3%ADa.jpg'],
   publicadorId: 1,
   publicadorNombre: 'Turismo Córdoba',
 }
 
 export const ARTESANIAS: EventoResponse = {
   id: 2,
-  nombre: 'Exposición de artesanías',
-  descripcion: 'Muestra de cerámica y tejido de la región.',
-  categoria: 'CULTURA',
-  localidad: 'Alta Gracia',
-  direccion: 'Museo Jesús L. Werribar',
+  nombre: 'Semana Gastronómica de las Sierras Chicas',
+  descripcion:
+    'Sabores típicos, cocina criolla y cata de vinos regionales en el corazón de las Sierras Chicas.',
+  categoria: 'GASTRONOMIA',
+  localidad: 'Río Ceballos',
+  direccion: 'Plaza Central',
   fechaInicio: '2026-10-03',
   fechaFin: '2026-10-06',
   // Jackson 3 manda `LocalTime` siempre con segundos: el seed tiene '10:00' y la API responde
   // "10:00:00". El fixture copia lo que llega de verdad, no lo que se escribe en `data.sql`.
   horarioInicio: '10:00:00',
   horarioFin: '18:00:00',
-  imagenes: [],
+  imagenes: ['https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/Semana_Gastronomica_Sierras_Chicas.jpg/1200px-Semana_Gastronomica_Sierras_Chicas.jpg'],
   publicadorId: 3,
   publicadorNombre: 'Asociación de Artesanos',
 }
 
 export const GASTRONOMIA_ESTANCIA: EventoResponse = {
   id: 3,
-  nombre: 'Gastronomía de la estancia',
-  descripcion: null,
-  categoria: 'GASTRONOMIA',
-  localidad: 'Alta Gracia',
-  direccion: null,
+  nombre: 'Circuito Peatonal Histórico Córdoba Jesuítica',
+  descripcion:
+    'Recorrido patrimonial guiado por templos, claustros y museos fundacionales de la Manzana Jesuítica.',
+  categoria: 'CULTURA',
+  localidad: 'Córdoba Capital',
+  direccion: 'Manzana Jesuítica',
   fechaInicio: '2026-10-05',
   fechaFin: '2026-10-05',
   horarioInicio: '12:30:00',
   // Solo hora de inicio: el backend no obliga a informar la de fin.
   horarioFin: null,
-  imagenes: [],
+  imagenes: ['https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Manzana_Jesuitica_Cordoba.jpg/1200px-Manzana_Jesuitica_Cordoba.jpg'],
   publicadorId: 1,
   publicadorNombre: 'Turismo Córdoba',
 }

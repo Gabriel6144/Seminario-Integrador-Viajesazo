@@ -20,18 +20,21 @@ export function EventosPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Header con título y botón */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h2 className="text-xl font-semibold tracking-tight">Eventos</h2>
-          <p className="text-sm text-muted-foreground">
+          <h2 className="font-heading text-2xl font-bold tracking-tight text-[#191c1e]">
+            Eventos turísticos
+          </h2>
+          <p className="text-sm text-[#3f484e]">
             Todos los eventos cargados, ordenados por fecha de inicio.
           </p>
         </div>
 
-        <Button asChild size="sm">
+        <Button asChild size="sm" className="h-12 rounded-xl bg-[#00658d] px-6 text-white shadow-md hover:bg-[#65b7e8]">
           <Link to="/eventos/nuevo">
-            <PlusIcon data-icon="inline-start" aria-hidden />
-            Nuevo evento
+            <PlusIcon className="h-5 w-5" aria-hidden />
+              Nuevo evento
           </Link>
         </Button>
       </div>

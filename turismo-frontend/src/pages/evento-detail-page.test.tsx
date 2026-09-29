@@ -30,9 +30,10 @@ describe('EventoDetailPage', () => {
   it('muestra el evento completo', async () => {
     renderDetalle('1')
 
-    expect(await screen.findByRole('heading', { name: FOLKLORE.nombre })).toBeInTheDocument()
+    expect(await screen.findByText(FOLKLORE.nombre)).toBeInTheDocument()
     expect(screen.getByText(FOLKLORE.descripcion as string)).toBeInTheDocument()
-    expect(screen.getByText(FOLKLORE.localidad as string)).toBeInTheDocument()
+    // La ubicación aparece en el hero image y en la ficha: se espera al menos una coincidencia.
+    expect((await screen.findAllByText(FOLKLORE.localidad as string)).length).toBeGreaterThan(0)
     expect(screen.getByText(FOLKLORE.direccion as string)).toBeInTheDocument()
   })
 
@@ -113,7 +114,7 @@ describe('EventoDetailPage', () => {
 describe('borrado de eventos desde el detalle', () => {
   it('no borra nada hasta que se confirma en el diálogo', async () => {
     renderDetalle('1')
-    await user().click(await screen.findByRole('button', { name: 'Borrar' }))
+    await user().click(await screen.findByRole('button', { name: 'Dar de baja' }))
     await user().click(await screen.findByRole('button', { name: 'Cancelar' }))
 
     // Cancelar tiene que cerrar el diálogo sin mandarle un DELETE a la API.
@@ -123,8 +124,8 @@ describe('borrado de eventos desde el detalle', () => {
 
   it('borra el evento al confirmar', async () => {
     renderDetalle('1')
-    await user().click(await screen.findByRole('button', { name: 'Borrar' }))
-    await user().click(await screen.findByRole('button', { name: 'Sí, borrar' }))
+    await user().click(await screen.findByRole('button', { name: 'Dar de baja' }))
+    await user().click(await screen.findByRole('button', { name: 'Confirmar baja' }))
 
     // El handler responde 204 sin cuerpo: si `apiDelete` intentara parsearlo, fallaría acá.
     await waitFor(() => expect(findEvento(1)).toBeUndefined())
@@ -135,8 +136,8 @@ describe('borrado de eventos desde el detalle', () => {
     // error más confuso posible después de borrar: la app parece haber fallado cuando todo salió
     // bien.
     const { unmount } = renderDetalle('1')
-    await user().click(await screen.findByRole('button', { name: 'Borrar' }))
-    await user().click(await screen.findByRole('button', { name: 'Sí, borrar' }))
+    await user().click(await screen.findByRole('button', { name: 'Dar de baja' }))
+    await user().click(await screen.findByRole('button', { name: 'Confirmar baja' }))
 
     unmount()
   })

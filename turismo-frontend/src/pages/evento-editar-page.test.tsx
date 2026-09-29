@@ -27,7 +27,7 @@ function renderEdicion(id: string) {
 }
 
 async function esperarFormulario() {
-  return screen.findByLabelText('Nombre')
+  return screen.findByLabelText('Nombre del evento')
 }
 
 async function elegirPublicador(nombre: string) {
@@ -49,7 +49,7 @@ describe('EventoEditarPage', () => {
     expect(screen.getByLabelText('Horario de inicio')).toHaveValue('20:00')
     expect(screen.getByLabelText('Horario de finalización')).toHaveValue('23:30')
     expect(screen.getByLabelText('URL de la imagen 1')).toHaveValue(
-      'https://cdn.cordoba.gob.ar/folklore-cosquin.jpg',
+      FOLKLORE.imagenes[0],
     )
   })
 
@@ -70,8 +70,8 @@ describe('EventoEditarPage', () => {
     renderEdicion('1')
     await esperarFormulario()
 
-    await user().clear(screen.getByLabelText('Nombre'))
-    await user().type(screen.getByLabelText('Nombre'), 'Con imagen')
+    await user().clear(screen.getByLabelText('Nombre del evento'))
+    await user().type(screen.getByLabelText('Nombre del evento'), 'Con imagen')
     await user().click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
     await waitFor(() => expect(findEvento(1)?.nombre).toBe('Con imagen'))
@@ -105,7 +105,7 @@ describe('EventoEditarPage', () => {
     renderEdicion('1')
     await esperarFormulario()
 
-    await user().clear(screen.getByLabelText('Descripción'))
+    await user().clear(screen.getByLabelText('Descripción completa'))
     await user().clear(screen.getByLabelText('Horario de inicio'))
     await user().click(screen.getByRole('button', { name: 'Guardar cambios' }))
 

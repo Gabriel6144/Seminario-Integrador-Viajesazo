@@ -21,9 +21,12 @@ export function AgendaPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Header */}
       <div className="flex flex-col gap-1">
-        <h2 className="text-xl font-semibold tracking-tight">Agenda de la semana</h2>
-        <p className="text-sm text-muted-foreground">
+        <h2 className="font-heading text-2xl font-bold tracking-tight text-[#191c1e]">
+          Agenda Turística
+        </h2>
+        <p className="text-sm text-[#3f484e]">
           Eventos que siguen vigentes desde hoy hasta el domingo.
         </p>
       </div>
