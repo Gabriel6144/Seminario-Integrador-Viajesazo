@@ -64,11 +64,12 @@ describe('EventosPage', () => {
     }
   })
 
-  it('muestra el nombre del publicador en cada tarjeta', async () => {
+  it('muestra la ubicación en cada tarjeta', async () => {
     renderListado()
 
-    expect((await screen.findAllByText('Turismo Córdoba')).length).toBeGreaterThan(0)
-    expect(screen.getByText('Asociación de Artesanos')).toBeInTheDocument()
+    // La ubicación aparece en el hero image y en el body de la tarjeta.
+    expect((await screen.findAllByText('Jesús María')).length).toBeGreaterThan(0)
+    expect((await screen.findAllByText('Río Ceballos')).length).toBeGreaterThan(0)
   })
 
   it('muestra el rango de fechas sin corrimiento de día', async () => {

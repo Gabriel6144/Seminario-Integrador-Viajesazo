@@ -85,18 +85,29 @@ export function EventoForm({
         </div>
       )}
 
-      <FieldSet>
-        <FieldLegend>Datos</FieldLegend>
+      {/* Sección 1: Datos Principales */}
+      <FormSection
+        number={1}
+        title="Datos Principales del Evento"
+        icon={
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg>
+        }
+      >
         <FieldGroup>
           <TextField
             id="nombre"
-            label="Nombre"
+            label="Nombre del evento"
             error={errors.nombre}
             inputProps={register('nombre')}
           />
 
           <Field data-invalid={errors.descripcion !== undefined}>
-            <FieldLabel htmlFor="descripcion">Descripción</FieldLabel>
+            <FieldLabel htmlFor="descripcion">Descripción completa</FieldLabel>
             <Textarea
               id="descripcion"
               rows={3}
@@ -111,7 +122,7 @@ export function EventoForm({
             name="categoria"
             render={({ field }) => (
               <Field data-invalid={errors.categoria !== undefined}>
-                <FieldLabel htmlFor="categoria">Categoría</FieldLabel>
+                <FieldLabel htmlFor="categoria">Categoría turística</FieldLabel>
                 <Select value={field.value} onValueChange={field.onChange}>
                   <SelectTrigger id="categoria" aria-invalid={errors.categoria !== undefined}>
                     <SelectValue placeholder="Sin categoría" />
@@ -129,10 +140,48 @@ export function EventoForm({
             )}
           />
         </FieldGroup>
-      </FieldSet>
+      </FormSection>
 
-      <FieldSet>
-        <FieldLegend>Cuándo</FieldLegend>
+      {/* Sección 2: Ubicación */}
+      <FormSection
+        number={2}
+        title="Ubicación en Córdoba"
+        icon={
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
+            <circle cx="12" cy="10" r="3" />
+          </svg>
+        }
+      >
+        <FieldGroup>
+          <TextField
+            id="localidad"
+            label="Localidad"
+            error={errors.localidad}
+            inputProps={register('localidad')}
+          />
+          <TextField
+            id="direccion"
+            label="Dirección exacta o referencia"
+            error={errors.direccion}
+            inputProps={register('direccion')}
+          />
+        </FieldGroup>
+      </FormSection>
+
+      {/* Sección 3: Calendario y Horarios */}
+      <FormSection
+        number={3}
+        title="Calendario y Horarios"
+        icon={
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg>
+        }
+      >
         <FieldDescription>
           La fecha de finalización no puede ser anterior a la de inicio.
         </FieldDescription>
@@ -168,56 +217,20 @@ export function EventoForm({
             inputProps={register('horarioFin')}
           />
         </FieldGroup>
-      </FieldSet>
+      </FormSection>
 
-      <FieldSet>
-        <FieldLegend>Dónde</FieldLegend>
-        <FieldGroup>
-          <TextField
-            id="localidad"
-            label="Localidad"
-            error={errors.localidad}
-            inputProps={register('localidad')}
-          />
-          <TextField
-            id="direccion"
-            label="Dirección"
-            error={errors.direccion}
-            inputProps={register('direccion')}
-          />
-        </FieldGroup>
-      </FieldSet>
-
-      <FieldSet>
-        <FieldLegend>Clasificación</FieldLegend>
-        <FieldGroup>
-          <Controller
-            control={control}
-            name="publicadorId"
-            render={({ field }) => (
-              <Field data-invalid={errors.publicadorId !== undefined}>
-                <FieldLabel htmlFor="publicadorId">Publicador</FieldLabel>
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger id="publicadorId" aria-invalid={errors.publicadorId !== undefined}>
-                    <SelectValue placeholder="Elegí un publicador" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {publicadores.map((publicador) => (
-                      <SelectItem key={publicador.id} value={String(publicador.id)}>
-                        {publicador.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FieldError>{errors.publicadorId?.message}</FieldError>
-              </Field>
-            )}
-          />
-        </FieldGroup>
-      </FieldSet>
-
-      <FieldSet>
-        <FieldLegend>Imágenes</FieldLegend>
+      {/* Sección 4: Imágenes */}
+      <FormSection
+        number={4}
+        title="Imágenes del Evento"
+        icon={
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" />
+            <path d="M21 15l-5-5L5 21" />
+          </svg>
+        }
+      >
         <FieldDescription>
           URLs completas, una por fila. Para sacar todas, quitá las filas: una lista vacía las
           borra del evento.
@@ -269,7 +282,43 @@ export function EventoForm({
             </Button>
           </div>
         </FieldGroup>
-      </FieldSet>
+      </FormSection>
+
+      {/* Sección 5: Publicador */}
+      <FormSection
+        number={5}
+        title="Publicador"
+        icon={
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
+            <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6" />
+          </svg>
+        }
+      >
+        <FieldGroup>
+          <Controller
+            control={control}
+            name="publicadorId"
+            render={({ field }) => (
+              <Field data-invalid={errors.publicadorId !== undefined}>
+                <FieldLabel htmlFor="publicadorId">Publicador</FieldLabel>
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger id="publicadorId" aria-invalid={errors.publicadorId !== undefined}>
+                    <SelectValue placeholder="Elegí un publicador" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {publicadores.map((publicador) => (
+                      <SelectItem key={publicador.id} value={String(publicador.id)}>
+                        {publicador.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldError>{errors.publicadorId?.message}</FieldError>
+              </Field>
+            )}
+          />
+        </FieldGroup>
+      </FormSection>
 
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" disabled={isPending}>
@@ -280,6 +329,38 @@ export function EventoForm({
         </Button>
       </div>
     </form>
+  )
+}
+
+/**
+ * Sección de formulario con número, icono y título.
+ *
+ * Diseño según prototipo Stitch: borde inferior, número circular y icono a la izquierda.
+ */
+function FormSection({
+  number,
+  title,
+  icon,
+  children,
+}: {
+  number: number
+  title: string
+  icon: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <FieldSet className="rounded-xl bg-white p-4 shadow-[0px_4px_20px_rgba(0,0,0,0.04)] sm:p-6">
+      <div className="mb-4 flex items-center gap-2 border-b border-[#e0e3e5] pb-2">
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#00658d] text-sm font-bold text-white">
+          {number}
+        </span>
+        <span className="text-[#00658d]">{icon}</span>
+        <FieldLegend className="font-heading text-lg font-bold text-[#191c1e]">
+          {title}
+        </FieldLegend>
+      </div>
+      {children}
+    </FieldSet>
   )
 }
 

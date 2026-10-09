@@ -44,7 +44,7 @@ async function completarObligatorios() {
  * Esperar por el campo es lo que evita el `getBy` contra un árbol que todavía no existe.
  */
 function buscarFormulario() {
-  return screen.findByLabelText('Nombre')
+  return screen.findByLabelText('Nombre del evento')
 }
 
 beforeEach(() => {
@@ -98,8 +98,8 @@ describe('EventoNuevoPage', () => {
   it('crea el evento con todos los opcionales que el usuario completó', async () => {
     renderAlta()
     await completarObligatorios()
-    await user().type(screen.getByLabelText('Descripción'), 'Espectáculo de invierno')
-    await user().click(screen.getByRole('combobox', { name: 'Categoría' }))
+    await user().type(screen.getByLabelText('Descripción completa'), 'Espectáculo de invierno')
+    await user().click(screen.getByRole('combobox', { name: 'Categoría turística' }))
     await user().click(await screen.findByRole('option', { name: 'Cultura' }))
     await user().type(screen.getByLabelText('Horario de inicio'), '20:00')
     await user().type(screen.getByLabelText('Horario de finalización'), '23:00')

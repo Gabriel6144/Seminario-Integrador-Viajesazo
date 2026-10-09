@@ -187,7 +187,7 @@ describe('toEventoFormValues', () => {
   it('convierte las imágenes de la respuesta en filas editables', () => {
     const values = toEventoFormValues(FOLKLORE)
 
-    expect(values.imagenes).toEqual([{ url: 'https://cdn.cordoba.gob.ar/folklore-cosquin.jpg' }])
+    expect(values.imagenes).toEqual([{ url: FOLKLORE.imagenes[0] }])
   })
 
   it('da un formulario que vuelve a pasar por el schema y produce el mismo request', () => {
