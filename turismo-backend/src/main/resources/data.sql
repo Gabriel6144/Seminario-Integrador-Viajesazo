@@ -177,3 +177,103 @@ VALUES (
     (SELECT id FROM evento WHERE nombre = 'Masa Vienesa'),
     'https://villageneralbelgrano.gob.ar//wp-content/uploads/2026/02/Logo-masa56_Mesa-de-trabajo-1-300x206.png'
 );
+
+
+-- ============================================================
+-- VIAJES SUGERIDOS PARA TURISTAS
+-- ============================================================
+
+INSERT INTO viaje (
+    nombre,
+    zona_interes,
+    rango_interes_km,
+    fecha_inicio,
+    fecha_fin,
+    ritmo,
+    usuario
+)
+VALUES (
+    'Escapada serrana por Villa General Belgrano',
+    'Villa General Belgrano y alrededores',
+    35,
+    CURRENT_DATE + 7,
+    CURRENT_DATE + 9,
+    'EQUILIBRADO',
+    'turista.demo@viajesazo.com'
+);
+
+INSERT INTO viaje (
+    nombre,
+    zona_interes,
+    rango_interes_km,
+    fecha_inicio,
+    fecha_fin,
+    ritmo,
+    usuario
+)
+VALUES (
+    'Cultura y naturaleza en Córdoba',
+    'Ciudad de Córdoba y Sierras Chicas',
+    50,
+    CURRENT_DATE + 14,
+    CURRENT_DATE + 17,
+    'TRANQUILO',
+    'turista.demo@viajesazo.com'
+);
+
+INSERT INTO viaje (
+    nombre,
+    zona_interes,
+    rango_interes_km,
+    fecha_inicio,
+    fecha_fin,
+    ritmo,
+    usuario
+)
+VALUES (
+    'Aventura en el Valle de Punilla',
+    'Carlos Paz, Tanti y alrededores',
+    45,
+    CURRENT_DATE + 21,
+    CURRENT_DATE + 24,
+    'INTENSIVO',
+    'turista.aventura@viajesazo.com'
+);
+
+INSERT INTO viaje (
+    nombre,
+    zona_interes,
+    rango_interes_km,
+    fecha_inicio,
+    fecha_fin,
+    ritmo,
+    usuario
+)
+VALUES (
+    'Sabores y tradiciones de Córdoba',
+    'Alta Gracia y Valle de Paravachasca',
+    30,
+    CURRENT_DATE + 28,
+    CURRENT_DATE + 30,
+    'TRANQUILO',
+    'turista.gastronomico@viajesazo.com'
+);
+
+INSERT INTO viaje (
+    nombre,
+    zona_interes,
+    rango_interes_km,
+    fecha_inicio,
+    fecha_fin,
+    ritmo,
+    usuario
+)
+VALUES (
+    'Recorrido familiar por las sierras',
+    'La Cumbrecita y Villa General Belgrano',
+    40,
+    CURRENT_DATE + 35,
+    CURRENT_DATE + 38,
+    'EQUILIBRADO',
+    'familia.demo@viajesazo.com'
+);
