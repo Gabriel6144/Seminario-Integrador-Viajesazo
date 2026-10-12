@@ -33,7 +33,7 @@ import com.viajesazo.turismo_backend.dto.request.EventoRequest;
 import com.viajesazo.turismo_backend.dto.response.EventoResponse;
 import com.viajesazo.turismo_backend.exception.ResourceNotFoundException;
 import com.viajesazo.turismo_backend.exception.BusinessRuleException;
-import com.viajesazo.turismo_backend.model.Categoria;
+import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.service.EventoService;
 
 @WebMvcTest(EventoController.class)

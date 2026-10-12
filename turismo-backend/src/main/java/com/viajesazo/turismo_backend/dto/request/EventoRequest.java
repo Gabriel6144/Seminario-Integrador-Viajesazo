@@ -4,7 +4,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 
-import com.viajesazo.turismo_backend.model.Categoria;
+import com.viajesazo.turismo_backend.model.InteresCategoria;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
@@ -14,7 +14,7 @@ public record EventoRequest(
 		String nombre,
 
 		String descripcion,
-		Categoria categoria,
+		InteresCategoria categoria,
 		String localidad,
 		String direccion,
 

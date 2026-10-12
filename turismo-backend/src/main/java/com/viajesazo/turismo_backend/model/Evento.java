@@ -28,7 +28,7 @@ public class Evento {
 
 	@Enumerated(EnumType.STRING)
 	@Column(length = 32)
-	private Categoria categoria;
+	private InteresCategoria categoria;
 
 	@Column(length = 120)
 	private String localidad;

@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.viajesazo.turismo_backend.dto.request.ViajeRequest;
 import com.viajesazo.turismo_backend.exception.BusinessRuleException;
 import com.viajesazo.turismo_backend.exception.ResourceNotFoundException;
 import com.viajesazo.turismo_backend.model.Viaje;
@@ -19,7 +20,6 @@ import lombok.RequiredArgsConstructor;
 public class ViajeService {
 
 	private final ViajeRepository viajeRepository;
-
 	@Transactional
 	public Viaje create(Viaje viaje) {
 		validateRange(viaje);

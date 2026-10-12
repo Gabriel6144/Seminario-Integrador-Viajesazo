@@ -4,7 +4,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 
-import com.viajesazo.turismo_backend.model.Categoria;
+import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.model.Evento;
 import com.viajesazo.turismo_backend.model.Publicador;
 
@@ -12,7 +12,7 @@ public record EventoResponse(
 		Long id,
 		String nombre,
 		String descripcion,
-		Categoria categoria,
+		InteresCategoria categoria,
 		String localidad,
 		String direccion,
 		LocalDate fechaInicio,

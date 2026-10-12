@@ -29,7 +29,7 @@ import com.viajesazo.turismo_backend.dto.request.PublicadorRequest;
 import com.viajesazo.turismo_backend.dto.response.PublicadorResponse;
 import com.viajesazo.turismo_backend.exception.BusinessRuleException;
 import com.viajesazo.turismo_backend.exception.ResourceNotFoundException;
-import com.viajesazo.turismo_backend.model.Categoria;
+import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.service.EventoService;
 import com.viajesazo.turismo_backend.service.PublicadorService;
 

@@ -22,7 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.viajesazo.turismo_backend.config.AppConfig;
 import com.viajesazo.turismo_backend.dto.response.EventoResponse;
-import com.viajesazo.turismo_backend.model.Categoria;
+import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.service.EventoService;
 
 @WebMvcTest(AgendaController.class)
