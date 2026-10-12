@@ -1,9 +1,16 @@
 package com.viajesazo.turismo_backend.model;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.ArrayList;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.NoArgsConstructor;
+import lombok.Builder;
+
 
 @Entity
 @Builder
@@ -20,8 +27,12 @@ public class Viaje {
     @Column(nullable = false, length = 120)
     private String nombre;
 
+
     @Column (nullable = false, length = 180)
-    private String zonaInteres; 
+    private Ubicacion zonaHospedaje; 
+
+    @Column (nullable = false, length = 180)
+    private Ubicacion zonaInteres; 
 
     @Column(nullable = false)
     private double rangoInteresKm;
@@ -36,8 +47,19 @@ public class Viaje {
     @Column(length = 50)
     private TipoRitmo ritmo;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "estado_id")
+
+    @ElementCollection
+    @Enumerated(EnumType.STRING)
+    @CollectionTable(
+        name = "viaje_intereses_categoria",
+        joinColumns = @JoinColumn(name = "viaje_id")
+    )
+    @Column(name = "categoria", nullable = false, length = 50)
+    @Builder.Default
+    private List<InteresCategoria> interesesCategoria = new ArrayList<>();
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 50)
     private Estado estado;
 
     // Usuario entiendo lo vemos en el utlimo Sprint, por ahora diría dejarlo como String

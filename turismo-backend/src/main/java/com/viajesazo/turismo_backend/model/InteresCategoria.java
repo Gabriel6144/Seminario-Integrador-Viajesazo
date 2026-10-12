@@ -3,12 +3,15 @@ package com.viajesazo.turismo_backend.model;
 /**
  * Categorías de actividad sobre las que el usuario registra su nivel de interés.
  */
-public enum Categoria {
-
-	GASTRONOMIA,
-	FAMILIA,
-	CULTURA,
+public enum InteresCategoria {
 	NATURALEZA,
-	AVENTURA
+    GASTRONOMIA,
+    CULTURA,
+    HISTORIA,
+    AVENTURA,
+    VIDA_NOCTURNA,
+    MUSICA,
+    COMPRAS,
+    FAMILIAR_Y_RELAX
 
 }
