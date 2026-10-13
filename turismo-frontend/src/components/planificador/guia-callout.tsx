@@ -1,0 +1,21 @@
+import { GUIA_AVATAR } from './constants'
+
+interface GuiaCalloutProps {
+  message: string
+}
+
+export function GuiaCallout({ message }: GuiaCalloutProps) {
+  return (
+    <div className="mb-5 flex items-center gap-3.5 rounded-2xl border border-sky-100 bg-sky-50/70 p-4">
+      <img
+        alt="Guía de Córdoba"
+        className="h-11 w-11 flex-shrink-0 rounded-full border border-sky-200 object-cover"
+        src={GUIA_AVATAR}
+      />
+      <div>
+        <span className="block text-xs font-bold text-sky-800">Guía de Córdoba</span>
+        <p className="text-sm text-slate-600">{message}</p>
+      </div>
+    </div>
+  )
+}
