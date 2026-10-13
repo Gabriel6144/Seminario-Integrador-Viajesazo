@@ -85,6 +85,7 @@ export function EventoEditarPage() {
         cancelTo={`/eventos/${id}`}
         isPending={actualizar.isPending}
         serverError={serverError}
+        ubicacionInicial={{ latitud: actual.latitud, longitud: actual.longitud }}
         onSubmit={(values) => {
           setServerError(null)
           actualizar.mutate(

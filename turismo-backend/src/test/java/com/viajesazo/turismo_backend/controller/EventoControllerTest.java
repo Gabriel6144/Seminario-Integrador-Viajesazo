@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -33,7 +34,9 @@ import com.viajesazo.turismo_backend.dto.request.EventoRequest;
 import com.viajesazo.turismo_backend.dto.response.EventoResponse;
 import com.viajesazo.turismo_backend.exception.ResourceNotFoundException;
 import com.viajesazo.turismo_backend.exception.BusinessRuleException;
+import com.viajesazo.turismo_backend.model.EstadoPropuesta;
 import com.viajesazo.turismo_backend.model.InteresCategoria;
+import com.viajesazo.turismo_backend.model.TipoAcceso;
 import com.viajesazo.turismo_backend.service.EventoService;
 
 @WebMvcTest(EventoController.class)
@@ -47,8 +50,12 @@ class EventoControllerTest {
 			  "nombre": "Festival de Folklore",
 			  "descripcion": "Encuentro de syrigamis",
 			  "categoria": "CULTURA",
+			  "tipoAcceso": "DE_PAGO",
+			  "montoEstimado": 25000,
+			  "sitioOficial": "https://festivaldecosquin.com",
+			  "lugarRecinto": "Plaza Próspero Molina",
 			  "localidad": "Cosquín",
-			  "direccion": "Plaza Pringles",
+			  "direccion": "Av. San Martín 800, Cosquín",
 			  "fechaInicio": "2026-10-01",
 			  "fechaFin": "2026-10-03",
 			  "horarioInicio": "20:00:00",
@@ -258,7 +265,10 @@ class EventoControllerTest {
 
 	private EventoResponse response() {
 		return new EventoResponse(7L, "Festival de Folklore", "Encuentro de syrigamis", InteresCategoria.CULTURA,
-				"Cosquín", "Plaza Pringles", LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-03"),
+				TipoAcceso.DE_PAGO, EstadoPropuesta.INICIADO, new BigDecimal("25000"), null,
+				"https://festivaldecosquin.com", "Plaza Próspero Molina", "Cosquín", "Av. San Martín 800, Cosquín",
+				new BigDecimal("-31.41350000"), new BigDecimal("-64.49470000"),
+				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-03"),
 				LocalTime.of(20, 0), LocalTime.of(23, 30),
 				List.of("https://cdn.cordoba.gob.ar/folklore.jpg"), 1L, "Turismo Córdoba");
 	}

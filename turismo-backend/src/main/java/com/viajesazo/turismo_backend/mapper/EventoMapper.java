@@ -25,15 +25,24 @@ public interface EventoMapper {
 	 */
 	@Mapping(target = "id", ignore = true)
 	@Mapping(target = "publicador", ignore = true)
+	@Mapping(target = "tipoAcceso", ignore = true)
+	@Mapping(target = "estadoPropuesta", ignore = true)
+	@Mapping(target = "latitud", ignore = true)
+	@Mapping(target = "longitud", ignore = true)
 	@Mapping(target = "imagenes", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
 	Evento toEntity(EventoRequest request);
 
 	/**
 	 * Actualización sobre la entidad ya cargada, para no perder el {@code id} ni borrarla y
-	 * volver a guardarla. Mismas reglas que {@link #toEntity}.
+	 * volver a guardarla. Mismas reglas que {@link #toEntity}: {@code estadoPropuesta} se ignora
+	 * porque solo cambia por reglas de negocio, y las coordenadas las resuelve el service.
 	 */
 	@Mapping(target = "id", ignore = true)
 	@Mapping(target = "publicador", ignore = true)
+	@Mapping(target = "tipoAcceso", ignore = true)
+	@Mapping(target = "estadoPropuesta", ignore = true)
+	@Mapping(target = "latitud", ignore = true)
+	@Mapping(target = "longitud", ignore = true)
 	@Mapping(target = "imagenes", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
 	void updateEntity(EventoRequest request, @MappingTarget Evento evento);
 

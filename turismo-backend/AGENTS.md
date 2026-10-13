@@ -12,8 +12,9 @@ Tesis de facultad: API REST que centraliza la información turística de la prov
   en el mismo commit, y es lo normal: la API y el cliente se cambian juntos. El `.gitignore` de la
   raíz es el que manda.
 - Estado actual: Sprint 1 (gestión de eventos) y Sprint 2 (gestión de viajes) completos, con
-  **112 tests en verde**. Incluye paginación, CRUD de eventos, alta de publicadores, CRUD de
-  viajes con baja lógica, seed de datos y mapeo con MapStruct.
+  **134 tests en verde**. Incluye paginación, CRUD de eventos, alta de publicadores, CRUD de
+  viajes con baja lógica, seed de datos, mapeo con MapStruct, **geocodificación de la ubicación
+  del evento con OpenStreetMap (Nominatim)** y **subida de imágenes a disco con servido estático**.
   Pendientes: `Actividad`, `Itinerario`, `Usuario`, `Preferencia` y rutas/traslados.
 - Para probar los endpoints a mano ver **`PRUEBAS-MANUALES.md`**: levantar, curl de cada ruta,
   casos de error, el detalle de los acentos y los bordes conocidos sin cubrir.
@@ -77,11 +78,12 @@ Los nombres de starters cambiaron respecto a Boot 3:
   **No existe `spring-boot-starter-test`** en este proyecto.
 - Base de datos: `com.h2database:h2` con scope `runtime`. **No declarar `<version>`**: el BOM
   4.1.1 ya gestiona H2 (2.4.240), Hibernate (7.4.5), Flyway y los drivers.
-- Faltan y habrá que agregar explícitamente: `spring-boot-starter-security`,
-  `spring-boot-starter-restclient` y `spring-boot-starter-test` (solo si hacen falta
-  utilidades compartidas; hoy cada slice ya trae lo suyo).
+- Faltan y habrá que agregar explícitamente: `spring-boot-starter-security` y
+  `spring-boot-starter-test` (solo si hacen falta utilidades compartidas; hoy cada slice ya trae
+  lo suyo).
 - En Boot 4, `RestClient` **no** está en `spring-boot-starter-webmvc`: hace falta
-  `spring-boot-starter-restclient` para llamar a OSRM/Mapa desde el service.
+  `spring-boot-starter-restclient` para llamar a servicios externos. **Ya está agregado**, y lo
+  usa `GeocodingService` para pegarle a Nominatim.
 - Jackson 3 (`tools.jackson.core`), no Jackson 2. `spring-boot-starter-json` ahora es
   `spring-boot-starter-jackson`.
 
@@ -129,7 +131,8 @@ Consecuencias que hay que tener presentes:
 
 `src/main/resources/data.sql` siembra 3 publicadores, 8 eventos (cada uno con una imagen),
 5 ubicaciones y 5 viajes. Como `ddl-auto=create-drop` borra todo en cada arranque, sin el script
-la app levanta vacía.
+la app levanta vacía. Los eventos del seed traen `tipo_acceso`, `estado_propuesta` y
+`latitud`/`longitud` de ejemplo (ya calculadas, sin pasar por Nominatim en el arranque).
 
 Nota de Sprint 2: los viajes se siembran **después** de las ubicaciones, porque `zonaInteres` es
 una FK a `ubicacion`. Todos van con `estado='PLANIFICADO'` a propósito: VZ-22 lista con
@@ -180,9 +183,17 @@ de nombres").
   `data.sql` va el nombre de la constante en mayúsculas (`CULTURA`).
 - `Publicador` — **ya existe**: nombre, email (único), teléfono. Relación unidireccional
   `Evento → Publicador`; `Publicador` no tiene `List<Evento>` a propósito, se consulta por repositorio.
-- `Evento` — **ya existe**: nombre, descripción, categoría, localidad, dirección, fecha inicio/fin,
-  horario inicio/fin, `imagenes` como `@ElementCollection` de URLs (`LAZY`), y `publicador` (`LAZY`,
-  obligatorio). **No tiene latitud/longitud**: eso llega con el sprint de mapas.
+- `Evento` — **ya existe**: nombre, descripción, categoría, tipo de acceso (`TipoAcceso`),
+  estado de la propuesta (`EstadoPropuesta`), lugar/recinto, localidad, dirección, latitud/longitud
+  (`BigDecimal`, las calcula el backend), arancel (monto estimado, descripción y link al sitio
+  oficial, solo para eventos arancelados), fecha inicio/fin, horario inicio/fin, `imagenes` como
+  `@ElementCollection` de URLs (`LAZY`), y `publicador` (`LAZY`, obligatorio). Ver
+  "Geocodificación y acceso" más abajo.
+- `TipoAcceso` — **ya existe** (`model/TipoAcceso.java`): `GRATUITO`, `DE_PAGO`. Persiste como
+  `STRING`. `Evento.tipoAcceso` tiene default `GRATUITO`.
+- `EstadoPropuesta` — **ya existe** (`model/EstadoPropuesta.java`): `INICIADO`, `REPROGRAMADO`,
+  `CANCELADO`, `FINALIZADO`. Persiste como `STRING` con default `INICIADO`. **No lo manda el
+  cliente**: lo setea `EventoService` al registrar y solo cambia por reglas de negocio (a definir).
 - `Ubicacion` — **ya existe** (`model/Ubicacion.java`): `ciudad`, `localidad`, `latitud`/`longitud`
   (`BigDecimal` con `precision`/`scale`). Es la zona de interés del viaje.
 - `Viaje` — **ya existe** (`model/Viaje.java`): `nombre`, `zonaInteres` (`@ManyToOne` a `Ubicacion`
@@ -332,6 +343,9 @@ devolver; si el mapeo se hiciera afuera, cualquier acceso a una relación `LAZY`
 | `handleDataIntegrityViolation` | 400 | violación de unicidad que llega de la base (email duplicado) |
 | `handleMissingParameter` | 400 | falta un query param obligatorio (`GET /api/viajes` sin `usuario`) |
 | `handleTypeMismatch` | 400 | path variable o query param con el tipo equivocado (`/api/viajes/abc`) |
+| `handleMaxUploadSize` | 400 | la imagen subida supera los 5 MB (`MaxUploadSizeExceededException`) |
+| `handleMissingPart` | 400 | falta la parte `archivo` en el multipart (`MissingServletRequestPartException`) |
+| `handleMissingResource` | 404 | imagen/estático inexistente bajo `app.imagenes.url-base` (`NoResourceFoundException`) |
 | `handleUnexpectedError` | 500 | catch-all; **no filtra el mensaje al cliente** |
 
 Tres detalles a no romper:
@@ -344,22 +358,96 @@ Tres detalles a no romper:
   y el valor que chocó,   y eso es un mapa de la base para cualquiera que podría llamar al alta.
 - El `Clock` llega por inyección (`AppConfig.clock()`), no por `LocalDateTime.now()`. Los tests de
   la semana ISO fijan el reloj y así no dependen del día en que corren. Por el mismo motivo, los
-  cuatro `@WebMvcTest` (`EventoControllerTest`, `PublicadorControllerTest`, `AgendaControllerTest`
-  y `ViajeControllerTest`) hacen `@Import(AppConfig.class)`: un slice no carga los beans de
-  `config/` y sin ese import el `Clock` no existiría.
+  `@WebMvcTest` (`EventoControllerTest`, `PublicadorControllerTest`, `AgendaControllerTest`,
+  `ViajeControllerTest`, `ImagenControllerTest` y `ImagenServingTest`) hacen
+  `@Import(AppConfig.class)`: un slice no carga los beans de `config/` y sin ese import el `Clock`
+  no existiría.
 
 Dos handlers del Sprint 2 evitan un 500 en casos de borde de la API de viajes:
 `handleMissingParameter` (`GET /api/viajes` sin `?usuario` → 400) y `handleTypeMismatch`
 (`GET /api/viajes/abc` con id no numérico → 400).
 
-## Servicios externos: decisión pendiente
+## Imágenes de eventos (subida a disco + servido estático)
 
-No hay nada cableado para mapas ni ruteo, y el repo **no tiene dónde colocar claves de API**
-(sin variables de entorno, sin `.env`, sin profiles de configuración).
+`Evento.imagenes` sigue siendo un `@ElementCollection` de URLs: **no se tocó la entidad, ni el
+`EventoRequest/Response`, ni el mapper**. Lo que cambió es cómo el publicador puebla esos strings:
+además de pegar una URL externa, ahora puede **subir un archivo**, que queda en disco y se sirve
+como estático. Flujo: subida **previa** (`POST /api/imagenes` devuelve `{ "url": ... }`) y luego se
+crea el evento con esa URL, igual que con las externas.
 
-Antes de implementar "distancia entre puntos", "duración estimada de traslado" y "visualizar
-itinerario sobre un mapa", hay que decidir entre un servicio con clave (Mapbox, Google Maps) y
-uno sin clave (OpenStreetMap + OSRM). **No hardcodear claves en `application.properties`.**
+| Método | Ruta | Qué hace |
+| --- | --- | --- |
+| POST | `/api/imagenes` | multipart, parte `archivo`; guarda y devuelve **201** `{ "url": "/api/archivos/<uuid>.<ext>" }` |
+| GET | `/api/archivos/**` | sirve el archivo subido como estático (lo registra `WebConfig`) |
+| DELETE | `/api/imagenes/{nombre}` | borra un archivo; **204** |
+
+Piezas: `ImagenService` (`guardar`/`borrar`, valida **magic bytes** de JPEG/PNG/GIF/WEBP, tope
+`MAX_BYTES = 5 MB`, nombre UUID y anti *path traversal*), `ImagenResponse` (`{url}`),
+`ImagenController` y `WebConfig`. Config en `application.properties`: `app.imagenes.dir=./data/imagenes`
+(carpeta en disco, **no versionada**: el `.gitignore` de la raíz ignora `data/`) y
+`app.imagenes.url-base`, más `spring.servlet.multipart.max-file-size=5MB` / `max-request-size=6MB`.
+
+Decisiones y trampas a no repetir:
+
+- **El prefijo de servido (`app.imagenes.url-base`) NO puede solaparse con el del controller.**
+  El default es `/api/archivos`, distinto de `/api/imagenes`. Con el prefijo viejo (`/api/imagenes`),
+  un `GET /api/imagenes/{archivo}` hacía match con el `@DeleteMapping("/{nombre}")` y Spring lanzaba
+  una excepción de método no soportado **antes** de llegar al resource handler (y como el catch-all
+  la convertía en 500, la imagen subida no se veía nunca). Si se cambia `url-base`, verificar que
+  ningún controller mapee ese prefijo. Lo cubre `ImagenServingTest`.
+- **El servido cuelga de `/api` a propósito**: así lo reenvía el proxy de Vite y el navegador lo ve
+  *same-origin*, sin CORS. No moverlo a `/uploads` u otra ruta fuera de `/api` sin resolver el proxy.
+- **`handleMissingResource` es necesario** porque el resource handler lanza `NoResourceFoundException`
+  para archivos inexistentes (una URL vieja en la base): sin ese handler el catch-all respondería 500
+  en lugar de 404.
+- **El alcance de borrado es el archivo suelto**, no las URLs guardadas en eventos: un evento que
+  referencie un archivo borrado simplemente muestra el placeholder en el frontend.
+- **Limitación conocida**: con `ddl-auto=create-drop` la base se vacía en cada arranque pero
+  `data/imagenes/` no, así que los archivos subidos quedan **huérfanos**. Si molesta, migrar a
+  `jdbc:h2:file:./data/turismo` + `ddl-auto=update`, o barrer huérfanos al arrancar.
+- La subida es **previa** al `POST /api/eventos`: si el evento no se llega a crear, el archivo ya
+  subido queda en disco (sin limpieza automática). Es una simplificación aceptada.
+
+## Geocodificación y acceso (OpenStreetMap)
+
+La ubicación del evento se resuelve **en el backend** con **Nominatim** (el geocoder de
+OpenStreetMap), que **no requiere clave de API**.
+
+- `GeocodingConfig` arma un bean `RestClient` (`nominatimRestClient`) con la base URL y el header
+  `User-Agent`. `GeocodingService.geocode(lugarRecinto, localidad, direccion)` arma una query
+  (`"lugar, dirección, localidad, Córdoba, Argentina"`) y devuelve `Optional<Coordenadas>`
+  (`latitud`/`longitud` como `BigDecimal`).
+- **La query se deduplica** (`GeocodingService.buildQuery`): se descartan los campos vacíos y los
+  que repiten a otro (sin distinguir mayúsculas, en cualquier sentido). El cliente suele mandar la
+  misma localidad en los tres campos —o el `display_name` entero de Nominatim en `direccion`— y
+  una query con el término repetido devuelve `[]` en el buscador free-form. Con el dedup, `"
+  Villa Carlos Paz"` en los tres campos colapsa a `"Villa Carlos Paz, Córdoba, Argentina"`.
+  Cubierto por `GeocodingServiceTest` (unit test del armado, sin red).
+- **Nominatim exige un `User-Agent` identificable** (política de uso). Va en
+  `application.properties`: `geocoding.nominatim.base-url` y `geocoding.nominatim.user-agent`. Si
+  se cambia el servicio, primero mirar su política de uso (límite ~1 request/segundo).
+- **Tolerante a fallos de red**: un error de conexión devuelve `Optional.empty()`; un fallo del
+  query es lo mismo que "no encontrado". La red no debe tirar un 500.
+- `EventoService.applyUbicacion` corre en `create` y `update`: si geocodifica, guarda
+  `latitud`/`longitud` en el `Evento`; si no encuentra la dirección, lanza
+  `BusinessRuleException` → **400** y **el evento no se guarda**. Es una decisión explícita: un
+  evento sin ubicación no sirve para el mapa.
+- `EventoRequest` exige `lugarRecinto`, `localidad` y `direccion` (`@NotBlank`): son la entrada
+  del geocoding.
+- En `update`, si no se pudo geocodificar, la transacción revienta antes de tocar la entidad, así
+  que las coordenadas viejas quedan intactas.
+
+Reglas de arancel (`EventoService.validateAcceso`): un evento `DE_PAGO` **exige** `montoEstimado`
+(`@PositiveOrZero`) y `sitioOficial` (`@Pattern` de URL `http(s)`); la `descripcionArancel` es
+opcional. Un `GRATUITO` ignora los tres campos. El estado (`EstadoPropuesta`) y el tipo de acceso
+por defecto los fija el service, no el JSON.
+
+## Ruteo / distancias: decisión pendiente
+
+`GeocodingService` cubre el "dónde queda" del evento. **Todavía no hay nada para calcular
+distancias ni duración de traslados** ("distancia entre puntos", "tiempo de viaje"). Cuando toque,
+la opción natural es **OSRM** (sin clave, sobre OpenStreetMap), en línea con la decisión de
+Nominatim. **No hardcodear claves en `application.properties`.**
 
 ## Tests: imports distintos a los de Boot 3
 
@@ -374,11 +462,11 @@ Las anotaciones de test **cambiaron de package**. Importar desde el package viej
 `@MockBean` ya no existe. Para tests unitarios con Mockito alcanza con
 `@ExtendWith(MockitoExtension.class)` + `@Mock`, sin contexto de Spring.
 
-Reparto actual (112 tests):
+Reparto actual (134 tests):
 
 | Archivo | Tests | Cubre |
 | --- | --- | --- |
-| `EventoServiceTest` | 18 | US1–US5, US7, reglas de negocio |
+| `EventoServiceTest` | 23 | US1–US5, US7, reglas de negocio, arancel, estado, geocoding |
 | `EventoRepositoryTest` | 16 | solapamiento, bordes, orden, paginación, filtro por publicador, listado completo |
 | `EventoControllerTest` | 15 | US1–US4, US7, errores 400/404, cuerpo inválido |
 | `ViajeControllerTest` | 14 | VZ-19/VZ-21/VZ-22/VZ-23, 400/404, `?usuario` obligatorio |
@@ -386,9 +474,13 @@ Reparto actual (112 tests):
 | `AgendaSemanalTest` | 7 | límites de la semana ISO, paginación |
 | `PublicadorServiceTest` | 7 | alta, consulta, 404, US7, **pre-chequeo de email** |
 | `ViajeServiceTest` | 7 | VZ-19–VZ-23, baja lógica, fecha invertida, 404 |
+| `ImagenServiceTest` | 6 | **guardar/borrar, magic bytes, tope 5 MB, anti path traversal (`@TempDir`)** |
+| `GeocodingServiceTest` | 5 | **dedup de la query de Nominatim, campos vacíos, provincia** |
 | `ViajeMapperTest` | 4 | mapeo entidad↔DTO, fechas `LocalDate`↔`LocalDateTime` |
 | `ViajeRepositoryTest` | 4 | activos por usuario, exclusión de cancelados, orden |
+| `ImagenControllerTest` | 4 | **POST/DELETE de `/api/imagenes`, parte faltante y archivo vacío → 400** |
 | `AgendaControllerTest` | 4 | forma del JSON paginado, `?page`/`?size`, tope de `size` |
+| `ImagenServingTest` | 2 | **sirve la imagen subida bajo `/api/archivos`; inexistente → 404** |
 | `PublicadorRepositoryTest` | 5 | orden alfabético, paginación, página vacía, **derived query + constraint de unicidad** |
 | `TurismoBackendApplicationTests` | 1 | `contextLoads` |
 
@@ -430,5 +522,5 @@ granular, no exponer entidades) coincide con lo que ya hace el código.
   (`í` = `0xC3 0xAD`; doblemente codificado sería `0xC3 0x83 0xC2 0xAD`). La consola de
   PowerShell tampoco renderiza acentos: un `?` en la salida no implica que el dato esté mal.
 - Commits con [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `chore:`, `docs:`.
-- El repositorio **todavía no es un repositorio git**: hay que hacer `git init` antes de poder
-  commitear.
+- El repositorio **es un repo git único** con los dos proyectos como subcarpetas; se commitea
+  desde la raíz, con el `.gitignore` de la raíz.

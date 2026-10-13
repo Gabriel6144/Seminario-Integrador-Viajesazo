@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { EventoEditarPage } from './evento-editar-page'
-import { COSQUIN, FOLKLORE, TURISMO } from '@/test/fixtures'
+import { COSQUIN, FOLKLORE, GASTRONOMIA_ESTANCIA, TURISMO } from '@/test/fixtures'
 import { findEvento, resetStore } from '@/test/store'
 import { user, renderRoute } from '@/test/utils'
 
@@ -142,5 +142,24 @@ describe('EventoEditarPage', () => {
     expect(await screen.findByRole('combobox', { name: 'Publicador' })).toHaveTextContent(
       TURISMO.nombre,
     )
+  })
+
+  it('precarga el arancel de un evento arancelado y lo limpia al pasar a gratuito', async () => {
+    renderEdicion('3')
+    await esperarFormulario()
+
+    expect(screen.getByLabelText('Monto estimado')).toHaveValue(GASTRONOMIA_ESTANCIA.montoEstimado)
+    expect(screen.getByLabelText('Sitio oficial de la boletería o entradas')).toHaveValue(
+      GASTRONOMIA_ESTANCIA.sitioOficial,
+    )
+
+    await user().click(screen.getByRole('combobox', { name: 'Tipo de acceso' }))
+    await user().click(await screen.findByRole('option', { name: 'Gratuito' }))
+    await user().click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    await waitFor(() => expect(findEvento(3)?.tipoAcceso).toBe('GRATUITO'))
+    // Al dejar de ser arancelado, el monto y el link no pueden quedar colgados en la base.
+    expect(findEvento(3)?.montoEstimado).toBeNull()
+    expect(findEvento(3)?.sitioOficial).toBeNull()
   })
 })

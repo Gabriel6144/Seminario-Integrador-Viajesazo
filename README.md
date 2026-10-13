@@ -52,8 +52,8 @@ que poner un proxy inverso delante o habilitar CORS en el backend.
 
 | | Comando | Qué corre |
 | --- | --- | --- |
-| Backend | `.\mvnw.cmd clean test` | 112 tests (JUnit 5, Mockito, `@WebMvcTest`, `@DataJpaTest`) |
-| Frontend | `npm test` | 120 tests (Vitest, Testing Library, MSW) |
+| Backend | `.\mvnw.cmd clean test` | 117 tests (JUnit 5, Mockito, `@WebMvcTest`, `@DataJpaTest`) |
+| Frontend | `npm test` | 140 tests (Vitest, Testing Library, MSW) |
 | Frontend | `npm run typecheck` | TypeScript sin emitir |
 | Frontend | `npm run lint` | oxlint |
 | Frontend | `npm run build` | typecheck + build de producción |
@@ -75,6 +75,10 @@ defaults de Spring Data en vez de la configuración del proyecto.
 - [`turismo-frontend/AGENTS.md`](./turismo-frontend/AGENTS.md) — la forma de la `Page`
   anidada, el manejo de fechas y `LocalTime`, los formularios y las convenciones de shadcn.
 - [`turismo-frontend/README.md`](./turismo-frontend/README.md) — detalle del cliente web.
+- [`docs/SPRINT-1.md`](./docs/SPRINT-1.md) — as-built del Sprint 1: endpoints, modelo y las
+  decisiones de eventos/publicadores con su justificación.
+- [`docs/OPENSTREETMAP.md`](./docs/OPENSTREETMAP.md) — cómo se resuelven las coordenadas con
+  Nominatim: búsqueda, reverse, dedup de la query y el caso real del 400.
 
 ## Estado y limitaciones conocidas
 

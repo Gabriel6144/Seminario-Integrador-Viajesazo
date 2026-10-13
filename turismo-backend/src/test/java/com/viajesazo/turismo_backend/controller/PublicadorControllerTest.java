@@ -120,7 +120,8 @@ class PublicadorControllerTest {
 	void returnsPublisherEvents() throws Exception {
 		when(eventoService.findByPublicadorId(eq(1L), any(Pageable.class))).thenReturn(
 				new PageImpl<>(List.of(new EventoResponse(7L, "Festival de Folklore", null, InteresCategoria.CULTURA,
-						"Cosquín", null, LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-03"),
+						null, null, null, null, null, null, "Cosquín", null, null, null,
+						LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-03"),
 						null, null, List.of(), 1L, "Turismo Córdoba")), PageRequest.of(0, 20), 1));
 
 		mockMvc.perform(get("/api/publicadores/1/eventos"))

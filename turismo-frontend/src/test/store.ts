@@ -69,11 +69,19 @@ export function updateEvento(id: number, request: EventoRequest): EventoResponse
   const evento = findEvento(id)
   if (evento === undefined) return undefined
 
+  const esDePago = request.tipoAcceso === 'DE_PAGO'
   const actualizado: EventoResponse = {
     ...evento,
     nombre: request.nombre,
     descripcion: request.descripcion,
     categoria: request.categoria,
+    tipoAcceso: request.tipoAcceso ?? evento.tipoAcceso,
+    // El backend calcula las coordenadas al guardar: un mock no las geocodifica y las conserva
+    // como están. El arancel solo tiene sentido para un evento arancelado.
+    montoEstimado: esDePago ? request.montoEstimado : null,
+    descripcionArancel: esDePago ? request.descripcionArancel : null,
+    sitioOficial: esDePago ? request.sitioOficial : null,
+    lugarRecinto: request.lugarRecinto,
     localidad: request.localidad,
     direccion: request.direccion,
     fechaInicio: request.fechaInicio,
@@ -90,13 +98,24 @@ export function updateEvento(id: number, request: EventoRequest): EventoResponse
 }
 
 export function createEvento(request: EventoRequest): EventoResponse {
+  const esDePago = request.tipoAcceso === 'DE_PAGO'
   const created: EventoResponse = {
     id: nextEventoId++,
     nombre: request.nombre,
     descripcion: request.descripcion,
     categoria: request.categoria,
+    tipoAcceso: request.tipoAcceso ?? 'GRATUITO',
+    // Igual que el backend real: el estado es una regla de negocio, no algo que manda el usuario.
+    estadoPropuesta: 'INICIADO',
+    montoEstimado: esDePago ? request.montoEstimado : null,
+    descripcionArancel: esDePago ? request.descripcionArancel : null,
+    sitioOficial: esDePago ? request.sitioOficial : null,
+    lugarRecinto: request.lugarRecinto,
     localidad: request.localidad,
     direccion: request.direccion,
+    // El mock no geocodifica: las coordenadas las pone el servidor con Nominatim.
+    latitud: null,
+    longitud: null,
     fechaInicio: request.fechaInicio,
     fechaFin: request.fechaFin,
     horarioInicio: request.horarioInicio,

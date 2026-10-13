@@ -1,7 +1,10 @@
 import {
   ArrowLeftIcon,
+  Building2Icon,
   CalendarDaysIcon,
+  CircleDollarSignIcon,
   ClockIcon,
+  ExternalLinkIcon,
   LandmarkIcon,
   MapPinIcon,
 } from 'lucide-react'
@@ -11,6 +14,7 @@ import { useEvento } from '@/api/eventos'
 import { CategoriaBadge } from '@/components/categoria-badge'
 import { EventoActions } from '@/components/evento-actions'
 import { EventoImagen } from '@/components/evento-imagen'
+import { EventoMapa } from '@/components/evento-mapa'
 import { ErrorState } from '@/components/query-state'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -25,6 +29,7 @@ import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDateRange, formatLocalDate, formatTimeRange } from '@/lib/dates'
 import { parseId } from '@/lib/parse-id'
+import { TIPO_ACCESO_LABELS, ESTADO_PROPUESTA_LABELS, type EstadoPropuesta } from '@/types/api'
 
 /** Detalle de un evento — `GET /api/eventos/{id}`. */
 export function EventoDetailPage() {
@@ -49,6 +54,8 @@ export function EventoDetailPage() {
   const evento = query.data
   const horario = formatTimeRange(evento.horarioInicio, evento.horarioFin)
   const imagen = evento.imagenes[0]
+  const esDePago = evento.tipoAcceso === 'DE_PAGO'
+  const tieneMapa = evento.latitud !== null && evento.longitud !== null
 
   return (
     <div className="flex flex-col gap-6">
@@ -66,13 +73,16 @@ export function EventoDetailPage() {
 
           {/* Badges flotantes */}
           <div className="absolute left-3 right-3 top-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
               <span className="rounded-full bg-white/95 px-3 py-1 text-xs font-bold text-[#7a5900] shadow-sm backdrop-blur-md">
                 {evento.categoria ? (
                   <CategoriaBadge categoria={evento.categoria} />
                 ) : (
                   'Sin categoría'
                 )}
+              </span>
+              <span className="rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-[#00658d] shadow-sm backdrop-blur-md">
+                {TIPO_ACCESO_LABELS[evento.tipoAcceso ?? 'GRATUITO']}
               </span>
             </div>
             <span className="rounded-full bg-[#eaf6fc] px-3 py-1 text-xs font-semibold text-[#00658d] shadow-sm backdrop-blur-md">
@@ -154,14 +164,65 @@ export function EventoDetailPage() {
               </div>
             )}
 
-            {evento.direccion !== null && (
+            {evento.lugarRecinto !== null && (
               <div className="flex items-center gap-2">
                 <LandmarkIcon className="h-4 w-4 text-[#3f484e]" aria-hidden />
+                <dt className="sr-only">Lugar o recinto</dt>
+                <dd className="text-[#3f484e]">{evento.lugarRecinto}</dd>
+              </div>
+            )}
+
+            {evento.direccion !== null && (
+              <div className="flex items-center gap-2">
+                <Building2Icon className="h-4 w-4 text-[#3f484e]" aria-hidden />
                 <dt className="sr-only">Dirección</dt>
                 <dd className="text-[#3f484e]">{evento.direccion}</dd>
               </div>
             )}
+
+            {esDePago && (
+              <div className="flex items-start gap-2">
+                <CircleDollarSignIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#1e7d32]" aria-hidden />
+                <div className="flex flex-col gap-0.5">
+                  <dt className="sr-only">Arancel</dt>
+                  <dd className="text-[#3f484e]">
+                    <span className="font-semibold text-[#1e7d32]">
+                      {formatArancel(evento.montoEstimado)}
+                    </span>
+                    {evento.descripcionArancel !== null && (
+                      <span> · {evento.descripcionArancel}</span>
+                    )}
+                  </dd>
+                  {evento.sitioOficial !== null && (
+                    <dd>
+                      <a
+                        href={evento.sitioOficial}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-[#00658d] underline-offset-4 hover:underline"
+                      >
+                        Sitio oficial de entradas
+                        <ExternalLinkIcon className="h-3.5 w-3.5" aria-hidden />
+                      </a>
+                    </dd>
+                  )}
+                </div>
+              </div>
+            )}
           </dl>
+
+          {tieneMapa && (
+            <div className="flex flex-col gap-1.5">
+              <h3 className="font-heading text-lg font-bold text-[#191c1e]">¿Dónde se hace?</h3>
+              <EventoMapa
+                nombre={evento.nombre}
+                lugar={evento.lugarRecinto ?? evento.direccion ?? evento.localidad ?? evento.nombre}
+                localidad={evento.localidad}
+                latitud={evento.latitud as number}
+                longitud={evento.longitud as number}
+              />
+            </div>
+          )}
 
           {evento.descripcion !== null && (
             <>
@@ -190,7 +251,8 @@ export function EventoDetailPage() {
 
         <CardFooter className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sm text-[#3f484e]">
-            {formatLocalDate(evento.fechaInicio)} · evento #{evento.id}
+            {formatLocalDate(evento.fechaInicio)} · evento #{evento.id} ·{' '}
+            {estadoLabel(evento.estadoPropuesta)}
           </span>
           <EventoActions
             id={evento.id}
@@ -214,6 +276,17 @@ function Volver() {
       </Link>
     </Button>
   )
+}
+
+/** `1500` → `$ 1.500,00`. El backend garantiza que no es null cuando el evento es arancelado. */
+function formatArancel(monto: number | null): string {
+  if (monto === null) return 'Arancelado'
+  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(monto)
+}
+
+/** `null` (evento viejo o sin estado) cae en el label de `INICIADO` para no mostrar nada raro. */
+function estadoLabel(estado: EstadoPropuesta | null): string {
+  return ESTADO_PROPUESTA_LABELS[estado ?? 'INICIADO']
 }
 
 function IdInvalido() {

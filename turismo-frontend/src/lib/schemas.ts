@@ -1,6 +1,13 @@
 import { z } from 'zod'
 
-import { CATEGORIAS, type Categoria, type EventoRequest, type PublicadorRequest } from '@/types/api'
+import {
+  CATEGORIAS,
+  TIPOS_ACCESO,
+  type Categoria,
+  type EventoRequest,
+  type PublicadorRequest,
+  type TipoAcceso,
+} from '@/types/api'
 
 /**
  * Schemas de validación de los formularios.
@@ -97,13 +104,45 @@ const imagenSchema = z.object({
   url: z.string().trim().min(1, 'Ingresá la URL o quitá la fila.'),
 })
 
+/**
+ * `tipoAcceso` es `''` mientras no se eligió nada en el `<Select>` (como `categoria`). El adapter
+ * lo traduce a `null`, y el backend aplica su default `GRATUITO`.
+ */
+const tipoAccesoSchema = z.union([
+  z.literal(''),
+  z.enum(TIPOS_ACCESO, { message: 'el tipo de acceso no es válido' }),
+])
+
+/** Decimal con hasta dos decimales. El vacío es válido acá; la obligatoriedad se exige si es `DE_PAGO`. */
+const montoEstimadoSchema = z
+  .string()
+  .trim()
+  .refine(
+    (value) => value.length === 0 || /^\d+(\.\d{1,2})?$/.test(value),
+    'el monto estimado no tiene un formato válido',
+  )
+
+/** `http(s)://...`, el mismo `@Pattern` del `EventoRequest`. Vacío se valida como obligatorio si es `DE_PAGO`. */
+const sitioOficialSchema = z
+  .string()
+  .trim()
+  .refine(
+    (value) => value.length === 0 || /^https?:\/\/.+/.test(value),
+    'el link al sitio oficial debe ser una URL http(s)',
+  )
+
 export const eventoSchema = z
   .object({
     nombre: z.string().trim().min(1, 'el nombre es obligatorio'),
     descripcion: z.string(),
     categoria: categoriaSchema,
-    localidad: z.string(),
-    direccion: z.string(),
+    tipoAcceso: tipoAccesoSchema,
+    montoEstimado: montoEstimadoSchema,
+    descripcionArancel: z.string(),
+    sitioOficial: sitioOficialSchema,
+    lugarRecinto: z.string().trim().min(1, 'el lugar o recinto es obligatorio'),
+    localidad: z.string().trim().min(1, 'la ciudad es obligatoria'),
+    direccion: z.string().trim().min(1, 'la dirección exacta es obligatoria'),
     fechaInicio: z
       .string()
       .trim()
@@ -139,6 +178,28 @@ export const eventoSchema = z
       path: ['horarioFin'],
     },
   )
+  /**
+   * Un evento arancelado sin monto ni link no es una propuesta válida: el backend lo rechaza en
+   * `EventoService.validateAcceso`. Se replica acá para que el usuario lo sepa antes de mandar.
+   */
+  .superRefine((values, ctx) => {
+    if (values.tipoAcceso !== 'DE_PAGO') return
+
+    if (values.montoEstimado.trim().length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'el monto estimado es obligatorio para un evento arancelado',
+        path: ['montoEstimado'],
+      })
+    }
+    if (values.sitioOficial.trim().length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'el link al sitio oficial es obligatorio para un evento arancelado',
+        path: ['sitioOficial'],
+      })
+    }
+  })
 
 export type EventoFormValues = z.infer<typeof eventoSchema>
 
@@ -152,12 +213,21 @@ export type EventoFormValues = z.infer<typeof eventoSchema>
  * así que una lista vacía terminaría **sin** borrar las imágenes que ya tenía el evento.
  */
 export function toEventoRequest(values: EventoFormValues): EventoRequest {
+  const esDePago = values.tipoAcceso === 'DE_PAGO'
+
   return {
     nombre: values.nombre.trim(),
     descripcion: blankToNull(values.descripcion),
     categoria: values.categoria === '' ? null : (values.categoria as Categoria),
-    localidad: blankToNull(values.localidad),
-    direccion: blankToNull(values.direccion),
+    tipoAcceso: values.tipoAcceso === '' ? null : (values.tipoAcceso as TipoAcceso),
+    // Los campos de arancel solo viajan si el evento es arancelado: si el usuario cambia a
+    // "Gratuito", se limpian para no dejar un monto colgado en la base.
+    montoEstimado: esDePago ? Number(values.montoEstimado.trim()) : null,
+    descripcionArancel: esDePago ? blankToNull(values.descripcionArancel) : null,
+    sitioOficial: esDePago ? blankToNull(values.sitioOficial) : null,
+    lugarRecinto: values.lugarRecinto.trim(),
+    localidad: values.localidad.trim(),
+    direccion: values.direccion.trim(),
     fechaInicio: values.fechaInicio.trim(),
     fechaFin: values.fechaFin.trim(),
     horarioInicio: blankToNull(values.horarioInicio),
@@ -172,6 +242,11 @@ export const EVENTO_FORM_DEFAULT: EventoFormValues = {
   nombre: '',
   descripcion: '',
   categoria: '',
+  tipoAcceso: 'GRATUITO',
+  montoEstimado: '',
+  descripcionArancel: '',
+  sitioOficial: '',
+  lugarRecinto: '',
   localidad: '',
   direccion: '',
   fechaInicio: '',
@@ -195,6 +270,11 @@ export function toEventoFormValues(evento: {
   nombre: string
   descripcion: string | null
   categoria: Categoria | null
+  tipoAcceso: TipoAcceso | null
+  montoEstimado: number | null
+  descripcionArancel: string | null
+  sitioOficial: string | null
+  lugarRecinto: string | null
   localidad: string | null
   direccion: string | null
   fechaInicio: string
@@ -208,6 +288,12 @@ export function toEventoFormValues(evento: {
     nombre: evento.nombre,
     descripcion: evento.descripcion ?? '',
     categoria: evento.categoria ?? '',
+    tipoAcceso: evento.tipoAcceso ?? 'GRATUITO',
+    // El backend serializa `BigDecimal` como número (`1500.00`); el input necesita string.
+    montoEstimado: evento.montoEstimado === null ? '' : String(evento.montoEstimado),
+    descripcionArancel: evento.descripcionArancel ?? '',
+    sitioOficial: evento.sitioOficial ?? '',
+    lugarRecinto: evento.lugarRecinto ?? '',
     localidad: evento.localidad ?? '',
     direccion: evento.direccion ?? '',
     fechaInicio: evento.fechaInicio,

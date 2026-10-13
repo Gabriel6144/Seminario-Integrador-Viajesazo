@@ -39,8 +39,19 @@ export const FOLKLORE: EventoResponse = {
   descripcion:
     'La mayor fiesta de la tradición gaucha y música folklórica en el norte cordobés, con destacados artistas nacionales y destrezas criollas.',
   categoria: 'CULTURA',
+  tipoAcceso: 'GRATUITO',
+  estadoPropuesta: 'INICIADO',
+  montoEstimado: null,
+  descripcionArancel: null,
+  sitioOficial: null,
+  lugarRecinto: 'Anfiteatro José Hernández',
   localidad: 'Jesús María',
-  direccion: 'Anfiteatro José Hernández',
+  direccion: 'Av. San Martín 100',
+  // Las coordenadas son aproximadas, como las que devuelve Nominatim: el mapa las usa para
+  // centrarse. El detalle lo testea con el componente de mapa mockeado para no arrastrar Leaflet
+  // a jsdom.
+  latitud: -30.9816,
+  longitud: -64.0959,
   fechaInicio: '2026-10-01',
   fechaFin: '2026-10-04',
   horarioInicio: '20:00:00',
@@ -56,8 +67,16 @@ export const ARTESANIAS: EventoResponse = {
   descripcion:
     'Sabores típicos, cocina criolla y cata de vinos regionales en el corazón de las Sierras Chicas.',
   categoria: 'GASTRONOMIA',
+  tipoAcceso: 'GRATUITO',
+  estadoPropuesta: 'INICIADO',
+  montoEstimado: null,
+  descripcionArancel: null,
+  sitioOficial: null,
+  lugarRecinto: 'Plaza Central',
   localidad: 'Río Ceballos',
   direccion: 'Plaza Central',
+  latitud: -31.1651,
+  longitud: -64.3195,
   fechaInicio: '2026-10-03',
   fechaFin: '2026-10-06',
   // Jackson 3 manda `LocalTime` siempre con segundos: el seed tiene '10:00' y la API responde
@@ -75,8 +94,17 @@ export const GASTRONOMIA_ESTANCIA: EventoResponse = {
   descripcion:
     'Recorrido patrimonial guiado por templos, claustros y museos fundacionales de la Manzana Jesuítica.',
   categoria: 'CULTURA',
+  // Arancelado a propósito: es el único fixture que ejercita el bloque de arancel del detalle.
+  tipoAcceso: 'DE_PAGO',
+  estadoPropuesta: 'INICIADO',
+  montoEstimado: 1500,
+  descripcionArancel: 'Entrada general. Menores de 12 años sin cargo.',
+  sitioOficial: 'https://entradas.cordoba.gob.ar/circuito-peatonal',
+  lugarRecinto: 'Manzana Jesuítica',
   localidad: 'Córdoba Capital',
-  direccion: 'Manzana Jesuítica',
+  direccion: 'Av. Vélez Sarsfield 264',
+  latitud: -31.4173,
+  longitud: -64.1835,
   fechaInicio: '2026-10-05',
   fechaFin: '2026-10-05',
   horarioInicio: '12:30:00',
@@ -93,8 +121,17 @@ export const SIN_CATEGORIA: EventoResponse = {
   descripcion: null,
   // El campo es nullable en el backend: la tarjeta tiene que tolerarlo y no mostrar badge.
   categoria: null,
+  tipoAcceso: 'GRATUITO',
+  estadoPropuesta: 'INICIADO',
+  montoEstimado: null,
+  descripcionArancel: null,
+  sitioOficial: null,
+  // Sin coordenadas a propósito: el detalle de este evento no puede mostrar el mapa.
+  lugarRecinto: 'Salón comunitario',
   localidad: null,
   direccion: null,
+  latitud: null,
+  longitud: null,
   fechaInicio: '2026-10-07',
   fechaFin: '2026-10-07',
   horarioInicio: null,
@@ -143,4 +180,33 @@ export function errorBody(status: number, message: string) {
     message,
     timestamp: '2026-10-01T12:00:00',
   }
+}
+
+/**
+ * Respuesta de ejemplo de `GET /nominatim/search`, con la forma real de Nominatim: `lat`/`lon`
+ * como **string** y `addressdetails` anidado. Es lo que consume el buscador de ubicación del
+ * formulario.
+ */
+export const NOMINATIM_SEARCH = [
+  {
+    lat: '-30.9816',
+    lon: '-64.0959',
+    display_name:
+      'Anfiteatro José Hernández, Cleto Peña 82, Jesús María, Córdoba, Argentina',
+    name: 'Anfiteatro José Hernández',
+    address: { road: 'Cleto Peña', city: 'Jesús María', state: 'Córdoba' },
+  },
+  {
+    lat: '-31.4167',
+    lon: '-64.1833',
+    display_name: 'Manzana Jesuítica, Av. Vélez Sarsfield 264, Córdoba, Argentina',
+    name: 'Manzana Jesuítica',
+    address: { road: 'Avenida Vélez Sarsfield', city: 'Córdoba', state: 'Córdoba' },
+  },
+]
+
+/** Respuesta de ejemplo de `GET /nominatim/reverse`. */
+export const NOMINATIM_REVERSE = {
+  display_name: 'Anfiteatro José Hernández, Cleto Peña 82, Jesús María, Córdoba, Argentina',
+  address: { road: 'Cleto Peña', city: 'Jesús María', state: 'Córdoba' },
 }

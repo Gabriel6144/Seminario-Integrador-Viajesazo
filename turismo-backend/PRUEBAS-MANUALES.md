@@ -73,9 +73,11 @@ base arranca siempre con los mismos datos: **3 publicadores, 8 eventos (cada uno
 Eventos por publicador: **1 → 4 eventos** (1, 3, 7, 8), **2 → 2** (2, 6), **3 → 2** (4, 5).
 
 Ojo: los eventos del seed usan **fechas fijas** 2026/2027 y **no setean `categoria` ni horarios**
-(esas columnas quedan en NULL). Por eso la agenda semanal (sección 8.1) solo trae eventos cuando
-la fecha del ensayo cae dentro de alguno de esos rangos: hoy (2026-10-12) el único que entra es
-**Oktoberfest** (termina hoy).
+(esas columnas quedan en NULL). Sí traen `tipo_acceso` (`DE_PAGO` o `GRATUITO`),
+`estado_propuesta` (`INICIADO`), lugar/recinto, localidad, dirección y `latitud`/`longitud`
+cargadas a mano (el backend las resolvería con Nominatim al darlas de alta por la API). Por eso la
+agenda semanal (sección 8.1) solo trae eventos cuando la fecha del ensayo cae dentro de alguno de
+esos rangos: hoy (2026-10-12) el único que entra es **Oktoberfest** (termina hoy).
 
 Los **viajes** sí usan fechas relativas a hoy, para que el demo siempre tenga viajes futuros. Las
 ubicaciones se siembran antes porque `Viaje.zonaInteres` es una FK a `ubicacion`:
@@ -237,7 +239,9 @@ Qué esperar: `totalElements: 4` para el publicador 1. Con `size=2` → `totalPa
 curl.exe -s http://localhost:8080/api/eventos/1
 ```
 
-Qué esperar: el evento 1 con sus 2 imágenes y `publicadorId: 1`, `publicadorNombre: "Turismo Córdoba"`.
+Qué esperar: el evento 1 con su imagen y `publicadorId: 1`, `publicadorNombre: "Turismo Córdoba"`.
+También vienen `tipoAcceso`, `estadoPropuesta`, `lugarRecinto` y `latitud`/`longitud` (las
+coordenadas que el backend guardó al geocodificar).
 Ojo: `publicadorId` y `publicadorNombre` vienen **aplanados** en el response (en la entidad el origen
 es `publicador.id` / `publicador.nombre`).
 
@@ -279,8 +283,13 @@ puede parsear: el frontend lo muestra tal cual (ver sección 9).
   "nombre": "Festival de prueba",
   "descripcion": "Evento creado a mano",
   "categoria": "CULTURA",
+  "tipoAcceso": "DE_PAGO",
+  "montoEstimado": 1500,
+  "descripcionArancel": "Entrada general",
+  "sitioOficial": "https://entradas.cordoba.gob.ar/festival",
+  "lugarRecinto": "Plaza Pringles",
   "localidad": "Cosquín",
-  "direccion": "Plaza Pringles",
+  "direccion": "Plaza Pringles, Cosquín, Córdoba",
   "fechaInicio": "2026-10-01",
   "fechaFin": "2026-10-03",
   "horarioInicio": "20:00:00",
@@ -290,10 +299,20 @@ puede parsear: el frontend lo muestra tal cual (ver sección 9).
 }
 ```
 
-Qué esperar: **201** y el evento creado con su `id`.
+Qué esperar: **201** y el evento creado con su `id`, `latitud`/`longitud` resueltas por el backend y
+`estadoPropuesta: "INICIADO"`.
 
-Solo son obligatorios `nombre`, `fechaInicio`, `fechaFin` y `publicadorId`. El resto puede venir
-`null` o ausente; sin `imagenes` se guarda con lista vacía, no con `null`.
+Son obligatorios `nombre`, `lugarRecinto`, `localidad`, `direccion`, `fechaInicio`, `fechaFin` y
+`publicadorId`. El resto puede venir `null` o ausente; sin `imagenes` se guarda con lista vacía, no
+con `null`. Si `tipoAcceso` falta, el backend asume `GRATUITO`. `estadoPropuesta` **no se manda**:
+lo fija el service en `INICIADO`.
+
+**El alta pasa por Nominatim (OpenStreetMap).** El backend geocodifica
+`lugarRecinto + direccion + localidad, Córdoba, Argentina`; si la dirección no resuelve (o no hay
+internet), responde **400** y el evento **no se guarda**. Para probar esto hace falta conexión a
+internet: sin ella, *cualquier* alta falla con el mensaje de ubicación.
+
+`tipoAcceso` acepta `GRATUITO` o `DE_PAGO`.
 
 `categoria` acepta exactamente: `NATURALEZA`, `GASTRONOMIA`, `CULTURA`, `HISTORIA`, `AVENTURA`,
 `VIDA_NOCTURNA`, `MUSICA`, `COMPRAS`, `FAMILIAR_Y_RELAX` (en mayúsculas; es como se persiste).
@@ -304,9 +323,17 @@ Casos de error, **medidos contra la app corriendo** (no deducidos del código):
 | Body | Status | `message` |
 | --- | --- | --- |
 | sin `nombre` o `nombre: ""` | 400 | `nombre: el nombre es obligatorio` |
+| sin `lugarRecinto` o vacío | 400 | `lugarRecinto: el lugar o recinto es obligatorio` |
+| sin `localidad` o vacía | 400 | `localidad: la ciudad es obligatoria` |
+| sin `direccion` o vacía | 400 | `direccion: la dirección exacta es obligatoria` |
 | sin `fechaInicio` o `fechaInicio: ""` | 400 | `fechaInicio: la fecha de inicio es obligatoria` |
 | sin `fechaFin` | 400 | `fechaFin: la fecha de finalización es obligatoria` |
 | sin `publicadorId` | 400 | `publicadorId: el publicador es obligatorio` |
+| `DE_PAGO` sin `montoEstimado` | 400 | `el monto estimado es obligatorio para un evento arancelado` |
+| `DE_PAGO` sin `sitioOficial` | 400 | `el link al sitio oficial es obligatorio para un evento arancelado` |
+| `montoEstimado` negativo | 400 | `montoEstimado: el monto estimado no puede ser negativo` |
+| `sitioOficial: "ftp://x"` | 400 | `sitioOficial: el link al sitio oficial debe ser una URL http(s)` |
+| ubicación que no resuelve | 400 | `no se encontró la ubicación del evento: revisá el lugar, la ciudad y la dirección` |
 | `"fechaInicio": "no-es-fecha"` | 400 | `el cuerpo de la petición no es válido o tiene un formato incorrecto` |
 | `"categoria": "NO_EXISTE"` | 400 | `el cuerpo de la petición no es válido o tiene un formato incorrecto` |
 | `"imagenes": [""]` | 400 | `imagenes[0]: las URLs de imagen no pueden estar vacías` |
@@ -332,7 +359,10 @@ curl.exe -s -X PUT http://localhost:8080/api/eventos/1 `
   -H "Content-Type: application/json" --data-binary "@target\body.json"
 ```
 
-Qué esperar: **200** con el evento ya modificado. Mismas validaciones que el alta.
+Qué esperar: **200** con el evento ya modificado. Mismas validaciones que el alta, **incluida la
+geocodificación**: si la nueva ubicación no resuelve en Nominatim, el PUT responde **400** y el
+evento queda como estaba (la transacción no llega a tocar las coordenadas viejas). `estadoPropuesta`
+no se puede cambiar desde acá (el mapper lo ignora).
 
 Ojo con el `update`: si el body **no** trae `imagenes`, se conserva la lista que ya tenía (no se
 borra), porque el mapper ignora los `null`. Para dejarla vacía hay que mandar `"imagenes": []`.
@@ -562,6 +592,7 @@ curl.exe -s -X POST http://localhost:8080/api/publicadores `
   -d '{\"nombre\":\"Duplicado\",\"email\":\"info@cordoba.gob.ar\"}'
 
 # alta, edicion y baja de un evento (secciones 8.6 a 8.8 para los bodies completos)
+# ojo: alta/edicion geocodifican con Nominatim -> necesitan internet y lugar/ciudad/direccion validos
 curl.exe -s -X POST http://localhost:8080/api/eventos -H "Content-Type: application/json" -d '...'
 curl.exe -s -X PUT  http://localhost:8080/api/eventos/1 -H "Content-Type: application/json" -d '...'
 curl.exe -s -i -X DELETE http://localhost:8080/api/eventos/7   # 204 sin cuerpo (baja FISICA)
@@ -572,7 +603,7 @@ curl.exe -s -X POST http://localhost:8080/api/viajes -H "Content-Type: applicati
 curl.exe -s -X PUT  http://localhost:8080/api/viajes/1 -H "Content-Type: application/json" -d '...'
 curl.exe -s -i -X DELETE http://localhost:8080/api/viajes/1   # 204 sin cuerpo (baja LOGICA -> CANCELADO)
 
-# tests automatizados (112, incluye lo de arriba salvo los bordes de la seccion 9)
+# tests automatizados (117, incluye lo de arriba salvo los bordes de la seccion 9)
 .\mvnw.cmd clean test
 ```
 

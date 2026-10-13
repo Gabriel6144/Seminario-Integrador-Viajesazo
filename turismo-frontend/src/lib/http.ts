@@ -89,6 +89,31 @@ export function apiDelete(path: string, signal?: AbortSignal): Promise<null> {
   return write<null>('DELETE', path, undefined, signal)
 }
 
+/**
+ * Alta con `multipart/form-data` (subida de archivos).
+ *
+ * Va aparte de {@link write} a propósito: **no** se fija `Content-Type`. El navegador tiene que
+ * ponerlo para incluir el `boundary` del multipart; si se setea `application/json` o un
+ * `multipart/form-data` sin boundary, el servidor no puede parsear el body y responde 400.
+ */
+export function apiPostForm<TResponse>(
+  path: string,
+  formData: FormData,
+  signal?: AbortSignal,
+): Promise<TResponse> {
+  return fetch(path, {
+    method: 'POST',
+    signal,
+    headers: { Accept: 'application/json' },
+    body: formData,
+  }).then(async (response) => {
+    if (!response.ok) {
+      throw new ApiError(response.status, await readErrorBody(response))
+    }
+    return readBody<TResponse>(response)
+  })
+}
+
 function write<TResponse>(
   method: WriteMethod,
   path: string,

@@ -22,6 +22,33 @@ export const CATEGORIAS = [
 export type Categoria = (typeof CATEGORIAS)[number]
 
 /**
+ * `TipoAcceso` del backend: si el evento es gratuito o arancelado. Se persiste como `STRING`.
+ */
+export const TIPOS_ACCESO = ['GRATUITO', 'DE_PAGO'] as const
+
+export type TipoAcceso = (typeof TIPOS_ACCESO)[number]
+
+export const TIPO_ACCESO_LABELS: Record<TipoAcceso, string> = {
+  GRATUITO: 'Gratuito',
+  DE_PAGO: 'Arancelado',
+}
+
+/**
+ * `EstadoPropuesta` del backend. Lo setea el backend al registrar el evento (`INICIADO`) y solo
+ * cambia por reglas de negocio, así que **no** viaja en el `EventoRequest`.
+ */
+export const ESTADOS_PROPUESTA = ['INICIADO', 'REPROGRAMADO', 'CANCELADO', 'FINALIZADO'] as const
+
+export type EstadoPropuesta = (typeof ESTADOS_PROPUESTA)[number]
+
+export const ESTADO_PROPUESTA_LABELS: Record<EstadoPropuesta, string> = {
+  INICIADO: 'Iniciado',
+  REPROGRAMADO: 'Reprogramado',
+  CANCELADO: 'Cancelado',
+  FINALIZADO: 'Finalizado',
+}
+
+/**
  * Cómo se muestra cada categoría en la UI.
  *
  * El enum del backend se persiste en mayúsculas (`CULTURA`) porque así lo guarda `data.sql` y así
@@ -72,8 +99,20 @@ export interface EventoResponse {
   nombre: string
   descripcion: string | null
   categoria: Categoria | null
+  tipoAcceso: TipoAcceso | null
+  /** Lo asigna el backend al registrar el evento; puede cambiar por reglas de negocio. */
+  estadoPropuesta: EstadoPropuesta | null
+  /** `BigDecimal` serializado como número, con dos decimales. Solo tiene sentido si es `DE_PAGO`. */
+  montoEstimado: number | null
+  descripcionArancel: string | null
+  /** Link al sitio oficial del evento; obligatorio cuando es `DE_PAGO`. */
+  sitioOficial: string | null
+  lugarRecinto: string | null
   localidad: string | null
   direccion: string | null
+  /** Coordenadas geocodificadas por el backend (Nominatim/OSM). Van juntas o ninguna. */
+  latitud: number | null
+  longitud: number | null
   fechaInicio: LocalDate
   fechaFin: LocalDate
   horarioInicio: LocalTime | null
@@ -93,6 +132,17 @@ export interface PublicadorResponse {
 }
 
 /**
+ * Respuesta de `POST /api/imagenes`. Espejo de `dto/response/ImagenResponse.java`.
+ *
+ * Solo trae la URL con la que queda servida la imagen subida; esa URL es la que se agrega al
+ * `imagenes` del evento. El backend la devuelve relativa (`/api/imagenes/{uuid}.{ext}`) para que
+ * pase por el proxy de Vite como el resto de la API.
+ */
+export interface ImagenResponse {
+  url: string
+}
+
+/**
  * Cuerpo de escritura de un evento. Es un tipo **distinto** de `EventoResponse` y no un
  * `Partial` de este: lo manda el cliente, así que no lleva `id` ni `publicadorNombre`, y el
  * publicador viene referenciado por `publicadorId`.
@@ -103,8 +153,16 @@ export interface EventoRequest {
   nombre: string
   descripcion: string | null
   categoria: Categoria | null
-  localidad: string | null
-  direccion: string | null
+  /** `null` deja que el backend aplique el default `GRATUITO`. */
+  tipoAcceso: TipoAcceso | null
+  /** Obligatorio si `tipoAcceso` es `DE_PAGO`; el backend responde 400 si falta. */
+  montoEstimado: number | null
+  descripcionArancel: string | null
+  /** Obligatorio si `tipoAcceso` es `DE_PAGO`. Debe ser una URL `http(s)`. */
+  sitioOficial: string | null
+  lugarRecinto: string
+  localidad: string
+  direccion: string
   fechaInicio: LocalDate
   fechaFin: LocalDate
   horarioInicio: LocalTime | null
