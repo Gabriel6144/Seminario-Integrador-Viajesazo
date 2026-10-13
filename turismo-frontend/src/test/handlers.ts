@@ -6,13 +6,14 @@ import {
   allPublicadores,
   createEvento,
   createPublicador,
+  createViaje,
   deleteEvento,
   findEvento,
   findPublicador,
   findPublicadorByEmail,
   updateEvento,
 } from './store'
-import type { EventoRequest, PublicadorRequest } from '@/types/api'
+import type { EventoRequest, PublicadorRequest, ViajeRequest } from '@/types/api'
 
 /**
  * Handlers de MSW que replican la API real.
@@ -133,6 +134,14 @@ export const handlers = [
   http.get('/api/agenda/semanal', ({ request }) => {
     const { content, meta } = paginate(allEventos(), request.url)
     return HttpResponse.json(page(content, meta))
+  }),
+
+  http.post('/api/viajes', async ({ request }) => {
+    const body = await readJson<ViajeRequest>(request)
+    if (!body.nombre || !body.nombre.trim()) {
+      return HttpResponse.json(errorBody(400, 'nombre: el nombre del viaje no puede estar vacío'), { status: 400 })
+    }
+    return HttpResponse.json(createViaje(body), { status: 201 })
   }),
 ]
 

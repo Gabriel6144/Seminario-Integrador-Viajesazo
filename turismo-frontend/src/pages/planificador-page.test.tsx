@@ -11,7 +11,6 @@ describe('PlanificadorPage', () => {
     renderWithProviders(<PlanificadorPage />)
 
     expect(screen.getByText('¡Córdoba te espera!')).toBeInTheDocument()
-    expect(screen.getByText('Viajesazo')).toBeInTheDocument()
 
     const btnEmpecemos = screen.getByRole('button', { name: /empecemos/i })
     await user.click(btnEmpecemos)
@@ -54,5 +53,19 @@ describe('PlanificadorPage', () => {
     // Cancelar modal
     await user.click(screen.getByRole('button', { name: /seguir planificando/i }))
     expect(screen.queryByText('¿Querés guardar tu aventura? 💙')).not.toBeInTheDocument()
+  })
+
+  it('guarda el borrador enviando la mutación al backend', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<PlanificadorPage />)
+
+    // Abrir modal de salida
+    const btnClose = screen.getByRole('button', { name: /cerrar/i })
+    await user.click(btnClose)
+
+    const btnBorrador = screen.getByRole('button', { name: /guardar como borrador/i })
+    await user.click(btnBorrador)
+
+    expect(await screen.findByText(/guardado con éxito/i)).toBeInTheDocument()
   })
 })

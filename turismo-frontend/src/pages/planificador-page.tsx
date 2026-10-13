@@ -1,5 +1,9 @@
 import { useState, useId } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useMutation } from '@tanstack/react-query'
+
+import { crearViaje } from '@/api/viajes'
+import type { InteresCategoria, TipoRitmo, UbicacionRequest, ViajeRequest } from '@/types/api'
 
 // Mascot / assistant avatar URLs
 const ASISTENTE_AVATAR =
@@ -17,38 +21,94 @@ const RANDOM_NAMES = [
   'Ruta del Fernet & Sierras',
 ]
 
-const ZONES = [
+interface ZoneItem {
+  name: string
+  label: string
+  desc: string
+  emoji: string
+  ubicacion: UbicacionRequest
+}
+
+const ZONES: ZoneItem[] = [
   {
     name: 'Centro Histórico',
     label: 'Centro Histórico & Nueva Córdoba',
     desc: 'Museos, vida urbana y gastronomía',
     emoji: '🏛️',
+    ubicacion: {
+      ciudad: 'Córdoba',
+      localidad: 'Centro Histórico',
+      latitud: -31.4201,
+      longitud: -64.1888,
+    },
   },
   {
     name: 'Villa Carlos Paz',
     label: 'Villa Carlos Paz (Valle de Punilla)',
     desc: 'Lago San Roque, teatros y sierras',
     emoji: '🌲',
+    ubicacion: {
+      ciudad: 'Villa Carlos Paz',
+      localidad: 'Valle de Punilla',
+      latitud: -31.4241,
+      longitud: -64.4978,
+    },
   },
   {
     name: 'La Cumbrecita / Calamuchita',
     label: 'La Cumbrecita & Valle de Calamuchita',
     desc: 'Bosques, cascadas y aldeas alpinas',
     emoji: '🌿',
+    ubicacion: {
+      ciudad: 'La Cumbrecita',
+      localidad: 'Valle de Calamuchita',
+      latitud: -31.8988,
+      longitud: -64.7731,
+    },
   },
   {
     name: 'Colonia Caroya / Sierras Chicas',
     label: 'Colonia Caroya & Sierras Chicas',
     desc: 'Bodegas, salames y estancias jesuitas',
     emoji: '🍷',
+    ubicacion: {
+      ciudad: 'Colonia Caroya',
+      localidad: 'Sierras Chicas',
+      latitud: -30.9833,
+      longitud: -64.0833,
+    },
   },
   {
     name: 'Mina Clavero / Traslasierra',
     label: 'Mina Clavero & Traslasierra',
     desc: 'Ríos cristalinos y microclima serrano',
     emoji: '⛰️',
+    ubicacion: {
+      ciudad: 'Mina Clavero',
+      localidad: 'Traslasierra',
+      latitud: -31.7214,
+      longitud: -65.0069,
+    },
   },
 ]
+
+const INTEREST_MAP: Record<string, InteresCategoria> = {
+  Naturaleza: 'NATURALEZA',
+  Gastronomía: 'GASTRONOMIA',
+  Cultura: 'CULTURA',
+  Historia: 'HISTORIA',
+  Aventura: 'AVENTURA',
+  'Vida nocturna': 'VIDA_NOCTURNA',
+  Música: 'MUSICA',
+  Compras: 'COMPRAS',
+  Familiar: 'FAMILIAR_Y_RELAX',
+}
+
+const RHYTHM_MAP: Record<string, TipoRitmo> = {
+  Tranquilo: 'TRANQUILO',
+  Equilibrado: 'EQUILIBRADO',
+  Intensivo: 'INTENSIVO',
+}
 
 const ALL_INTERESTS = [
   { name: 'Naturaleza', emoji: '🌿' },
@@ -253,13 +313,36 @@ export function PlanificadorPage() {
     }, 1100)
   }
 
+  const selectedZone = ZONES.find((z) => z.name === zone) ?? ZONES[0]
+
+  const buildViajePayload = (): ViajeRequest => ({
+    nombre: tripName.trim() || 'Escapada a Córdoba',
+    fechaInicio: dateFrom,
+    fechaFin: dateTo,
+    ubicacion: selectedZone.ubicacion,
+    rangoInteresKm: Number(radiusKm),
+    ritmo: RHYTHM_MAP[rhythm] ?? 'EQUILIBRADO',
+    interesesCategoria: interests.map((i) => INTEREST_MAP[i] ?? 'NATURALEZA'),
+    usuario: 'turista_demo',
+  })
+
+  const { mutate: guardarViaje, isPending: isSavingTrip } = useMutation({
+    mutationFn: (payload: ViajeRequest) => crearViaje(payload),
+    onSuccess: (data) => {
+      showToast(`¡Viaje "${data.nombre}" guardado con éxito! 💙`)
+    },
+    onError: (error) => {
+      showToast(error instanceof Error ? error.message : 'Error al guardar el viaje en el servidor')
+    },
+  })
+
   const handleSaveTrip = () => {
-    showToast('¡Circuito guardado con éxito en Mis Viajes! 💙')
+    guardarViaje(buildViajePayload())
   }
 
   const handleSaveDraft = () => {
     setIsExitModalOpen(false)
-    showToast('Borrador guardado correctamente 💾')
+    guardarViaje(buildViajePayload())
     setTimeout(() => {
       navigate('/')
     }, 1200)
@@ -312,19 +395,14 @@ export function PlanificadorPage() {
       </div>
 
       {/* BOTÓN CERRAR / X */}
-      {step > 1 ? (
       <button
         type="button"
-        aria-label="Salir"
+        aria-label="Cerrar"
         className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-600 active:scale-90 md:h-9 md:w-9"
-        onClick={() => setIsExitModalOpen(true)} // Ajusta esto a tu función real de abrir modal de salida
+        onClick={() => setIsExitModalOpen(true)}
       >
         <span className="material-symbols-outlined text-xl">close</span>
       </button>
-      ) : (
-        // Espaciador vacío para mantener la barra centrada en el paso 1
-        <div className="h-8 w-8 flex-shrink-0 md:h-9 md:w-9"></div>
-      )}
     </div>
   )}
 </header>
@@ -416,7 +494,7 @@ export function PlanificadorPage() {
                 <span className="material-symbols-outlined fill text-[18px] text-amber-500">
                   auto_awesome
                 </span>
-                <span>✨ Sorprendeme con un nombre</span>
+                <span> Sorprendeme con un nombre</span>
               </button>
 
               <div className="mt-6">
@@ -1210,11 +1288,14 @@ export function PlanificadorPage() {
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <button
                   type="button"
+                  disabled={isSavingTrip}
                   onClick={handleSaveTrip}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-sky-600 px-6 py-3.5 font-heading text-sm font-bold text-white shadow-md shadow-sky-500/20 transition-all hover:bg-sky-700 active:scale-[0.98]"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-sky-600 px-6 py-3.5 font-heading text-sm font-bold text-white shadow-md shadow-sky-500/20 transition-all hover:bg-sky-700 active:scale-[0.98] disabled:opacity-60"
                 >
-                  <span className="material-symbols-outlined text-lg">bookmark</span>
-                  <span>Guardar en Mis viajes</span>
+                  <span className="material-symbols-outlined text-lg">
+                    {isSavingTrip ? 'hourglass_top' : 'bookmark'}
+                  </span>
+                  <span>{isSavingTrip ? 'Guardando...' : 'Guardar en Mis viajes'}</span>
                 </button>
                 <button
                   type="button"
@@ -1257,11 +1338,14 @@ export function PlanificadorPage() {
             <div className="mt-6 flex flex-col gap-2.5">
               <button
                 type="button"
+                disabled={isSavingTrip}
                 onClick={handleSaveDraft}
-                className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-sky-600 px-4 py-3 text-xs font-bold text-white shadow-md shadow-sky-500/20 transition-all hover:bg-sky-700 active:scale-[0.98]"
+                className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-sky-600 px-4 py-3 text-xs font-bold text-white shadow-md shadow-sky-500/20 transition-all hover:bg-sky-700 active:scale-[0.98] disabled:opacity-60"
               >
-                <span className="material-symbols-outlined text-base">bookmark</span>
-                <span>Guardar como borrador</span>
+                <span className="material-symbols-outlined text-base">
+                  {isSavingTrip ? 'hourglass_top' : 'bookmark'}
+                </span>
+                <span>{isSavingTrip ? 'Guardando...' : 'Guardar como borrador'}</span>
               </button>
               <button
                 type="button"

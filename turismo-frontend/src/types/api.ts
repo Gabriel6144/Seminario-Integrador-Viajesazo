@@ -140,3 +140,57 @@ export interface ApiErrorResponse {
   message: string
   timestamp: string
 }
+
+export type TipoRitmo = 'TRANQUILO' | 'EQUILIBRADO' | 'INTENSIVO'
+
+export type InteresCategoria =
+  | 'NATURALEZA'
+  | 'GASTRONOMIA'
+  | 'CULTURA'
+  | 'HISTORIA'
+  | 'AVENTURA'
+  | 'VIDA_NOCTURNA'
+  | 'MUSICA'
+  | 'COMPRAS'
+  | 'FAMILIAR_Y_RELAX'
+
+export type EstadoViaje = 'PLANIFICADO' | 'EN_CURSO' | 'FINALIZADO' | 'CANCELADO'
+
+export interface UbicacionRequest {
+  ciudad: string
+  localidad?: string | null
+  latitud: number
+  longitud: number
+}
+
+export interface UbicacionResponse {
+  nombre?: string | null
+  ciudad: string
+  localidad?: string | null
+  latitud: number
+  longitud: number
+}
+
+export interface ViajeRequest {
+  nombre: string
+  fechaInicio: LocalDate
+  fechaFin: LocalDate
+  ubicacion: UbicacionRequest
+  rangoInteresKm: number
+  ritmo: TipoRitmo
+  interesesCategoria: InteresCategoria[]
+  usuario: string
+}
+
+export interface ViajeResponse {
+  id: number
+  nombre: string
+  ubicacion: UbicacionResponse
+  rangoInteresKm: number
+  fechaInicio: LocalDate
+  fechaFin: LocalDate
+  ritmo: TipoRitmo
+  interesesCategoria: InteresCategoria[]
+  estado?: EstadoViaje | null
+  usuario: string
+}

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { NavLink } from 'react-router-dom';
 
 /**
  * Header sticky con logo de VIAJESAZO y badge de verificado.
@@ -25,11 +26,19 @@ export function TopAppBar() {
           
         </div>
 
-        {/* Desktop nav */}
-        <nav className="hidden items-center gap-6 md:flex" aria-label="Principal">
-          <Link
+       {/* Desktop nav */}
+        <nav className="hidden items-center gap-2 md:flex" aria-label="Principal">
+          
+          <NavLink
             to="/"
-            className="flex items-center gap-1 text-sm font-semibold text-[#00658d]"
+            end
+            className={({ isActive }) =>
+              `flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-all ${
+                isActive
+                  ? "bg-gradient-to-r from-sky-600 to-sky-500 text-white font-bold shadow-sm"
+                  : "text-[#3f484e] font-medium hover:bg-slate-100 hover:text-[#00658d]"
+              }`
+            }
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
               <rect x="3" y="4" width="18" height="18" rx="2" />
@@ -38,26 +47,48 @@ export function TopAppBar() {
               <line x1="3" y1="10" x2="21" y2="10" />
             </svg>
             Eventos
-          </Link>
-          <Link
+          </NavLink>
+
+          <NavLink
             to="/agenda"
-            className="text-sm text-[#3f484e] transition-colors hover:text-[#00658d]"
+            className={({ isActive }) =>
+              `flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-all ${
+                isActive
+                  ? "bg-gradient-to-r from-sky-600 to-sky-500 text-white font-bold shadow-sm"
+                  : "text-[#3f484e] font-medium hover:bg-slate-100 hover:text-[#00658d]"
+              }`
+            }
           >
             Agenda
-          </Link>
-          <Link
+          </NavLink>
+
+          <NavLink
             to="/planificar"
-            className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-sky-600 to-sky-500 px-3 py-1 text-xs font-bold text-white shadow-sm transition-all hover:opacity-95"
+            className={({ isActive }) =>
+              `flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-all ${
+                isActive
+                  ? "bg-gradient-to-r from-sky-600 to-sky-500 text-white font-bold shadow-sm"
+                  : "text-[#3f484e] font-medium hover:bg-slate-100 hover:text-[#00658d]"
+              }`
+            }
           >
             <span className="material-symbols-outlined text-[16px]">explore</span>
             Planificar
-          </Link>
-          <Link
+          </NavLink>
+
+          <NavLink
             to="/publicadores"
-            className="text-sm text-[#3f484e] transition-colors hover:text-[#00658d]"
+            className={({ isActive }) =>
+              `flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-all ${
+                isActive
+                  ? "bg-gradient-to-r from-sky-600 to-sky-500 text-white font-bold shadow-sm"
+                  : "text-[#3f484e] font-medium hover:bg-slate-100 hover:text-[#00658d]"
+              }`
+            }
           >
             Publicadores
-          </Link>
+          </NavLink>
+
         </nav>
 
         {/* Badge publicador */}

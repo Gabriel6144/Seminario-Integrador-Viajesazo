@@ -16,15 +16,45 @@ import type { EventoRequest, EventoResponse, PublicadorRequest, PublicadorRespon
 
 let eventos: EventoResponse[] = []
 let publicadores: PublicadorResponse[] = []
+let viajes: import('@/types/api').ViajeResponse[] = []
 let nextEventoId = 0
 let nextPublicadorId = 0
+let nextViajeId = 1
 
 export function resetStore(): void {
   eventos = structuredClone(EVENTOS)
   publicadores = structuredClone(PUBLICADORES)
+  viajes = []
   // Los fixtures ya traen ids 1..3 y 1..7, así que los siguientes arrancan por arriba.
   nextEventoId = Math.max(0, ...EVENTOS.map((evento) => evento.id)) + 1
   nextPublicadorId = Math.max(0, ...PUBLICADORES.map((publicador) => publicador.id)) + 1
+  nextViajeId = 1
+}
+
+export function allViajes(): import('@/types/api').ViajeResponse[] {
+  return viajes
+}
+
+export function createViaje(request: import('@/types/api').ViajeRequest): import('@/types/api').ViajeResponse {
+  const created: import('@/types/api').ViajeResponse = {
+    id: nextViajeId++,
+    nombre: request.nombre,
+    fechaInicio: request.fechaInicio,
+    fechaFin: request.fechaFin,
+    ubicacion: {
+      ciudad: request.ubicacion.ciudad,
+      localidad: request.ubicacion.localidad,
+      latitud: request.ubicacion.latitud,
+      longitud: request.ubicacion.longitud,
+    },
+    rangoInteresKm: request.rangoInteresKm,
+    ritmo: request.ritmo,
+    interesesCategoria: [...request.interesesCategoria],
+    estado: 'PLANIFICADO',
+    usuario: request.usuario,
+  }
+  viajes.push(created)
+  return created
 }
 
 export function allEventos(): EventoResponse[] {
