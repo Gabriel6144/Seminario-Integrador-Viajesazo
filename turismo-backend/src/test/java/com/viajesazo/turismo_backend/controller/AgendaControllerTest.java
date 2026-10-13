@@ -22,7 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.viajesazo.turismo_backend.config.AppConfig;
 import com.viajesazo.turismo_backend.dto.response.EventoResponse;
-import com.viajesazo.turismo_backend.model.Categoria;
+import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.service.EventoService;
 
 @WebMvcTest(AgendaController.class)
@@ -103,7 +103,7 @@ class AgendaControllerTest {
 	}
 
 	private EventoResponse event(Long id, String nombre, LocalDate fecha) {
-		return new EventoResponse(id, nombre, null, Categoria.CULTURA, "Cosquín", null,
+		return new EventoResponse(id, nombre, null, InteresCategoria.CULTURA, "Cosquín", null,
 				fecha, fecha, null, null, List.of(), 1L, "Turismo Córdoba");
 	}
 

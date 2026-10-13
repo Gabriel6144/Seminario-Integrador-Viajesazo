@@ -32,7 +32,7 @@ import com.viajesazo.turismo_backend.dto.response.EventoResponse;
 import com.viajesazo.turismo_backend.exception.BusinessRuleException;
 import com.viajesazo.turismo_backend.exception.ResourceNotFoundException;
 import com.viajesazo.turismo_backend.mapper.EventoMapperImpl;
-import com.viajesazo.turismo_backend.model.Categoria;
+import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.model.Evento;
 import com.viajesazo.turismo_backend.model.Publicador;
 import com.viajesazo.turismo_backend.repository.EventoRepository;
@@ -70,7 +70,7 @@ class EventoServiceTest {
 
 		assertThat(result.id()).isEqualTo(7L);
 		assertThat(result.nombre()).isEqualTo("Festival de Folklore");
-		assertThat(result.categoria()).isEqualTo(Categoria.CULTURA);
+		assertThat(result.categoria()).isEqualTo(InteresCategoria.CULTURA);
 		assertThat(result.publicadorId()).isEqualTo(1L);
 		verify(eventoRepository).save(any(Evento.class));
 	}
@@ -287,7 +287,7 @@ class EventoServiceTest {
 	}
 
 	private EventoRequest request() {
-		return new EventoRequest("Festival de Folklore", "Encuentro de Syrigamis", Categoria.CULTURA,
+		return new EventoRequest("Festival de Folklore", "Encuentro de Syrigamis", InteresCategoria.CULTURA,
 				"Cosquín", "Plaza Pringles", LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-03"),
 				LocalTime.of(20, 0), LocalTime.of(23, 30), List.of("https://cdn.cordoba.gob.ar/folklore.jpg"), 1L);
 	}
@@ -300,7 +300,7 @@ class EventoServiceTest {
 		return Evento.builder()
 				.id(7L)
 				.nombre("Evento Original")
-				.categoria(Categoria.CULTURA)
+				.categoria(InteresCategoria.CULTURA)
 				.localidad("Alta Gracia")
 				.fechaInicio(LocalDate.parse("2026-09-25"))
 				.fechaFin(LocalDate.parse("2026-09-26"))

@@ -11,8 +11,8 @@
 	<groupId>com.viajesazo</groupId>
 	<artifactId>turismo-backend</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name/>
-	<description/>
+	<name>Turismo Backend</name>
+	<description>API para administrar destinos y eventos turísticos</description>
 	<url/>
 	<licenses>
 		<license/>

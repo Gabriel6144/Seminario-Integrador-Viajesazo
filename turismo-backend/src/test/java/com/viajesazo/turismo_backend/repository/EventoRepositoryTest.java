@@ -15,7 +15,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
-import com.viajesazo.turismo_backend.model.Categoria;
+import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.model.Evento;
 import com.viajesazo.turismo_backend.model.Publicador;
 
@@ -261,7 +261,7 @@ class EventoRepositoryTest {
 	private Evento save(String name, LocalDate from, LocalDate to, Publicador owner) {
 		return eventoRepository.save(Evento.builder()
 				.nombre(name)
-				.categoria(Categoria.CULTURA)
+				.categoria(InteresCategoria.CULTURA)
 				.localidad("Cosquín")
 				.fechaInicio(from)
 				.fechaFin(to)
@@ -272,7 +272,7 @@ class EventoRepositoryTest {
 	private Evento saveTimed(String name, LocalDate date, LocalTime startTime) {
 		return eventoRepository.save(Evento.builder()
 				.nombre(name)
-				.categoria(Categoria.CULTURA)
+				.categoria(InteresCategoria.CULTURA)
 				.localidad("Cosquín")
 				.fechaInicio(date)
 				.fechaFin(date)

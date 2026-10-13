@@ -33,7 +33,7 @@ import com.viajesazo.turismo_backend.dto.request.EventoRequest;
 import com.viajesazo.turismo_backend.dto.response.EventoResponse;
 import com.viajesazo.turismo_backend.exception.ResourceNotFoundException;
 import com.viajesazo.turismo_backend.exception.BusinessRuleException;
-import com.viajesazo.turismo_backend.model.Categoria;
+import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.service.EventoService;
 
 @WebMvcTest(EventoController.class)
@@ -257,7 +257,7 @@ class EventoControllerTest {
 	}
 
 	private EventoResponse response() {
-		return new EventoResponse(7L, "Festival de Folklore", "Encuentro de syrigamis", Categoria.CULTURA,
+		return new EventoResponse(7L, "Festival de Folklore", "Encuentro de syrigamis", InteresCategoria.CULTURA,
 				"Cosquín", "Plaza Pringles", LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-03"),
 				LocalTime.of(20, 0), LocalTime.of(23, 30),
 				List.of("https://cdn.cordoba.gob.ar/folklore.jpg"), 1L, "Turismo Córdoba");

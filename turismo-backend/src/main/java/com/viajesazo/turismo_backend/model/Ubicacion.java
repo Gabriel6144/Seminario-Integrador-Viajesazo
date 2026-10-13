@@ -23,6 +23,7 @@ public class Ubicacion {
     private Long id;
 
     private String ciudad;
+    private String localidad;
 
     @Column(precision = 10, scale = 8)
     private BigDecimal latitud;

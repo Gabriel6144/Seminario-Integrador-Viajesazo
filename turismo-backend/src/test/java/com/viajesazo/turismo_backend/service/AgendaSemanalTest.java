@@ -24,7 +24,7 @@ import org.springframework.data.domain.Pageable;
 
 import com.viajesazo.turismo_backend.dto.response.EventoResponse;
 import com.viajesazo.turismo_backend.mapper.EventoMapperImpl;
-import com.viajesazo.turismo_backend.model.Categoria;
+import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.model.Evento;
 import com.viajesazo.turismo_backend.model.Publicador;
 import com.viajesazo.turismo_backend.repository.EventoRepository;
@@ -150,7 +150,7 @@ class AgendaSemanalTest {
 		return Evento.builder()
 				.id(10L)
 				.nombre("Festival de Folklore")
-				.categoria(Categoria.CULTURA)
+				.categoria(InteresCategoria.CULTURA)
 				.localidad("Cosquín")
 				.fechaInicio(LocalDate.parse("2026-09-25"))
 				.fechaFin(LocalDate.parse("2026-09-27"))

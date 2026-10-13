@@ -182,98 +182,124 @@ VALUES (
 -- ============================================================
 -- VIAJES SUGERIDOS PARA TURISTAS
 -- ============================================================
+--
+-- `Viaje.zonaInteres` es una asociación `@ManyToOne` a `Ubicacion` (columna
+-- `zona_interes_id`), así que primero se siembran las ubicaciones y luego se
+-- referencian por id. El estado va en 'PLANIFICADO' a propósito: VZ-22 lista los
+-- viajes con `estado <> 'CANCELADO'`, y una fila con estado NULL quedaría fuera
+-- de la comparación (NULL <> 'X' no es verdadero).
+--
+-- Las fechas son relativas a hoy (mismo criterio que los eventos) para que el
+-- demo tenga siempre viajes futuros.
+
+INSERT INTO ubicacion (ciudad, localidad, latitud, longitud) VALUES
+    ('Villa General Belgrano', 'Córdoba', -31.95, -64.55),
+    ('Ciudad de Córdoba', 'Córdoba', -31.42, -64.18),
+    ('Carlos Paz', 'Córdoba', -31.42, -64.50),
+    ('Alta Gracia', 'Córdoba', -31.65, -64.43),
+    ('La Cumbrecita', 'Córdoba', -31.90, -64.77);
 
 INSERT INTO viaje (
     nombre,
-    zona_interes,
+    zona_interes_id,
     rango_interes_km,
     fecha_inicio,
     fecha_fin,
     ritmo,
+    estado,
     usuario
 )
 VALUES (
     'Escapada serrana por Villa General Belgrano',
-    'Villa General Belgrano y alrededores',
+    1,
     35,
-    CURRENT_DATE + 7,
-    CURRENT_DATE + 9,
+    DATEADD('DAY', 7, CURRENT_TIMESTAMP),
+    DATEADD('DAY', 9, CURRENT_TIMESTAMP),
     'EQUILIBRADO',
+    'PLANIFICADO',
     'turista.demo@viajesazo.com'
 );
 
 INSERT INTO viaje (
     nombre,
-    zona_interes,
+    zona_interes_id,
     rango_interes_km,
     fecha_inicio,
     fecha_fin,
     ritmo,
+    estado,
     usuario
 )
 VALUES (
     'Cultura y naturaleza en Córdoba',
-    'Ciudad de Córdoba y Sierras Chicas',
+    2,
     50,
-    CURRENT_DATE + 14,
-    CURRENT_DATE + 17,
+    DATEADD('DAY', 14, CURRENT_TIMESTAMP),
+    DATEADD('DAY', 17, CURRENT_TIMESTAMP),
     'TRANQUILO',
+    'PLANIFICADO',
     'turista.demo@viajesazo.com'
 );
 
 INSERT INTO viaje (
     nombre,
-    zona_interes,
+    zona_interes_id,
     rango_interes_km,
     fecha_inicio,
     fecha_fin,
     ritmo,
+    estado,
     usuario
 )
 VALUES (
     'Aventura en el Valle de Punilla',
-    'Carlos Paz, Tanti y alrededores',
+    3,
     45,
-    CURRENT_DATE + 21,
-    CURRENT_DATE + 24,
+    DATEADD('DAY', 21, CURRENT_TIMESTAMP),
+    DATEADD('DAY', 24, CURRENT_TIMESTAMP),
     'INTENSIVO',
+    'PLANIFICADO',
     'turista.aventura@viajesazo.com'
 );
 
 INSERT INTO viaje (
     nombre,
-    zona_interes,
+    zona_interes_id,
     rango_interes_km,
     fecha_inicio,
     fecha_fin,
     ritmo,
+    estado,
     usuario
 )
 VALUES (
     'Sabores y tradiciones de Córdoba',
-    'Alta Gracia y Valle de Paravachasca',
+    4,
     30,
-    CURRENT_DATE + 28,
-    CURRENT_DATE + 30,
+    DATEADD('DAY', 28, CURRENT_TIMESTAMP),
+    DATEADD('DAY', 30, CURRENT_TIMESTAMP),
     'TRANQUILO',
+    'PLANIFICADO',
     'turista.gastronomico@viajesazo.com'
 );
 
 INSERT INTO viaje (
     nombre,
-    zona_interes,
+    zona_interes_id,
     rango_interes_km,
     fecha_inicio,
     fecha_fin,
     ritmo,
+    estado,
     usuario
 )
 VALUES (
     'Recorrido familiar por las sierras',
-    'La Cumbrecita y Villa General Belgrano',
+    5,
     40,
-    CURRENT_DATE + 35,
-    CURRENT_DATE + 38,
+    DATEADD('DAY', 35, CURRENT_TIMESTAMP),
+    DATEADD('DAY', 38, CURRENT_TIMESTAMP),
     'EQUILIBRADO',
+    'PLANIFICADO',
     'familia.demo@viajesazo.com'
 );

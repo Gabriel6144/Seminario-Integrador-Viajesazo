@@ -18,7 +18,6 @@ import lombok.Builder;
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name = "viaje")
-
 public class Viaje {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -28,10 +27,8 @@ public class Viaje {
     private String nombre;
 
 
-    @Column (nullable = false, length = 180)
-    private Ubicacion zonaHospedaje; 
-
-    @Column (nullable = false, length = 180)
+    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL, optional = false)
+    @JoinColumn(name = "zona_interes_id", nullable = false)
     private Ubicacion zonaInteres; 
 
     @Column(nullable = false)
@@ -60,7 +57,7 @@ public class Viaje {
 
     @Enumerated(EnumType.STRING)
     @Column(length = 50)
-    private Estado estado;
+    private EstadoViaje estado;
 
     // Usuario entiendo lo vemos en el utlimo Sprint, por ahora diría dejarlo como String
     @Column(nullable = false, length = 120)
