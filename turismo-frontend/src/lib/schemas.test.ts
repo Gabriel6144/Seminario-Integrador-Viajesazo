@@ -306,6 +306,11 @@ describe('toEventoFormValues', () => {
       lugarRecinto: FOLKLORE.lugarRecinto,
       localidad: FOLKLORE.localidad,
       direccion: FOLKLORE.direccion,
+      lugar: FOLKLORE.lugar,
+      referencia: FOLKLORE.referencia,
+      lat: FOLKLORE.lat,
+      lng: FOLKLORE.lng,
+      osmId: null,
       fechaInicio: FOLKLORE.fechaInicio,
       fechaFin: FOLKLORE.fechaFin,
       // Vuelven como "20:00" y no como "20:00:00", y `LocalTime` acepta las dos formas.

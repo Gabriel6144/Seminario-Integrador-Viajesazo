@@ -43,7 +43,8 @@ describe('EventoDetailPage', () => {
     expect(screen.getByText(FOLKLORE.descripcion as string)).toBeInTheDocument()
     // La ubicación aparece en el hero image y en la ficha: se espera al menos una coincidencia.
     expect((await screen.findAllByText(FOLKLORE.localidad as string)).length).toBeGreaterThan(0)
-    expect(screen.getByText(FOLKLORE.direccion as string)).toBeInTheDocument()
+    // El lugar aparece en el hero image y en la ficha: se espera al menos una coincidencia.
+    expect((await screen.findAllByText(FOLKLORE.lugar as string)).length).toBeGreaterThan(0)
   })
 
   it('muestra el rango horario recortado a HH:mm', async () => {
