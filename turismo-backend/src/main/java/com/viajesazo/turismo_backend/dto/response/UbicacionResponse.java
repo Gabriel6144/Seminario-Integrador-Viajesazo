@@ -1,8 +1,14 @@
 package com.viajesazo.turismo_backend.dto.response;
 
-public class UbicacionResponse {
-    private String nombre;
-    private double latitud;
-    private double longitud;
+
+
+public record UbicacionResponse ( 
+    String nombre,
+    String localidad,
+    String ciudad,
+    double latitud,
+    double longitud
+){
+   
     
 }

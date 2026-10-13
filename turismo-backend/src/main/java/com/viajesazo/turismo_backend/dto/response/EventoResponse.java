@@ -5,8 +5,8 @@ import java.time.LocalTime;
 import java.util.List;
 
 import com.viajesazo.turismo_backend.model.InteresCategoria;
-import com.viajesazo.turismo_backend.model.Evento;
-import com.viajesazo.turismo_backend.model.Publicador;
+
+
 
 public record EventoResponse(
 		Long id,

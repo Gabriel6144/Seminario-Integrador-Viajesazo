@@ -103,7 +103,7 @@ class AgendaControllerTest {
 	}
 
 	private EventoResponse event(Long id, String nombre, LocalDate fecha) {
-		return new EventoResponse(id, nombre, null, Categoria.CULTURA, "Cosquín", null,
+		return new EventoResponse(id, nombre, null, InteresCategoria.CULTURA, "Cosquín", null,
 				fecha, fecha, null, null, List.of(), 1L, "Turismo Córdoba");
 	}
 

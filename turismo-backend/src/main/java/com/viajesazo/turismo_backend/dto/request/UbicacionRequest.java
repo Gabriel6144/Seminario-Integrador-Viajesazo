@@ -37,7 +37,7 @@ public record UbicacionRequest(
         max = 150,
         message = "La ciudad de interés no puede superar los 150 caracteres"
     )
-    String ciudadDeInteres,
+    String ciudad,
 
     @Size(
         max = 150,

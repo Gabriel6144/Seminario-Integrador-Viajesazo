@@ -3,7 +3,8 @@
 API REST y cliente web para centralizar la información turística de la provincia de Córdoba
 (Argentina) y generar itinerarios personalizados según fechas, preferencias y disponibilidad.
 
-Sprint 1 completo: gestión de eventos y publicadores.
+Sprint 1 completo (gestión de eventos y publicadores) y Sprint 2 completo (gestión de viajes:
+alta, edición, listado de activos y baja lógica).
 
 ## Estructura
 
@@ -28,9 +29,9 @@ cd turismo-backend
 ./mvnw spring-boot:run               # Unix
 ```
 
-Arranca con H2 en memoria y ejecuta `data.sql`, así que ya viene con **3 publicadores, 7
-eventos y 5 imágenes** de ejemplo. El esquema se recrea en cada arranque (`create-drop`): lo
-que se carga o borra no sobrevive a un reinicio.
+Arranca con H2 en memoria y ejecuta `data.sql`, así que ya viene con **3 publicadores, 8
+eventos (cada uno con su imagen), 5 ubicaciones y 5 viajes** de ejemplo. El esquema se recrea
+en cada arranque (`create-drop`): lo que se carga o borra no sobrevive a un reinicio.
 
 ### 2. El frontend (puerto 5173)
 
@@ -51,7 +52,7 @@ que poner un proxy inverso delante o habilitar CORS en el backend.
 
 | | Comando | Qué corre |
 | --- | --- | --- |
-| Backend | `.\mvnw.cmd clean test` | 83 tests (JUnit 5, Mockito, `@WebMvcTest`, `@DataJpaTest`) |
+| Backend | `.\mvnw.cmd clean test` | 112 tests (JUnit 5, Mockito, `@WebMvcTest`, `@DataJpaTest`) |
 | Frontend | `npm test` | 120 tests (Vitest, Testing Library, MSW) |
 | Frontend | `npm run typecheck` | TypeScript sin emitir |
 | Frontend | `npm run lint` | oxlint |
@@ -80,6 +81,10 @@ defaults de Spring Data en vez de la configuración del proyecto.
 - **No hay autenticación.** Cualquiera que abra la app puede crear, editar y borrar. Es la
   limitación del alcance del Sprint 1, no una decisión de diseño.
 - **Los publicadores solo se dan de alta**: la API no expone `PUT` ni `DELETE` para ellos.
+- **Los viajes se asocian al turista por `usuario` (String), no por un `turistaId` ni una entidad
+  `Usuario`.** Es la deuda del Sprint 2: "asociar al turista" se resuelve con el identificador en
+  texto hasta que exista autenticación. La baja de viajes es **lógica** (`estado=CANCELADO`), a
+  diferencia de la de eventos, que es física.
 - El selector de publicadores del formulario pide `?size=100`, que es el tope configurado en el
   backend. Con más de 100 publicadores hay que agregarle búsqueda o paginación.
 - El mensaje de email duplicado confirma si un email está registrado, lo que habilita enumerar
@@ -87,8 +92,8 @@ defaults de Spring Data en vez de la configuración del proyecto.
 - Los datos de H2 son efímeros. Para una demo con datos cargados hay que sembrar por script o
   cambiar a `jdbc:h2:file:./data/turismo` con `ddl-auto=update`.
 
-## Sprites siguientes
+## Sprints siguientes
 
-`Viaje`, `Actividad`, `Itinerario`, `Usuario`, `Preferencia`, y el mapa con distancia y
-traslados. La baja de eventos es física, así que cuando exista `Itinerario` hay que decidir si
-el `DELETE` valida los itinerarios asociados: hoy no lo hace y dejaría referencias colgantes.
+`Actividad`, `Itinerario`, `Usuario`, `Preferencia`, y el mapa con distancia y traslados. La
+baja de eventos es física, así que cuando exista `Itinerario` hay que decidir si el `DELETE`
+valida los itinerarios asociados: hoy no lo hace y dejaría referencias colgantes.

@@ -11,64 +11,83 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
+import com.viajesazo.turismo_backend.model.EstadoViaje;
 import com.viajesazo.turismo_backend.model.TipoRitmo;
+import com.viajesazo.turismo_backend.model.Ubicacion;
 import com.viajesazo.turismo_backend.model.Viaje;
 
 @DataJpaTest
 class ViajeRepositoryTest {
 
-	private static final LocalDateTime FROM = LocalDateTime.parse("2026-10-20T00:00:00");
-	private static final LocalDateTime TO = LocalDateTime.parse("2026-10-25T23:59:59");
+	private static final String TURISTA = "turista@test.com";
+	private static final String OTRO = "otro@test.com";
 
 	@Autowired
 	private ViajeRepository viajeRepository;
 
 	@Test
-	@DisplayName("incluye los viajes que se solapan con el rango consultado")
-	void includesOverlappingTrips() {
-		save("Viaje vigente", LocalDateTime.parse("2026-10-19T10:00:00"),
-				LocalDateTime.parse("2026-10-21T18:00:00"));
-		save("Viaje futuro dentro del rango", LocalDateTime.parse("2026-10-24T10:00:00"),
-				LocalDateTime.parse("2026-10-27T18:00:00"));
+	@DisplayName("VZ-22: lista solo los viajes activos del turista")
+	void listsOnlyActiveTripsOfTourist() {
+		save("Activo propio", TURISTA, EstadoViaje.PLANIFICADO);
+		save("Cancelado propio", TURISTA, EstadoViaje.CANCELADO);
+		save("Activo ajeno", OTRO, EstadoViaje.PLANIFICADO);
 
-		assertThat(viajeRepository.findOverlapping(FROM, TO, PageRequest.of(0, 10)).getContent())
-				.extracting(Viaje::getNombre)
-				.containsExactly("Viaje vigente", "Viaje futuro dentro del rango");
+		Page<Viaje> result = viajeRepository.findByUsuarioAndEstadoNotOrderByFechaInicioAsc(
+				TURISTA, EstadoViaje.CANCELADO, PageRequest.of(0, 10));
+
+		assertThat(result.getContent()).extracting(Viaje::getNombre).containsExactly("Activo propio");
 	}
 
 	@Test
-	@DisplayName("excluye los viajes completamente fuera del rango")
-	void excludesTripsOutsideRange() {
-		save("Viaje pasado", LocalDateTime.parse("2026-10-10T10:00:00"),
-				LocalDateTime.parse("2026-10-19T18:00:00"));
-		save("Viaje posterior", LocalDateTime.parse("2026-10-26T10:00:00"),
-				LocalDateTime.parse("2026-10-27T18:00:00"));
+	@DisplayName("VZ-22: ordena los viajes activos por fecha de inicio")
+	void ordersActiveTripsByStartDate() {
+		save("Segundo", TURISTA, EstadoViaje.PLANIFICADO, LocalDateTime.parse("2026-10-22T00:00:00"));
+		save("Primero", TURISTA, EstadoViaje.PLANIFICADO, LocalDateTime.parse("2026-10-20T00:00:00"));
 
-		assertThat(viajeRepository.findOverlapping(FROM, TO, PageRequest.of(0, 10)).getContent()).isEmpty();
-	}
-
-	@Test
-	@DisplayName("lista los viajes ordenados por inicio y fin")
-	void ordersTripsByStartAndEnd() {
-		save("Segundo", LocalDateTime.parse("2026-10-22T10:00:00"),
-				LocalDateTime.parse("2026-10-24T18:00:00"));
-		save("Primero", LocalDateTime.parse("2026-10-20T10:00:00"),
-				LocalDateTime.parse("2026-10-21T18:00:00"));
-
-		Page<Viaje> result = viajeRepository.findAllByOrderByFechaInicioAscFechaFinAsc(PageRequest.of(0, 10));
+		Page<Viaje> result = viajeRepository.findByUsuarioAndEstadoNotOrderByFechaInicioAsc(
+				TURISTA, EstadoViaje.CANCELADO, PageRequest.of(0, 10));
 
 		assertThat(result.getContent()).extracting(Viaje::getNombre).containsExactly("Primero", "Segundo");
 	}
 
-	private Viaje save(String nombre, LocalDateTime inicio, LocalDateTime fin) {
+	@Test
+	@DisplayName("VZ-22: la página vacía de un turista sin viajes activos no falla")
+	void returnsEmptyPageWhenNoActiveTrips() {
+		save("Cancelado", TURISTA, EstadoViaje.CANCELADO);
+
+		Page<Viaje> result = viajeRepository.findByUsuarioAndEstadoNotOrderByFechaInicioAsc(
+				TURISTA, EstadoViaje.CANCELADO, PageRequest.of(0, 10));
+
+		assertThat(result.getContent()).isEmpty();
+	}
+
+	@Test
+	@DisplayName("VZ-23 CA2: un viaje cancelado no se encuentra por id")
+	void excludesCancelledTripFromFindById() {
+		Viaje cancelled = save("Cancelado", TURISTA, EstadoViaje.CANCELADO);
+		Viaje active = save("Activo", TURISTA, EstadoViaje.PLANIFICADO);
+
+		assertThat(viajeRepository.findByIdAndEstadoNot(cancelled.getId(), EstadoViaje.CANCELADO)).isEmpty();
+		assertThat(viajeRepository.findByIdAndEstadoNot(active.getId(), EstadoViaje.CANCELADO)).isPresent();
+	}
+
+	private Viaje save(String nombre, String usuario, EstadoViaje estado) {
+		return save(nombre, usuario, estado, LocalDateTime.parse("2026-10-20T00:00:00"));
+	}
+
+	private Viaje save(String nombre, String usuario, EstadoViaje estado, LocalDateTime inicio) {
 		return viajeRepository.save(Viaje.builder()
 				.nombre(nombre)
-				.zonaInteres("Sierras de Córdoba")
+				.zonaInteres(Ubicacion.builder()
+						.ciudad("Sierras de Córdoba")
+						.localidad("Córdoba")
+						.build())
 				.rangoInteresKm(40)
 				.fechaInicio(inicio)
-				.fechaFin(fin)
+				.fechaFin(inicio.plusDays(2))
 				.ritmo(TipoRitmo.EQUILIBRADO)
-				.usuario("turista@test.com")
+				.estado(estado)
+				.usuario(usuario)
 				.build());
 	}
 }

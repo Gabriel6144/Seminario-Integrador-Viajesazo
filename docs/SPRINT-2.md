@@ -226,8 +226,39 @@ un cambio en un archivo que no es tuyo, lo pedís por el PR de su dueño (o lo p
 
 ## 12. Definition of Done
 
-- [ ] `.\mvnw.cmd clean test` en verde (83 actuales + los nuevos).
-- [ ] Endpoints documentados con curl en `PRUEBAS-MANUALES.md`.
-- [ ] `README.md` y `turismo-backend/AGENTS.md` actualizados (modelo, baja lógica, pendientes).
-- [ ] Nomenclatura y estilo respetados (tabulaciones, dominio en español).
-- [ ] Cada PR con al menos una aprobación.
+- [x] `.\mvnw.cmd clean test` en verde: **112 tests, 0 fallos** (83 del Sprint 1 + 29 nuevos).
+- [x] Endpoints documentados con curl en `PRUEBAS-MANUALES.md` (sección "8 bis. Viajes").
+- [x] `README.md` y `turismo-backend/AGENTS.md` actualizados (modelo, baja lógica, pendientes).
+- [x] Nomenclatura y estilo respetados (tabulaciones, dominio en español).
+- [ ] Cada PR con al menos una aprobación (pendiente del flujo de PR; el código y los tests ya están).
+
+## 13. Implementación (as-built) — desvíos respecto del plan
+
+El contrato se congeló contra el **modelo de dominio ya existente** en el repo, que no coincidía
+con las propuestas de las secciones 3 y 5. Estas son las decisiones reales con las que se
+implementó; **pisan** a las recomendaciones D1–D5 del plan:
+
+| Punto | Plan (secciones 3 y 5) | Implementado (real) |
+| --- | --- | --- |
+| Asociación al turista (D1) | `turistaId: Long` | `usuario: String` (email; sin FK, sin entidad `Usuario`) |
+| Baja lógica (VZ-23) | `activo: boolean` | `estado: EstadoViaje` = `CANCELADO` |
+| Preferencias (D2) | `List<Categoria>` | `interesesCategoria: List<InteresCategoria>` (`@ElementCollection`) |
+| Zona de interés (D3) | `zonaInteres: String` | `zonaInteres: Ubicacion` (`@ManyToOne`, `zona_interes_id`) |
+| Rango (D3) | `rangoZona: Integer` | `rangoInteresKm: double` |
+| Ritmo (D4) | `RELAJADO/MODERADO/INTENSO` | `TipoRitmo`: `TRANQUILO/EQUILIBRADO/INTENSIVO` |
+| Fechas | `LocalDate` | `LocalDateTime` en la entidad, `LocalDate` en el DTO (conversión en el mapper) |
+| Enum de categorías | `Categoria` (5 valores) | `InteresCategoria` (9 valores), compartido con `Evento` |
+| Filtro del listado (VZ-22) | `?turistaId=` | `?usuario=` (obligatorio) |
+
+Detalles de implementación que no estaban en el plan:
+
+- **El endpoint base es `/api/viajes`** (el plan usaba `/api/viajes` también, pero con
+  `turistaId`); `GET /{id}` es soporte para editar.
+- **`POST` fuerza `estado = PLANIFICADO`**; `PUT` no permite cambiar el `estado`.
+- **Dos handlers nuevos** en `GlobalExceptionHandler`: `handleMissingParameter` (falta `?usuario`
+  → 400) y `handleTypeMismatch` (id no numérico → 400). Antes caían en el catch-all (500).
+- **El seed** siembra 5 ubicaciones y 5 viajes con fechas relativas; los viajes van con
+  `estado='PLANIFICADO'` porque `estado <> 'CANCELADO'` no matchea `NULL`.
+- **Tests nuevos** (29): `ViajeServiceTest` (7), `ViajeControllerTest` (14), `ViajeMapperTest` (4)
+  y `ViajeRepositoryTest` (4). Se ajustaron a `InteresCategoria` los tests del Sprint 1 afectados
+  por el renombre de `Categoria`.

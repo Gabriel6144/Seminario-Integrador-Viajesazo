@@ -11,8 +11,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import jakarta.validation.ConstraintViolationException;
 
@@ -62,6 +64,24 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(HttpMessageNotReadableException.class)
 	public ResponseEntity<ErrorResponse> handleUnreadableBody(HttpMessageNotReadableException ex) {
 		return build(HttpStatus.BAD_REQUEST, "el cuerpo de la petición no es válido o tiene un formato incorrecto");
+	}
+
+	/**
+	 * Falta un query param obligatorio (p. ej. {@code GET /api/viajes} sin {@code usuario}). Sin
+	 * este handler caería en el catch-all y respondería 500 en lugar de 400.
+	 */
+	@ExceptionHandler(MissingServletRequestParameterException.class)
+	public ResponseEntity<ErrorResponse> handleMissingParameter(MissingServletRequestParameterException ex) {
+		return build(HttpStatus.BAD_REQUEST, "falta el parámetro obligatorio '" + ex.getParameterName() + "'");
+	}
+
+	/**
+	 * Un path variable o query param con el tipo equivocado (p. ej. {@code /api/viajes/abc}). Sin
+	 * este handler caería en el catch-all y respondería 500 en lugar de 400.
+	 */
+	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+	public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+		return build(HttpStatus.BAD_REQUEST, "el parámetro '" + ex.getName() + "' tiene un formato inválido");
 	}
 
 	/**

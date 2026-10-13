@@ -257,7 +257,7 @@ class EventoControllerTest {
 	}
 
 	private EventoResponse response() {
-		return new EventoResponse(7L, "Festival de Folklore", "Encuentro de syrigamis", Categoria.CULTURA,
+		return new EventoResponse(7L, "Festival de Folklore", "Encuentro de syrigamis", InteresCategoria.CULTURA,
 				"Cosquín", "Plaza Pringles", LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-03"),
 				LocalTime.of(20, 0), LocalTime.of(23, 30),
 				List.of("https://cdn.cordoba.gob.ar/folklore.jpg"), 1L, "Turismo Córdoba");

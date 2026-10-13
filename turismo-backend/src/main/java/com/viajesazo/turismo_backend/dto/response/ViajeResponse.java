@@ -1,11 +1,13 @@
 package com.viajesazo.turismo_backend.dto.response;
 
+import com.viajesazo.turismo_backend.model.EstadoViaje;
 import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.model.TipoRitmo;
 import java.time.LocalDate;
 import java.util.List;
 
-public record ViajeResponse (
+public record ViajeResponse(
+    Long id,
     String nombre,
     UbicacionResponse ubicacion,
     double rangoInteresKm,
@@ -13,6 +15,7 @@ public record ViajeResponse (
     LocalDate fechaFin,
     TipoRitmo ritmo,
     List<InteresCategoria> interesesCategoria,
+    EstadoViaje estado,
     String usuario
 
 ) {}

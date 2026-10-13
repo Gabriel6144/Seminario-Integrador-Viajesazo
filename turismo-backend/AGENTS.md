@@ -11,9 +11,10 @@ Tesis de facultad: API REST que centraliza la información turística de la prov
   son subcarpetas del mismo repo git, no repos separados. Se puede tocar el backend y el frontend
   en el mismo commit, y es lo normal: la API y el cliente se cambian juntos. El `.gitignore` de la
   raíz es el que manda.
-- Estado actual: Sprint 1 (gestión de eventos) completo, con **83 tests en verde**. Incluye
-  paginación, CRUD de eventos, alta de publicadores, seed de datos y mapeo con MapStruct.
-  Pendientes: `Viaje`, `Actividad`, `Itinerario`, `Usuario`, `Preferencia` y rutas/traslados.
+- Estado actual: Sprint 1 (gestión de eventos) y Sprint 2 (gestión de viajes) completos, con
+  **112 tests en verde**. Incluye paginación, CRUD de eventos, alta de publicadores, CRUD de
+  viajes con baja lógica, seed de datos y mapeo con MapStruct.
+  Pendientes: `Actividad`, `Itinerario`, `Usuario`, `Preferencia` y rutas/traslados.
 - Para probar los endpoints a mano ver **`PRUEBAS-MANUALES.md`**: levantar, curl de cada ruta,
   casos de error, el detalle de los acentos y los bordes conocidos sin cubrir.
 
@@ -56,7 +57,7 @@ Esta es la regla que más fácil se rompe, porque el dominio va en español y el
 | Entidades: nombre de clase y sus campos | **español** | `Evento.fechaInicio` |
 | DTO: nombre del record y sus campos | **español** | `EventoResponse.nombre()` |
 | Rutas, tablas y `spring.application.name` | **español** | `/api/eventos`, `evento`, `turismo-backend` |
-| Constantes del enum `Categoria` | **español** | `CULTURA`, `NATURALEZA` |
+| Constantes del enum `InteresCategoria` | **español** | `CULTURA`, `NATURALEZA` |
 | Mensajes de excepción, validaciones, `@DisplayName`, javadoc | **español** | `"No existe el evento con id 7"` |
 
 Dos excepciones explícitas al patrón inglés, decididas a propósito: **`AgendaController`** y
@@ -126,8 +127,14 @@ Consecuencias que hay que tener presentes:
 
 ### Seed: `data.sql`
 
-`src/main/resources/data.sql` siembra 3 publicadores, 7 eventos y 5 imágenes. Como
-`ddl-auto=create-drop` borra todo en cada arranque, sin el script la app levanta vacía.
+`src/main/resources/data.sql` siembra 3 publicadores, 8 eventos (cada uno con una imagen),
+5 ubicaciones y 5 viajes. Como `ddl-auto=create-drop` borra todo en cada arranque, sin el script
+la app levanta vacía.
+
+Nota de Sprint 2: los viajes se siembran **después** de las ubicaciones, porque `zonaInteres` es
+una FK a `ubicacion`. Todos van con `estado='PLANIFICADO'` a propósito: VZ-22 lista con
+`estado <> 'CANCELADO'`, y una fila con `estado` en NULL quedaría fuera de la comparación
+(`NULL <> 'CANCELADO'` no es verdadero).
 
 Tres propiedades hacen que funcione, y las tres hacen falta:
 
@@ -141,10 +148,11 @@ Tres propiedades hacen que funcione, y las tres hacen falta:
   solo se ve en desarrollo; en Linux el default ya es UTF-8 y pasa desapercibido. Si aparecen
   mojibake en los datos, es esto primero.
 
-El seed usa fechas **relativas a `CURRENT_DATE`** a propósito (`DATEADD('DAY', -2, CURRENT_DATE)`,
-etc.), sembrando una semana hacia atrás y dos hacia adelante: la agenda consulta de hoy al domingo
-de la semana, así que con fechas fijas el demo dejaría de tener eventos en pantalla ni un mes
-después de escribirlo. Al agregar filas, mantener esa propiedad.
+Los **viajes** usan fechas **relativas a hoy** a propósito (`DATEADD('DAY', 7, CURRENT_TIMESTAMP)`,
+etc.), así el demo siempre tiene viajes futuros sin importar cuándo se levante. Al agregar viajes,
+mantener esa propiedad. Los **eventos**, en cambio, hoy usan fechas **fijas** 2026/2027 en el
+seed; si el demo necesita eventos vigentes en la agenda, hay que volver a fechas relativas
+(`DATEADD('DAY', n, CURRENT_DATE)`).
 
 ### El seed no debe correr en los tests
 
@@ -161,18 +169,30 @@ tests fallarían sin que el código esté mal.
 
 ## Modelo de dominio
 
-Nombres y campos tomados de los requerimientos de la tesis. **Solo existen `Publicador` y
-`Evento` (más el enum `Categoria`)** — el resto son tipos que hay que crear. La nomenclatura del
-dominio va en español (ver "Convenciones de nombres").
+Nombres y campos tomados de los requerimientos de la tesis. **Ya existen `Publicador`, `Evento`,
+`Ubicacion` y `Viaje`** (más los enums `InteresCategoria`, `TipoRitmo` y `EstadoViaje`) — el
+resto son tipos que hay que crear. La nomenclatura del dominio va en español (ver "Convenciones
+de nombres").
 
-- `Categoria` — **ya existe**: gastronomía, familia, cultura, naturaleza, aventura. Persiste como
-  `STRING`, así que en `data.sql` va el nombre de la constante en mayúsculas (`CULTURA`).
+- `InteresCategoria` — **ya existe** (antes se llamaba `Categoria`; se renombró porque ahora la
+  comparten `Evento` y `Viaje`): `NATURALEZA`, `GASTRONOMIA`, `CULTURA`, `HISTORIA`, `AVENTURA`,
+  `VIDA_NOCTURNA`, `MUSICA`, `COMPRAS`, `FAMILIAR_Y_RELAX`. Persiste como `STRING`, así que en
+  `data.sql` va el nombre de la constante en mayúsculas (`CULTURA`).
 - `Publicador` — **ya existe**: nombre, email (único), teléfono. Relación unidireccional
   `Evento → Publicador`; `Publicador` no tiene `List<Evento>` a propósito, se consulta por repositorio.
 - `Evento` — **ya existe**: nombre, descripción, categoría, localidad, dirección, fecha inicio/fin,
   horario inicio/fin, `imagenes` como `@ElementCollection` de URLs (`LAZY`), y `publicador` (`LAZY`,
   obligatorio). **No tiene latitud/longitud**: eso llega con el sprint de mapas.
-- `Viaje` — destino, fecha de inicio y fin (de ahí se calcula la duración), preferencias asociadas.
+- `Ubicacion` — **ya existe** (`model/Ubicacion.java`): `ciudad`, `localidad`, `latitud`/`longitud`
+  (`BigDecimal` con `precision`/`scale`). Es la zona de interés del viaje.
+- `Viaje` — **ya existe** (`model/Viaje.java`): `nombre`, `zonaInteres` (`@ManyToOne` a `Ubicacion`
+  por `zona_interes_id`, obligatoria), `rangoInteresKm` (`double`), `fechaInicio`/`fechaFin`
+  (`LocalDateTime`), `ritmo` (`TipoRitmo`), `interesesCategoria` (`@ElementCollection` de
+  `InteresCategoria`) y `usuario` (`String`). La baja lógica se modela con `estado` (`EstadoViaje`),
+  **no** con un `activo` booleano (ver "API del Sprint 2").
+- `EstadoViaje` — **ya existe**: `PLANIFICADO`, `EN_CURSO`, `FINALIZADO`, `CANCELADO`. VZ-23 usa
+  `CANCELADO` para la baja lógica.
+- `TipoRitmo` — **ya existe**: `TRANQUILO`, `EQUILIBRADO`, `INTENSIVO`.
 - `Preferencia` / nivel de interés por categoría — se apoya en `Categoria`.
 - `Actividad` — descripción, categoría, ubicación, horarios de disponibilidad, duración estimada,
   imágenes, publicada por un `Publicador`.
@@ -250,6 +270,41 @@ Configurado en `application.properties`: `spring.data.web.pageable.default-page-
 (publicador sin eventos, o la base recién arrancada sin nada cargado) devuelve una página vacía
 con 200, no un 404.
 
+## API del Sprint 2 — Viajes
+
+Base `/api`. Mismas convenciones que el Sprint 1 (rutas y JSON en español, paginación con
+`PagedModel` anidado).
+
+| Método | Ruta | Caso de uso |
+| --- | --- | --- |
+| POST | `/api/viajes` | VZ-19 — registrar viaje |
+| PUT | `/api/viajes/{id}` | VZ-21 — modificar |
+| GET | `/api/viajes?usuario=&page=&size=` | VZ-22 — listar viajes activos del turista |
+| DELETE | `/api/viajes/{id}` | VZ-23 — baja **lógica** |
+| GET | `/api/viajes/{id}` | soporte (detalle para editar) |
+
+Decisiones que no son obvias y conviene no deshacer sin motivo:
+
+- **La baja es lógica** (VZ-23). A diferencia de `Evento`, cuya baja es **física**, `DELETE
+  /api/viajes/{id}` marca `estado = CANCELADO` y responde **204**. No "corregirla" a física: es
+  la primera baja lógica del proyecto y está pedida así.
+- **"Activo" = `estado <> CANCELADO`**, no un campo `activo` booleano. El listado y el detalle usan
+  `findByUsuarioAndEstadoNotOrderByFechaInicioAsc` y `findByIdAndEstadoNot`; un viaje cancelado
+  deja de existir para la API (el listado no lo muestra, `GET /{id}` → 404, `PUT` → 404).
+- **"Mis viajes" filtra por `usuario` (String), no por `turistaId`.** No hay entidad `Usuario`
+  todavía; es deuda. `GET /api/viajes` **exige** `?usuario=` y sin él responde **400** (lo maneja
+  `handleMissingParameter`).
+- **La API expone `LocalDate`; la entidad guarda `LocalDateTime`.** `ViajeMapper` convierte con
+  helpers `default` (medianoche). El tipo de persistencia no se filtra al contrato de la API.
+- **`POST` fuerza `estado = PLANIFICADO`** e ignora el `estado` que viniera en el body; `PUT`
+  tampoco permite cambiarlo (el mapeo de update lo ignora). El único cambio de `estado` es el que
+  hace el `DELETE`.
+- **La confirmación previa de VZ-23 CA1 es de la UI** (AlertDialog); el backend solo expone el
+  `DELETE`.
+
+Deuda conocida: `usuario` es un `String` sin FK, igual que el `email` de `Publicador`. Cuando
+exista `Usuario`/autenticación hay que migrar a una relación real.
+
 ## Servicios
 
 `EventoService` y `PublicadorService` usan Lombok `@RequiredArgsConstructor` (todos los collaborators
@@ -275,6 +330,8 @@ devolver; si el mapeo se hiciera afuera, cualquier acceso a una relación `LAZY`
 | `handleConstraintViolation` | 400 | path variables y query params |
 | `handleUnreadableBody` | 400 | JSON mal formado, categoría inexistente, fecha inválida |
 | `handleDataIntegrityViolation` | 400 | violación de unicidad que llega de la base (email duplicado) |
+| `handleMissingParameter` | 400 | falta un query param obligatorio (`GET /api/viajes` sin `usuario`) |
+| `handleTypeMismatch` | 400 | path variable o query param con el tipo equivocado (`/api/viajes/abc`) |
 | `handleUnexpectedError` | 500 | catch-all; **no filtra el mensaje al cliente** |
 
 Tres detalles a no romper:
@@ -287,8 +344,13 @@ Tres detalles a no romper:
   y el valor que chocó,   y eso es un mapa de la base para cualquiera que podría llamar al alta.
 - El `Clock` llega por inyección (`AppConfig.clock()`), no por `LocalDateTime.now()`. Los tests de
   la semana ISO fijan el reloj y así no dependen del día en que corren. Por el mismo motivo, los
-  tres `@WebMvcTest` hacen `@Import(AppConfig.class)`: un slice no carga los beans de `config/` y
-  sin ese import el `Clock` no existiría.
+  cuatro `@WebMvcTest` (`EventoControllerTest`, `PublicadorControllerTest`, `AgendaControllerTest`
+  y `ViajeControllerTest`) hacen `@Import(AppConfig.class)`: un slice no carga los beans de
+  `config/` y sin ese import el `Clock` no existiría.
+
+Dos handlers del Sprint 2 evitan un 500 en casos de borde de la API de viajes:
+`handleMissingParameter` (`GET /api/viajes` sin `?usuario` → 400) y `handleTypeMismatch`
+(`GET /api/viajes/abc` con id no numérico → 400).
 
 ## Servicios externos: decisión pendiente
 
@@ -312,16 +374,20 @@ Las anotaciones de test **cambiaron de package**. Importar desde el package viej
 `@MockBean` ya no existe. Para tests unitarios con Mockito alcanza con
 `@ExtendWith(MockitoExtension.class)` + `@Mock`, sin contexto de Spring.
 
-Reparto actual (83 tests):
+Reparto actual (112 tests):
 
 | Archivo | Tests | Cubre |
 | --- | --- | --- |
 | `EventoServiceTest` | 18 | US1–US5, US7, reglas de negocio |
 | `EventoRepositoryTest` | 16 | solapamiento, bordes, orden, paginación, filtro por publicador, listado completo |
 | `EventoControllerTest` | 15 | US1–US4, US7, errores 400/404, cuerpo inválido |
+| `ViajeControllerTest` | 14 | VZ-19/VZ-21/VZ-22/VZ-23, 400/404, `?usuario` obligatorio |
 | `PublicadorControllerTest` | 10 | validación, ruta anidada, página vacía, US7, **email duplicado → 400** |
 | `AgendaSemanalTest` | 7 | límites de la semana ISO, paginación |
 | `PublicadorServiceTest` | 7 | alta, consulta, 404, US7, **pre-chequeo de email** |
+| `ViajeServiceTest` | 7 | VZ-19–VZ-23, baja lógica, fecha invertida, 404 |
+| `ViajeMapperTest` | 4 | mapeo entidad↔DTO, fechas `LocalDate`↔`LocalDateTime` |
+| `ViajeRepositoryTest` | 4 | activos por usuario, exclusión de cancelados, orden |
 | `AgendaControllerTest` | 4 | forma del JSON paginado, `?page`/`?size`, tope de `size` |
 | `PublicadorRepositoryTest` | 5 | orden alfabético, paginación, página vacía, **derived query + constraint de unicidad** |
 | `TurismoBackendApplicationTests` | 1 | `contextLoads` |

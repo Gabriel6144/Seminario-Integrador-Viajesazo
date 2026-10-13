@@ -1,5 +1,8 @@
 package com.viajesazo.turismo_backend.mapper;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
@@ -20,19 +23,27 @@ public interface ViajeMapper {
     // MAPPINGS DE VIAJE
     // ==========================================
 
+    /**
+     * El {@code id} y el {@code estado} se ignoran a propósito: los asigna el service
+     * (el id lo genera la base y el alta siempre nace {@code PLANIFICADO}). La
+     * {@code zonaInteres} se mapea desde la {@code ubicacion} del request; con el
+     * {@code cascade = ALL} de la entidad, el guardado persiste la ubicación nueva.
+     */
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "estado", ignore = true) // El estado no viene en el Request inicial
-    @Mapping(target = "zonaHospedaje", ignore = true) // El Request solo envía una ubicación, asumimos que es zonaInteres
+    @Mapping(target = "estado", ignore = true)
     @Mapping(target = "zonaInteres", source = "ubicacion")
-    @Mapping(target = "usuario", source = "usuario")
     @Mapping(target = "interesesCategoria", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     Viaje toEntity(ViajeRequest request);
 
+    /**
+     * Actualización sobre la entidad ya cargada, para no perder el {@code id} ni el
+     * {@code estado}. La {@code zonaInteres} se ignora acá y se actualiza en sitio con
+     * {@link #updateUbicacion(UbicacionRequest, Ubicacion)} para no dejar una fila
+     * {@code ubicacion} huérfana en cada modificación.
+     */
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "estado", ignore = true)
-    @Mapping(target = "zonaHospedaje", ignore = true)
-    @Mapping(target = "zonaInteres", source = "ubicacion")
-    @Mapping(target = "usuario", source = "usuario")
+    @Mapping(target = "zonaInteres", ignore = true)
     @Mapping(target = "interesesCategoria", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     void updateEntity(ViajeRequest request, @MappingTarget Viaje viaje);
 
@@ -45,9 +56,24 @@ public interface ViajeMapper {
     // ==========================================
 
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "ciudad", source = "ciudadDeInteres")
     Ubicacion toUbicacionEntity(UbicacionRequest request);
+
+    @Mapping(target = "id", ignore = true)
+    void updateUbicacion(UbicacionRequest request, @MappingTarget Ubicacion ubicacion);
 
     @Mapping(target = "nombre", source = "ciudad")
     UbicacionResponse toUbicacionResponse(Ubicacion ubicacion);
+
+
+    // ==========================================
+    // CONVERSIÓN DE FECHAS (API en LocalDate, persistencia en LocalDateTime)
+    // ==========================================
+
+    default LocalDateTime toLocalDateTime(LocalDate fecha) {
+        return fecha == null ? null : fecha.atStartOfDay();
+    }
+
+    default LocalDate toLocalDate(LocalDateTime fecha) {
+        return fecha == null ? null : fecha.toLocalDate();
+    }
 }
