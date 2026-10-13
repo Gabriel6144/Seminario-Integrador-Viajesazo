@@ -41,7 +41,7 @@ export function PublicadoresPage() {
         <Button asChild size="sm" className="h-12 rounded-xl bg-[#00658d] px-6 text-white shadow-md hover:bg-[#65b7e8]">
           <Link to="/publicadores/nuevo">
             <PlusIcon className="h-5 w-5" aria-hidden />
-            + Nuevo publicador
+            Nuevo publicador
           </Link>
         </Button>
       </div>
