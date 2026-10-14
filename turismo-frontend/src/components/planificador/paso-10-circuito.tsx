@@ -24,7 +24,7 @@ export function Paso10Circuito({
   onRestart,
 }: Paso10CircuitoProps) {
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="w-full">
       {/* Banner de Éxito */}
       <div className="relative mb-6 overflow-hidden rounded-3xl bg-gradient-to-r from-sky-600 to-sky-800 p-6 text-white shadow-lg">
         <div className="relative z-10 flex items-center justify-between">
@@ -33,7 +33,7 @@ export function Paso10Circuito({
               Itinerario Oficial
             </span>
             <h2 className="font-heading mt-1.5 text-2xl font-bold leading-tight sm:text-3xl">
-              ¡Tu aventura está lista! 🎉
+              ¡Tu aventura está lista!
             </h2>
             <p className="mt-1 text-sm text-sky-100">
               {tripName} • {daysCount} Días ({rhythm})

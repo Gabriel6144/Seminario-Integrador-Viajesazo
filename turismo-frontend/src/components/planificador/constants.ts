@@ -21,7 +21,7 @@ export const ZONES: ZoneItem[] = [
     name: 'Centro Histórico',
     label: 'Centro Histórico & Nueva Córdoba',
     desc: 'Museos, vida urbana y gastronomía',
-    emoji: '🏛️',
+    icon: 'account_balance',
     ubicacion: {
       ciudad: 'Córdoba',
       localidad: 'Centro Histórico',
@@ -33,7 +33,7 @@ export const ZONES: ZoneItem[] = [
     name: 'Villa Carlos Paz',
     label: 'Villa Carlos Paz (Valle de Punilla)',
     desc: 'Lago San Roque, teatros y sierras',
-    emoji: '🌲',
+    icon: 'forest',
     ubicacion: {
       ciudad: 'Villa Carlos Paz',
       localidad: 'Valle de Punilla',
@@ -45,7 +45,7 @@ export const ZONES: ZoneItem[] = [
     name: 'La Cumbrecita / Calamuchita',
     label: 'La Cumbrecita & Valle de Calamuchita',
     desc: 'Bosques, cascadas y aldeas alpinas',
-    emoji: '🌿',
+    icon: 'nature',
     ubicacion: {
       ciudad: 'La Cumbrecita',
       localidad: 'Valle de Calamuchita',
@@ -57,7 +57,7 @@ export const ZONES: ZoneItem[] = [
     name: 'Colonia Caroya / Sierras Chicas',
     label: 'Colonia Caroya & Sierras Chicas',
     desc: 'Bodegas, salames y estancias jesuitas',
-    emoji: '🍷',
+    icon: 'wine_bar',
     ubicacion: {
       ciudad: 'Colonia Caroya',
       localidad: 'Sierras Chicas',
@@ -69,7 +69,7 @@ export const ZONES: ZoneItem[] = [
     name: 'Mina Clavero / Traslasierra',
     label: 'Mina Clavero & Traslasierra',
     desc: 'Ríos cristalinos y microclima serrano',
-    emoji: '⛰️',
+    icon: 'landscape',
     ubicacion: {
       ciudad: 'Mina Clavero',
       localidad: 'Traslasierra',
@@ -98,21 +98,20 @@ export const RHYTHM_MAP: Record<string, TipoRitmo> = {
 }
 
 export const ALL_INTERESTS: InterestItem[] = [
-  { name: 'Naturaleza', emoji: '🌿' },
-  { name: 'Gastronomía', emoji: '🍴' },
-  { name: 'Cultura', emoji: '🎨' },
-  { name: 'Historia', emoji: '🏛️' },
-  { name: 'Aventura', emoji: '🥾' },
-  { name: 'Vida nocturna', emoji: '🌙', label: 'Noche & Bares' },
-  { name: 'Música', emoji: '🎵', label: 'Música & Cuarteto' },
-  { name: 'Compras', emoji: '🛍️', label: 'Compras & Ferias' },
-  { name: 'Familiar', emoji: '👨‍👩‍👧', label: 'Familiar' },
+  { name: 'Naturaleza', icon: 'forest' },
+  { name: 'Gastronomía', icon: 'restaurant' },
+  { name: 'Cultura', icon: 'palette' },
+  { name: 'Historia', icon: 'account_balance' },
+  { name: 'Aventura', icon: 'hiking' },
+  { name: 'Vida nocturna', icon: 'nightlife', label: 'Noche & Bares' },
+  { name: 'Música', icon: 'music_note', label: 'Música & Cuarteto' },
+  { name: 'Compras', icon: 'shopping_bag', label: 'Compras & Ferias' },
+  { name: 'Familiar', icon: 'family_restroom', label: 'Familiar' },
 ]
 
 export const RHYTHMS: RhythmItem[] = [
   {
     id: 'Tranquilo',
-    emoji: '🌿',
     title: 'TRANQUILO',
     desc: 'Pocas actividades por día, paradas largas y tiempo para disfrutar el paisaje.',
     tag: '1 a 2 paradas diarias',
@@ -121,7 +120,6 @@ export const RHYTHMS: RhythmItem[] = [
   },
   {
     id: 'Equilibrado',
-    emoji: '✨',
     title: 'EQUILIBRADO',
     desc: 'Ritmo intermedio, tiempo bien distribuido entre paradas y momentos de descanso.',
     tag: '3 a 4 paradas diarias (Recomendado)',
@@ -130,7 +128,6 @@ export const RHYTHMS: RhythmItem[] = [
   },
   {
     id: 'Intensivo',
-    emoji: '🔥',
     title: 'INTENSO',
     desc: 'Días con agenda llena, recorrido continuo y máximo uso del tiempo desde la mañana a la noche.',
     tag: '5+ actividades por día',

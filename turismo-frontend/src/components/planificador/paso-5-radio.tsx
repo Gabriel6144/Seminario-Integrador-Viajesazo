@@ -15,20 +15,21 @@ export function Paso5Radio({
   onNext,
 }: Paso5RadioProps) {
   return (
-    <div>
-      <GuiaCallout message="Ajustá cuánto te querés mover desde tu base de alojamiento." />
+    <div className="flex min-h-[500px] w-full flex-col justify-between">
+      <div>
+        <GuiaCallout message="Ajustá cuánto te querés mover desde tu base de alojamiento." />
 
-      <h2 className="font-heading text-2xl font-bold text-slate-800 sm:text-3xl">
-        ¿Hasta dónde querés explorar? 🗺️
-      </h2>
-      <p className="mt-1.5 text-sm text-slate-500">
-        Podemos buscar actividades a pasos de tu hotel o abrir el abanico a toda la región serrana.
-      </p>
+        <h2 className="font-heading text-2xl font-bold text-slate-800 sm:text-3xl">
+          ¿Hasta dónde querés explorar?
+        </h2>
+        <p className="mt-1.5 text-sm text-slate-500">
+          Podemos buscar actividades a pasos de tu hotel o abrir el abanico a toda la región serrana.
+        </p>
 
-      {/* Layout 2 columnas en desktop */}
-      <div className="mt-6 grid grid-cols-1 items-center gap-6 md:grid-cols-2">
-        {/* Radar Interactivo */}
-        <div className="relative flex h-60 flex-col justify-between overflow-hidden rounded-3xl border border-slate-700 bg-slate-900 p-5 shadow-xl sm:h-72">
+        {/* Layout 2 columnas en desktop */}
+        <div className="mt-5 grid grid-cols-1 items-center gap-5 md:grid-cols-2">
+          {/* Radar Interactivo */}
+          <div className="relative flex h-56 flex-col justify-between overflow-hidden rounded-3xl border border-slate-700 bg-slate-900 p-4 shadow-xl sm:h-64">
           <div className="absolute inset-0 bg-[radial-gradient(#38bdf8_1.5px,transparent_1.5px)] [background-size:20px_20px] opacity-20" />
 
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
@@ -55,13 +56,13 @@ export function Paso5Radio({
 
             {/* Puntos de interés simulados */}
             <div className="absolute -translate-x-12 -translate-y-10 rounded-full bg-sky-300 px-2 py-0.5 text-[10px] font-bold text-slate-900 shadow">
-              ☕ Café
+              Café
             </div>
             <div className="absolute translate-x-14 translate-y-8 rounded-full bg-sky-300 px-2 py-0.5 text-[10px] font-bold text-slate-900 shadow">
-              🌲 Parque
+              Parque
             </div>
             <div className="absolute -translate-x-16 translate-y-14 rounded-full bg-sky-300 px-2 py-0.5 text-[10px] font-bold text-slate-900 shadow">
-              🎨 Museo
+              Museo
             </div>
           </div>
 
@@ -109,9 +110,9 @@ export function Paso5Radio({
 
           <div className="mt-6 grid grid-cols-3 gap-2.5 border-t border-slate-100 pt-4">
             {[
-              { km: 3, label: 'Más cerca 🏠' },
-              { km: 8, label: 'Equilibrado ✨' },
-              { km: 18, label: 'Aventura 🧭' },
+              { km: 3, label: 'Más cerca' },
+              { km: 8, label: 'Equilibrado' },
+              { km: 18, label: 'Aventura' },
             ].map((preset) => {
               const isSelected = radiusKm === preset.km
               return (
@@ -133,8 +134,9 @@ export function Paso5Radio({
           </div>
         </div>
       </div>
+      </div>
 
-      <div className="mt-10 flex justify-end">
+      <div className="mt-auto pt-6 flex justify-end">
         <button
           type="button"
           className="flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-600 px-8 py-3.5 font-heading text-sm font-bold text-white shadow-md shadow-sky-500/20 transition-all hover:bg-sky-700 active:scale-[0.98] sm:w-auto"

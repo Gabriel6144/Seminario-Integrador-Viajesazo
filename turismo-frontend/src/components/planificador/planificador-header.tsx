@@ -10,7 +10,7 @@ export function PlanificadorHeader({ step, onBack, onClose }: PlanificadorHeader
   const progressPercent = Math.min(100, Math.round((step / 8) * 100))
 
   return (
-    <header className="w-full">
+    <header className="mb-2 w-full px-2 sm:px-4">
       <div className="flex items-center gap-3 w-full">
         {step > 1 ? (
           <button

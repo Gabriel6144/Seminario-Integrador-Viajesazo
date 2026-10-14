@@ -106,12 +106,12 @@ describe('PlanificadorPage', () => {
     // Botón cerrar -> modal en el paso 2
     const btnClose = screen.getByRole('button', { name: /cerrar/i })
     await user.click(btnClose)
-    expect(screen.getByText('¿Querés guardar tu aventura? 💙')).toBeInTheDocument()
+    expect(screen.getByText('¿Querés guardar tu aventura?')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /guardar como borrador/i })).toBeInTheDocument()
 
     // Cancelar modal
     await user.click(screen.getByRole('button', { name: /seguir planificando/i }))
-    expect(screen.queryByText('¿Querés guardar tu aventura? 💙')).not.toBeInTheDocument()
+    expect(screen.queryByText('¿Querés guardar tu aventura?')).not.toBeInTheDocument()
 
     // Botón volver
     const btnBack = screen.getByRole('button', { name: /atrás/i })

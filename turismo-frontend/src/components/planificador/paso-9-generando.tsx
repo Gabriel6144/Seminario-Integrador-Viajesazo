@@ -7,7 +7,7 @@ interface Paso9GenerandoProps {
 
 export function Paso9Generando({ loadingStep }: Paso9GenerandoProps) {
   return (
-    <div className="flex min-h-[440px] flex-col items-center justify-center py-12 text-center">
+    <div className="flex min-h-[500px] w-full flex-col items-center justify-center py-8 text-center">
       <div className="relative mb-6 h-40 w-40">
         <div
           className="absolute inset-0 animate-spin rounded-full border-4 border-dashed border-sky-400"

@@ -24,18 +24,16 @@ export function Paso8Resumen({
   onGenerate,
 }: Paso8ResumenProps) {
   return (
-    <div className="mx-auto max-w-3xl">
-      <div className="mb-6 text-center">
-        <div className="mx-auto mb-2.5 flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 text-amber-600 shadow-inner">
+    <div className="flex min-h-[500px] w-full flex-col justify-between">
+      <div>
+        <div className="mb-6 text-center">
+          <div className="mx-auto mb-2.5 flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 text-amber-600 shadow-inner">
           <span className="material-symbols-outlined fill text-3xl">task_alt</span>
         </div>
         <h2 className="font-heading text-2xl font-bold text-slate-800 sm:text-3xl">
-          ¡Listo! Tenemos tu aventura preparada 💙
+          ¡Listo! Tenemos tu aventura preparada
         </h2>
-        <p className="mt-1.5 text-sm text-slate-500">
-          Con esta información la IA generará un itinerario inteligente optimizado.
-        </p>
-      </div>
+        </div>
 
       {/* Grid 2 columnas en desktop */}
       <div className="grid grid-cols-1 gap-3.5 rounded-3xl border border-slate-200/90 bg-white p-5 shadow-sm sm:grid-cols-2 sm:p-6">
@@ -149,15 +147,15 @@ export function Paso8Resumen({
           </button>
         </div>
       </div>
+      </div>
 
-      <div className="mt-8">
+      <div className="mt-auto pt-6">
         <button
           type="button"
           onClick={onGenerate}
           className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-sky-600 via-sky-500 to-amber-500 px-8 py-4 font-heading text-lg font-bold text-white shadow-xl shadow-sky-500/25 transition-all hover:opacity-95 active:scale-[0.98]"
         >
-          <span className="material-symbols-outlined text-2xl">auto_awesome</span>
-          <span> Generar mi circuito</span>
+          <span>Generar mi circuito</span>
         </button>
         <p className="mt-2 text-center text-xs text-slate-400">
           Personalizado con motor turístico de Viajesazo

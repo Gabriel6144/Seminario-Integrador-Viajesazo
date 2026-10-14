@@ -4,19 +4,20 @@ export interface ZoneItem {
   name: string
   label: string
   desc: string
-  emoji: string
+  icon: string
+  emoji?: string
   ubicacion: UbicacionRequest
 }
 
 export interface InterestItem {
   name: string
-  emoji: string
+  icon: string
+  emoji?: string
   label?: string
 }
 
 export interface RhythmItem {
   id: string
-  emoji: string
   title: string
   desc: string
   tag: string
@@ -38,4 +39,3 @@ export interface ActivityItem {
   title: string
   desc: string
 }
-

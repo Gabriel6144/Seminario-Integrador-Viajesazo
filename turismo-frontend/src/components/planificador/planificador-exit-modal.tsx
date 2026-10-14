@@ -26,7 +26,7 @@ export function PlanificadorExitModal({
           <span className="material-symbols-outlined text-3xl">bookmark_add</span>
         </div>
         <h3 className="font-heading text-lg font-bold text-slate-800">
-          ¿Querés guardar tu aventura? 💙
+          ¿Querés guardar tu aventura?
         </h3>
         <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
           Podés guardar tu planificación como borrador y continuarla en cualquier momento.

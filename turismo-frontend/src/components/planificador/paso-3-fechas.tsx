@@ -26,12 +26,13 @@ export function Paso3Fechas({
   onNext,
 }: Paso3FechasProps) {
   return (
-    <div className="mx-auto max-w-2xl">
-      <GuiaCallout message="Reviso el clima y aperturas para esos días." />
+    <div className="flex min-h-[500px] w-full flex-col justify-between">
+      <div>
+        <GuiaCallout message="Reviso el clima y aperturas para esos días." />
 
-      <h2 className="font-heading text-2xl font-bold text-slate-800 sm:text-3xl">
-        ¿Cuándo venís a Córdoba? 📅
-      </h2>
+        <h2 className="font-heading text-2xl font-bold text-slate-800 sm:text-3xl">
+          ¿Cuándo venís a Córdoba?
+        </h2>
       <p className="mt-1.5 text-sm text-slate-500">
         Elegí las fechas para encontrar actividades que estén realmente disponibles durante tu estadía.
       </p>
@@ -127,8 +128,9 @@ export function Paso3Fechas({
           </div>
         </div>
       )}
+      </div>
 
-      <div className="mt-10 flex justify-end">
+      <div className="mt-auto pt-6 flex justify-end">
         <button
           type="button"
           className="flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-600 px-8 py-3.5 font-heading text-sm font-bold text-white shadow-md shadow-sky-500/20 transition-all hover:bg-sky-700 active:scale-[0.98] sm:w-auto"

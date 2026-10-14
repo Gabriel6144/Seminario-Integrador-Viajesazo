@@ -6,7 +6,7 @@ interface Paso1BienvenidaProps {
 
 export function Paso1Bienvenida({ onStart }: Paso1BienvenidaProps) {
   return (
-    <div className="flex flex-col items-center py-6 text-center">
+    <div className="flex min-h-[500px] w-full flex-col items-center justify-center py-6 text-center">
       <div className="relative mb-6 flex h-44 w-44 items-center justify-center">
         <div className="animate-ripple absolute inset-0 rounded-full bg-sky-200/50" />
         <div className="animate-gentle-pulse relative z-10 h-36 w-36 overflow-hidden rounded-full border-4 border-sky-300 bg-white p-1.5 shadow-xl">
@@ -16,9 +16,6 @@ export function Paso1Bienvenida({ onStart }: Paso1BienvenidaProps) {
             src={ASISTENTE_AVATAR}
           />
         </div>
-        <span className="absolute bottom-2 right-4 z-20 flex items-center justify-center rounded-full bg-amber-400 p-2 text-sm text-white shadow-md">
-          👋
-        </span>
       </div>
 
       <h1 className="font-heading mb-3 text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl">

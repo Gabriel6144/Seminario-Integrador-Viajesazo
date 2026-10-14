@@ -6,10 +6,10 @@ interface GuiaCalloutProps {
 
 export function GuiaCallout({ message }: GuiaCalloutProps) {
   return (
-    <div className="mb-5 flex items-center gap-3.5 rounded-2xl border border-sky-100 bg-sky-50/70 p-4">
+    <div className="mb-4 flex items-center gap-3 rounded-2xl border border-sky-100 bg-sky-50/70 px-4 py-2.5">
       <img
         alt="Guía de Córdoba"
-        className="h-11 w-11 flex-shrink-0 rounded-full border border-sky-200 object-cover"
+        className="h-9 w-9 flex-shrink-0 rounded-full border border-sky-200 object-cover"
         src={GUIA_AVATAR}
       />
       <div>

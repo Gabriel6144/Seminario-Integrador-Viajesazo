@@ -56,10 +56,10 @@ export function PlanificadorPage() {
   // Loading animation state
   const [loadingStepIndex, setLoadingStepIndex] = useState<number>(0)
   const loadingSteps: LoadingStep[] = [
-    { title: 'Estamos buscando experiencias para vos... 🔎', sub: 'Explorando paradas serranas y recomendaciones locales...', bar: 30 },
-    { title: 'Encontramos actividades que coinciden con tus intereses... ✨', sub: `Combinando ${interests.slice(0, 2).join(' & ')}...`, bar: 65 },
-    { title: 'Estamos armando la mejor combinación... 🗺️', sub: 'Calculando tiempos óptimos sin apurarte...', bar: 88 },
-    { title: '¡Tu aventura está lista! 🎉', sub: 'Itinerario optimizado con éxito.', bar: 100 },
+    { title: 'Estamos buscando experiencias para vos...', sub: 'Explorando paradas serranas y recomendaciones locales...', bar: 30 },
+    { title: 'Encontramos actividades que coinciden con tus intereses...', sub: `Combinando ${interests.slice(0, 2).join(' & ')}...`, bar: 65 },
+    { title: 'Estamos armando la mejor combinación...', sub: 'Calculando tiempos óptimos sin apurarte...', bar: 88 },
+    { title: '¡Tu aventura está lista!', sub: 'Itinerario optimizado con éxito.', bar: 100 },
   ]
 
   // Validation helpers for each step
@@ -178,7 +178,7 @@ export function PlanificadorPage() {
   const { mutate: guardarViaje, isPending: isSavingTrip } = useMutation({
     mutationFn: (payload: ViajeRequest) => crearViaje(payload),
     onSuccess: (data) => {
-      showToast(`¡Viaje "${data.nombre}" guardado con éxito! 💙`)
+      showToast(`¡Viaje "${data.nombre}" guardado con éxito!`)
     },
     onError: (error) => {
       showToast(error instanceof Error ? error.message : 'Error al guardar el viaje en el servidor')
@@ -203,7 +203,7 @@ export function PlanificadorPage() {
   }
 
   return (
-    <div>
+    <div className="mx-auto w-full max-w-4xl">
       <div>
         {/* HEADER PROGRESO (Pasos 1 al 8) */}
         <PlanificadorHeader
@@ -213,7 +213,7 @@ export function PlanificadorPage() {
         />
 
         {/* CONTENIDO PRINCIPAL RESPONSIVE */}
-        <main className="p-4 sm:p-8">
+        <main className="p-2 sm:p-4">
           {step === 1 && <Paso1Bienvenida onStart={() => setStep(2)} />}
 
           {step === 2 && (
