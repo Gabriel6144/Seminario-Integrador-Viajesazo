@@ -1,5 +1,7 @@
-import { useState, useId } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState, useId } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useBorrador, useActualizarBorrador, useCompletarBorrador, useCrearViaje, useGuardarBorrador } from '@/api/viajes'
+import type { InteresCategoria, TipoRitmo, UbicacionRequest, ViajeBorradorRequest, ViajeRequest } from '@/types/api'
 
 // Mascot / assistant avatar URLs
 const ASISTENTE_AVATAR =
@@ -173,8 +175,63 @@ const DAYS_DATA: Record<number, Array<{ time: string; cat: string; catClass: str
   ],
 }
 
+const INTEREST_MAP: Record<string, InteresCategoria> = {
+  Naturaleza: 'NATURALEZA',
+  Gastronomía: 'GASTRONOMIA',
+  Cultura: 'CULTURA',
+  Historia: 'HISTORIA',
+  Aventura: 'AVENTURA',
+  'Vida nocturna': 'VIDA_NOCTURNA',
+  Música: 'MUSICA',
+  Compras: 'COMPRAS',
+  Familiar: 'FAMILIAR_Y_RELAX',
+}
+
+const RHYTHM_MAP: Record<string, TipoRitmo> = {
+  Tranquilo: 'TRANQUILO',
+  Equilibrado: 'EQUILIBRADO',
+  Intensivo: 'INTENSIVO',
+}
+
+const RHYTHM_REVERSE: Record<TipoRitmo, string> = {
+  TRANQUILO: 'Tranquilo',
+  EQUILIBRADO: 'Equilibrado',
+  INTENSIVO: 'Intensivo',
+}
+
+const INTEREST_REVERSE: Partial<Record<InteresCategoria, string>> = Object.fromEntries(
+  Object.entries(INTEREST_MAP).map(([k, v]) => [v, k]),
+) as Partial<Record<InteresCategoria, string>>
+
+const ZONE_UBICACION: Record<string, UbicacionRequest> = {
+  'Centro Histórico': { ciudad: 'Córdoba', localidad: 'Centro Histórico', latitud: -31.42, longitud: -64.18 },
+  'Villa Carlos Paz': { ciudad: 'Villa Carlos Paz', localidad: 'Valle de Punilla', latitud: -31.42, longitud: -64.5 },
+  'La Cumbrecita / Calamuchita': { ciudad: 'La Cumbrecita', localidad: 'Valle de Calamuchita', latitud: -31.9, longitud: -64.77 },
+  'Colonia Caroya / Sierras Chicas': { ciudad: 'Colonia Caroya', localidad: 'Sierras Chicas', latitud: -30.98, longitud: -64.08 },
+  'Mina Clavero / Traslasierra': { ciudad: 'Mina Clavero', localidad: 'Traslasierra', latitud: -31.72, longitud: -65.01 },
+}
+
 export function PlanificadorPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const borradorIdInicial = searchParams.get('borrador')
+  const [borradorId, setBorradorId] = useState<number | null>(
+    borradorIdInicial ? Number(borradorIdInicial) : null,
+  )
+
+  // Sincroniza `borradorId` cuando el query param `borrador` cambia
+  // (por ejemplo, al recargar la página o navegar entre borradores)
+  useEffect(() => {
+    const nuevoId = searchParams.get('borrador')
+    setBorradorId(nuevoId ? Number(nuevoId) : null)
+  }, [searchParams])
+
+  const borradorQuery = useBorrador(borradorId)
+  const guardarBorrador = useGuardarBorrador()
+  const actualizarBorrador = useActualizarBorrador()
+  const completarBorrador = useCompletarBorrador()
+  const crearViaje = useCrearViaje()
+
   const tripNameId = useId()
   const dateFromId = useId()
   const dateToId = useId()
@@ -212,6 +269,25 @@ export function PlanificadorPage() {
     const diff = Math.ceil(Math.abs(d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24)) + 1
     return isNaN(diff) || diff < 1 ? 1 : diff
   })()
+
+  useEffect(() => {
+    const d = borradorQuery.data
+    if (!d) return
+    setTripName(d.nombre ?? 'Escapada a Córdoba')
+    if (d.fechaInicio) setDateFrom(d.fechaInicio)
+    if (d.fechaFin) setDateTo(d.fechaFin)
+    if (d.rangoInteresKm != null) setRadiusKm(d.rangoInteresKm)
+    if (d.interesesCategoria.length > 0) {
+      setInterests(d.interesesCategoria.map((item) => INTEREST_REVERSE[item] ?? item))
+    }
+    if (d.ritmo) setRhythm(RHYTHM_REVERSE[d.ritmo] ?? rhythm)
+    if (d.ubicacion) {
+      const zona = Object.keys(ZONE_UBICACION).find((nombre) => ZONE_UBICACION[nombre].ciudad === d.ubicacion?.ciudad)
+      if (zona) setZone(zona)
+    }
+    if (d.pasoActual) setStep(d.pasoActual)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [borradorQuery.data, borradorId])
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
@@ -253,16 +329,61 @@ export function PlanificadorPage() {
     }, 1100)
   }
 
+  const buildViajePayload = (): ViajeBorradorRequest => ({
+    nombre: tripName.trim() || 'Escapada a Córdoba',
+    fechaInicio: dateFrom,
+    fechaFin: dateTo,
+    ubicacion: ZONE_UBICACION[zone] ?? null,
+    rangoInteresKm: Number(radiusKm),
+    ritmo: RHYTHM_MAP[rhythm] ?? 'EQUILIBRADO',
+    interesesCategoria: interests.map((item) => INTEREST_MAP[item] ?? 'NATURALEZA'),
+    pasoActual: step,
+    usuario: 'turista_demo',
+  })
+
   const handleSaveTrip = () => {
-    showToast('¡Circuito guardado con éxito en Mis Viajes! 💙')
+    if (borradorId !== null) {
+      completarBorrador.mutate(borradorId, {
+        onSuccess: (data) => {
+          showToast(`¡Viaje "${data.nombre ?? 'sin nombre'}" guardado en Mis viajes! 💙`)
+          setBorradorId(null)
+          setTimeout(() => navigate('/borradores'), 1200)
+        },
+        onError: (error) => {
+          showToast(error instanceof Error ? error.message : 'Error al completar el viaje')
+        },
+      })
+      return
+    }
+
+    crearViaje.mutate(buildViajePayload() as ViajeRequest, {
+      onSuccess: (data) => {
+        showToast(`¡Viaje "${data.nombre ?? 'sin nombre'}" guardado en Mis viajes! 💙`)
+        setTimeout(() => navigate('/borradores'), 1200)
+      },
+      onError: (error) => {
+        showToast(error instanceof Error ? error.message : 'Error al guardar el viaje')
+      },
+    })
   }
 
   const handleSaveDraft = () => {
     setIsExitModalOpen(false)
-    showToast('Borrador guardado correctamente 💾')
-    setTimeout(() => {
-      navigate('/')
-    }, 1200)
+    const payload = buildViajePayload()
+    const onSuccess = (data: { id: number; nombre: string | null }) => {
+      setBorradorId(data.id)
+      showToast('Borrador guardado correctamente 💾')
+      setTimeout(() => navigate('/borradores'), 1200)
+    }
+    const onError = (error: unknown) => {
+      showToast(error instanceof Error ? error.message : 'Error al guardar el borrador')
+    }
+
+    if (borradorId !== null) {
+      actualizarBorrador.mutate({ id: borradorId, request: payload }, { onSuccess, onError })
+    } else {
+      guardarBorrador.mutate(payload, { onSuccess, onError })
+    }
   }
 
   const handleDiscardExit = () => {

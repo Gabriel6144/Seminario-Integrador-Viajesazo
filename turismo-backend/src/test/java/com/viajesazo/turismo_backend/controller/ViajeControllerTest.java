@@ -232,7 +232,7 @@ class ViajeControllerTest {
 	private ViajeResponse response() {
 		return new ViajeResponse(7L, "Escapada serrana",
 				new UbicacionResponse("Villa General Belgrano", "Córdoba", "Villa General Belgrano", -31.95, -64.55),
-				35, LocalDate.parse("2026-10-20"), LocalDate.parse("2026-10-22"),
-				TipoRitmo.EQUILIBRADO, List.of(InteresCategoria.CULTURA), EstadoViaje.PLANIFICADO, USUARIO);
+				35.0, LocalDate.parse("2026-10-20"), LocalDate.parse("2026-10-22"),
+				TipoRitmo.EQUILIBRADO, List.of(InteresCategoria.CULTURA), EstadoViaje.PLANIFICADO, 8, USUARIO);
 	}
 }

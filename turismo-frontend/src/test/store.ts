@@ -1,5 +1,5 @@
-import { EVENTOS, PUBLICADORES } from './fixtures'
-import type { EventoRequest, EventoResponse, PublicadorRequest, PublicadorResponse } from '@/types/api'
+import { BORRADORES, EVENTOS, PUBLICADORES } from './fixtures'
+import type { EventoRequest, EventoResponse, PublicadorRequest, PublicadorResponse, ViajeBorradorRequest, ViajeResponse } from '@/types/api'
 
 /**
  * Base de datos en memoria para los tests.
@@ -16,15 +16,19 @@ import type { EventoRequest, EventoResponse, PublicadorRequest, PublicadorRespon
 
 let eventos: EventoResponse[] = []
 let publicadores: PublicadorResponse[] = []
+let borradores: ViajeResponse[] = []
 let nextEventoId = 0
 let nextPublicadorId = 0
+let nextBorradorId = 0
 
 export function resetStore(): void {
   eventos = structuredClone(EVENTOS)
   publicadores = structuredClone(PUBLICADORES)
+  borradores = structuredClone(BORRADORES)
   // Los fixtures ya traen ids 1..3 y 1..7, así que los siguientes arrancan por arriba.
   nextEventoId = Math.max(0, ...EVENTOS.map((evento) => evento.id)) + 1
   nextPublicadorId = Math.max(0, ...PUBLICADORES.map((publicador) => publicador.id)) + 1
+  nextBorradorId = Math.max(0, ...BORRADORES.map((borrador) => borrador.id)) + 1
 }
 
 export function allEventos(): EventoResponse[] {
@@ -33,6 +37,77 @@ export function allEventos(): EventoResponse[] {
 
 export function allPublicadores(): PublicadorResponse[] {
   return publicadores
+}
+
+export function allBorradores(): ViajeResponse[] {
+  return borradores
+}
+
+export function findBorrador(id: number): ViajeResponse | undefined {
+  return borradores.find((borrador) => borrador.id === id)
+}
+
+export function createBorrador(request: ViajeBorradorRequest): ViajeResponse {
+  const created: ViajeResponse = {
+    id: nextBorradorId++,
+    nombre: request.nombre ?? null,
+    ubicacion: request.ubicacion
+      ? {
+          nombre: request.ubicacion.ciudad,
+          localidad: request.ubicacion.localidad,
+          ciudad: request.ubicacion.ciudad,
+          latitud: request.ubicacion.latitud,
+          longitud: request.ubicacion.longitud,
+        }
+      : null,
+    rangoInteresKm: request.rangoInteresKm ?? null,
+    fechaInicio: request.fechaInicio ?? null,
+    fechaFin: request.fechaFin ?? null,
+    ritmo: request.ritmo ?? null,
+    interesesCategoria: request.interesesCategoria ?? [],
+    estado: 'BORRADOR',
+    pasoActual: request.pasoActual ?? null,
+    usuario: request.usuario,
+  }
+  borradores.push(created)
+  return created
+}
+
+export function updateBorrador(id: number, request: ViajeBorradorRequest): ViajeResponse | undefined {
+  const borrador = findBorrador(id)
+  if (borrador === undefined) return undefined
+  if (request.nombre !== undefined) borrador.nombre = request.nombre
+  if (request.ubicacion) {
+    borrador.ubicacion = {
+      nombre: request.ubicacion.ciudad,
+      localidad: request.ubicacion.localidad,
+      ciudad: request.ubicacion.ciudad,
+      latitud: request.ubicacion.latitud,
+      longitud: request.ubicacion.longitud,
+    }
+  }
+  if (request.rangoInteresKm !== undefined) borrador.rangoInteresKm = request.rangoInteresKm
+  if (request.fechaInicio !== undefined) borrador.fechaInicio = request.fechaInicio
+  if (request.fechaFin !== undefined) borrador.fechaFin = request.fechaFin
+  if (request.ritmo !== undefined) borrador.ritmo = request.ritmo
+  if (request.interesesCategoria) borrador.interesesCategoria = request.interesesCategoria
+  if (request.pasoActual !== undefined) borrador.pasoActual = request.pasoActual
+  return borrador
+}
+
+export function completeBorrador(id: number): ViajeResponse | undefined {
+  const borrador = findBorrador(id)
+  if (borrador === undefined) return undefined
+  borrador.estado = 'PLANIFICADO'
+  borrador.pasoActual = 8
+  return borrador
+}
+
+export function deleteBorrador(id: number): boolean {
+  const index = borradores.findIndex((borrador) => borrador.id === id)
+  if (index === -1) return false
+  borradores.splice(index, 1)
+  return true
 }
 
 export function findEvento(id: number): EventoResponse | undefined {

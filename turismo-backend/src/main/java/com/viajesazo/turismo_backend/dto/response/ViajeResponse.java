@@ -10,12 +10,13 @@ public record ViajeResponse(
     Long id,
     String nombre,
     UbicacionResponse ubicacion,
-    double rangoInteresKm,
+    Double rangoInteresKm,
     LocalDate fechaInicio,
     LocalDate fechaFin,
     TipoRitmo ritmo,
     List<InteresCategoria> interesesCategoria,
     EstadoViaje estado,
+    Integer pasoActual,
     String usuario
 
 ) {}

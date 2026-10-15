@@ -58,6 +58,12 @@ export function TopAppBar() {
           >
             Publicadores
           </Link>
+          <Link
+            to="/borradores"
+            className="text-sm text-[#3f484e] transition-colors hover:text-[#00658d]"
+          >
+            Borradores
+          </Link>
         </nav>
 
         {/* Badge publicador */}

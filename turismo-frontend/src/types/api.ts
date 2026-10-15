@@ -198,3 +198,75 @@ export interface ApiErrorResponse {
   message: string
   timestamp: string
 }
+
+export const TIPOS_RITMO = ['TRANQUILO', 'EQUILIBRADO', 'INTENSIVO'] as const
+export type TipoRitmo = (typeof TIPOS_RITMO)[number]
+
+export const ESTADOS_VIAJE = ['BORRADOR', 'PLANIFICADO', 'EN_CURSO', 'FINALIZADO', 'CANCELADO'] as const
+export type EstadoViaje = (typeof ESTADOS_VIAJE)[number]
+
+export const INTERESES_CATEGORIA = [
+  'NATURALEZA',
+  'GASTRONOMIA',
+  'CULTURA',
+  'HISTORIA',
+  'AVENTURA',
+  'VIDA_NOCTURNA',
+  'MUSICA',
+  'COMPRAS',
+  'FAMILIAR_Y_RELAX',
+] as const
+export type InteresCategoria = (typeof INTERESES_CATEGORIA)[number]
+
+export interface UbicacionRequest {
+  ciudad: string
+  localidad: string | null
+  latitud: number
+  longitud: number
+}
+
+export interface UbicacionResponse {
+  nombre: string
+  localidad: string | null
+  ciudad: string
+  latitud: number
+  longitud: number
+}
+
+export interface ViajeBorradorRequest {
+  nombre: string | null
+  ubicacion: UbicacionRequest | null
+  rangoInteresKm: number | null
+  fechaInicio: LocalDate | null
+  fechaFin: LocalDate | null
+  ritmo: TipoRitmo | null
+  interesesCategoria: InteresCategoria[] | null
+  pasoActual: number | null
+  usuario: string
+}
+
+export interface ViajeResponse {
+  id: number
+  nombre: string | null
+  ubicacion: UbicacionResponse | null
+  rangoInteresKm: number | null
+  fechaInicio: LocalDate | null
+  fechaFin: LocalDate | null
+  ritmo: TipoRitmo | null
+  /** Nunca `null` en las respuestas; el backend usa `@Builder.Default`. */
+  interesesCategoria: InteresCategoria[]
+  estado: EstadoViaje
+  pasoActual: number | null
+  usuario: string
+}
+
+export interface ViajeRequest {
+  nombre: string
+  ubicacion: UbicacionRequest
+  rangoInteresKm: number
+  fechaInicio: LocalDate
+  fechaFin: LocalDate
+  ritmo: TipoRitmo
+  interesesCategoria: InteresCategoria[]
+  usuario: string
+}

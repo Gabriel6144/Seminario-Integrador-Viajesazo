@@ -2,6 +2,7 @@ import { createBrowserRouter } from 'react-router-dom'
 
 import { Layout } from '@/components/layout'
 import { AgendaPage } from '@/pages/agenda-page'
+import { BorradoresPage } from '@/pages/borradores-page'
 import { EventoDetailPage } from '@/pages/evento-detail-page'
 import { EventoEditarPage } from '@/pages/evento-editar-page'
 import { EventoNuevoPage } from '@/pages/evento-nuevo-page'
@@ -34,6 +35,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, Component: EventosPage },
       { path: 'agenda', Component: AgendaPage },
+      { path: 'borradores', Component: BorradoresPage },
       { path: 'planificar', Component: PlanificadorPage },
       { path: 'eventos/nuevo', Component: EventoNuevoPage },
       { path: 'eventos/:id', Component: EventoDetailPage },

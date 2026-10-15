@@ -2,17 +2,23 @@ import { http, HttpResponse } from 'msw'
 
 import { errorBody, NOMINATIM_REVERSE, NOMINATIM_SEARCH, page } from './fixtures'
 import {
+  allBorradores,
   allEventos,
   allPublicadores,
+  completeBorrador,
+  createBorrador,
   createEvento,
   createPublicador,
+  deleteBorrador,
   deleteEvento,
+  findBorrador,
   findEvento,
   findPublicador,
   findPublicadorByEmail,
+  updateBorrador,
   updateEvento,
 } from './store'
-import type { EventoRequest, PublicadorRequest } from '@/types/api'
+import type { EventoRequest, PublicadorRequest, ViajeBorradorRequest } from '@/types/api'
 
 /**
  * Handlers de MSW que replican la API real.
@@ -128,6 +134,48 @@ export const handlers = [
     }
 
     return HttpResponse.json(createPublicador(body as PublicadorRequest), { status: 201 })
+  }),
+
+  http.get('/api/viajes/borradores', ({ request }) => {
+    const { content, meta } = paginate(allBorradores(), request.url)
+    return HttpResponse.json(page(content, meta))
+  }),
+
+  http.get('/api/viajes/borradores/:id', ({ params }) => {
+    const borrador = findBorrador(Number(params.id))
+    if (borrador === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el borrador con id ${String(params.id)}`), { status: 404 })
+    }
+    return HttpResponse.json(borrador)
+  }),
+
+  http.post('/api/viajes/borradores', async ({ request }) => {
+    const body = await readJson<Partial<ViajeBorradorRequest>>(request)
+    return HttpResponse.json(createBorrador(body as ViajeBorradorRequest), { status: 201 })
+  }),
+
+  http.put('/api/viajes/borradores/:id', async ({ params, request }) => {
+    const body = await readJson<Partial<ViajeBorradorRequest>>(request)
+    const actualizado = updateBorrador(Number(params.id), body as ViajeBorradorRequest)
+    if (actualizado === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el borrador con id ${String(params.id)}`), { status: 404 })
+    }
+    return HttpResponse.json(actualizado)
+  }),
+
+  http.post('/api/viajes/borradores/:id/completar', ({ params }) => {
+    const completado = completeBorrador(Number(params.id))
+    if (completado === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el borrador con id ${String(params.id)}`), { status: 404 })
+    }
+    return HttpResponse.json(completado)
+  }),
+
+  http.delete('/api/viajes/borradores/:id', ({ params }) => {
+    if (!deleteBorrador(Number(params.id))) {
+      return HttpResponse.json(errorBody(404, `No existe el borrador con id ${String(params.id)}`), { status: 404 })
+    }
+    return new HttpResponse(null, { status: 204 })
   }),
 
   http.get('/api/agenda/semanal', ({ request }) => {

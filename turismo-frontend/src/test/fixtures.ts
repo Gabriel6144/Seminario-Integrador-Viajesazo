@@ -1,4 +1,4 @@
-import type { EventoResponse, Page, PublicadorResponse } from '@/types/api'
+import type { EventoResponse, Page, PublicadorResponse, ViajeResponse } from '@/types/api'
 
 /**
  * Datos de prueba.
@@ -210,3 +210,25 @@ export const NOMINATIM_REVERSE = {
   display_name: 'Anfiteatro José Hernández, Cleto Peña 82, Jesús María, Córdoba, Argentina',
   address: { road: 'Cleto Peña', city: 'Jesús María', state: 'Córdoba' },
 }
+
+export const BORRADORES: ViajeResponse[] = [
+  {
+    id: 1,
+    nombre: 'Borrador de ejemplo',
+    ubicacion: {
+      nombre: 'Córdoba',
+      localidad: 'Centro',
+      ciudad: 'Córdoba',
+      latitud: -31.42,
+      longitud: -64.18,
+    },
+    rangoInteresKm: 20,
+    fechaInicio: '2026-11-01',
+    fechaFin: '2026-11-03',
+    ritmo: 'EQUILIBRADO',
+    interesesCategoria: ['NATURALEZA'],
+    estado: 'BORRADOR',
+    pasoActual: 4,
+    usuario: 'turista_demo',
+  },
+]
