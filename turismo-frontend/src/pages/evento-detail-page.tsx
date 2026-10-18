@@ -9,12 +9,6 @@ import {
   MapPinIcon,
 } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
-import { MapContainer, TileLayer, Marker } from 'react-leaflet'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
-import markerIcon from 'leaflet/dist/images/marker-icon.png'
-import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
-import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 
 import { useEvento } from '@/api/eventos'
 import { CategoriaBadge } from '@/components/categoria-badge'
@@ -36,13 +30,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { formatDateRange, formatLocalDate, formatTimeRange } from '@/lib/dates'
 import { parseId } from '@/lib/parse-id'
 import { TIPO_ACCESO_LABELS, ESTADO_PROPUESTA_LABELS, type EstadoPropuesta } from '@/types/api'
-
-// Arreglar el ícono por defecto de Leaflet con Vite
-L.Icon.Default.mergeOptions({
-  iconUrl: markerIcon,
-  iconRetinaUrl: markerIcon2x,
-  shadowUrl: markerShadow,
-})
 
 /** Detalle de un evento — `GET /api/eventos/{id}`. */
 export function EventoDetailPage() {
@@ -241,81 +228,6 @@ export function EventoDetailPage() {
             <>
               <Separator />
               <p className="leading-relaxed text-[#3f484e]">{evento.descripcion}</p>
-            </>
-          )}
-
-          {/* Ubicación en Córdoba */}
-          {(evento.lugar || evento.localidad || evento.direccion || evento.referencia || evento.gpsFijado) && (
-            <>
-              <Separator />
-              <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-heading text-lg font-bold text-[#191c1e]">Ubicación en Córdoba</h3>
-                  {evento.gpsFijado && (
-                    <span className="rounded-full bg-[#eaf6fc] px-3 py-1 text-xs font-semibold text-[#00658d]">
-                      GPS Fijado
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-2 text-sm">
-                  {evento.lugar && (
-                    <div className="flex items-center gap-2">
-                      <LandmarkIcon className="h-4 w-4 text-[#00658d]" aria-hidden />
-                      <span className="text-[#3f484e]">{evento.lugar}</span>
-                    </div>
-                  )}
-                  {evento.localidad && (
-                    <div className="flex items-center gap-2">
-                      <MapPinIcon className="h-4 w-4 text-[#bb0413]" aria-hidden />
-                      <span className="text-[#3f484e]">{evento.localidad}</span>
-                    </div>
-                  )}
-                  {evento.referencia && (
-                    <div className="flex items-center gap-2">
-                      <LandmarkIcon className="h-4 w-4 text-[#3f484e]" aria-hidden />
-                      <span className="text-[#3f484e]">{evento.referencia}</span>
-                    </div>
-                  )}
-                  {!evento.referencia && evento.direccion && (
-                    <div className="flex items-center gap-2">
-                      <LandmarkIcon className="h-4 w-4 text-[#3f484e]" aria-hidden />
-                      <span className="text-[#3f484e]">{evento.direccion}</span>
-                    </div>
-                  )}
-                </div>
-
-                {evento.gpsFijado && evento.lat !== null && evento.lng !== null && (
-                  <>
-                    <div className="h-[190px] w-full overflow-hidden rounded-lg border border-gray-200">
-                      <MapContainer
-                        center={[evento.lat, evento.lng]}
-                        zoom={15}
-                        style={{ height: '100%', width: '100%' }}
-                        dragging={false}
-                        scrollWheelZoom={false}
-                        doubleClickZoom={false}
-                        zoomControl={false}
-                      >
-                        <TileLayer
-                          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-                        />
-                        <Marker position={[evento.lat, evento.lng]} />
-                      </MapContainer>
-                    </div>
-                    <a
-                      href={`https://www.openstreetmap.org/?mlat=${evento.lat}&mlon=${evento.lng}#map=17/${evento.lat}/${evento.lng}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#00658d] px-4 py-2 text-sm font-medium text-white hover:bg-[#65b7e8]"
-                    >
-                      <MapPinIcon className="h-4 w-4" aria-hidden />
-                      Ver en mapa interactivo
-                    </a>
-                  </>
-                )}
-              </div>
             </>
           )}
 
