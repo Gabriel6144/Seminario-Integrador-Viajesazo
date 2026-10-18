@@ -63,14 +63,14 @@ describe('PlanificadorPage', () => {
     await user.click(screen.getByRole('button', { name: /continuar/i }))
 
     // Ya estamos en el paso 3 (Fechas)
-    expect(screen.getByText(/¿cuándo venís a córdoba\? 📅/i)).toBeInTheDocument()
+    expect(screen.getByText(/¿cuándo venís a córdoba\?/i)).toBeInTheDocument()
 
     // Intentar continuar sin fechas
     await user.click(screen.getByRole('button', { name: /continuar/i }))
     expect(
       screen.getByText(/por favor, seleccioná las fechas de llegada y partida/i),
     ).toBeInTheDocument()
-    expect(screen.getByText(/¿cuándo venís a córdoba\? 📅/i)).toBeInTheDocument()
+    expect(screen.getByText(/¿cuándo venís a córdoba\?/i)).toBeInTheDocument()
   })
 
   it('rechaza fecha de llegada anterior a la fecha actual y no permite avanzar', async () => {
@@ -94,7 +94,7 @@ describe('PlanificadorPage', () => {
     expect(
       screen.getAllByText(/la fecha de llegada no puede ser anterior a la fecha actual/i).length,
     ).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText(/¿cuándo venís a córdoba\? 📅/i)).toBeInTheDocument()
+    expect(screen.getByText(/¿cuándo venís a córdoba\?/i)).toBeInTheDocument()
   })
 
   it('permite navegar hacia atrás y abrir el modal de salida', async () => {
