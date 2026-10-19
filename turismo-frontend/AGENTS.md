@@ -10,8 +10,12 @@ Los dos proyectos viven en el **mismo repositorio git**, como subcarpetas. Eso n
 acoplados de build: cada uno tiene su `package.json` / `pom.xml` y sus propios comandos.
 
 - Estado actual: Sprint 1 completo. Listados paginados de eventos y publicadores, detalle de
-  ambos, agenda semanal, **CRUD de eventos y alta de publicadores**, y ruta 404.
-  **120 tests en verde.**
+  ambos, agenda semanal, **CRUD de eventos y alta de publicadores**, y ruta 404. El alta/edición
+  de eventos ya soporta **tipo de acceso y arancel** (`GRATUITO` / `DE_PAGO` con monto y link al
+  sitio oficial) y **ubicación con mapa** (Leaflet + OpenStreetMap), incluido un **selector de
+  ubicación** con buscador y pin arrastrable. **151 tests en total (149 en verde).** Los 2 que
+  fallan son de `planificador-page.test.tsx` (`Viajesazo` y `/cerrar/i`), de otro sprint; son
+  deuda aparte, no los rompió el selector.
 - Sigue sin autenticación: cualquiera que abra la app puede crear, editar y borrar eventos. Es
   una limitación conocida del alcance de la tesis, no una decisión de diseño closed.
 - Para la API ver el `AGENTS.md` y el `PRUEBAS-MANUALES.md` de `../turismo-backend`.
@@ -75,6 +79,15 @@ Cosas que se olvidan fácil y ya están resueltas en el código, para no volver 
   la borre de verdad.
 - **`publicadorNombre` viene aplanado**: es un JOIN del backend, no un campo del DTO de entrada.
   No se manda al crear ni al editar.
+- **El alta/edición de un evento geocodifica de verdad**: el backend resuelve
+  `lugarRecinto + direccion + localidad` con Nominatim (OpenStreetMap) y **rechaza con 400** si no
+  encuentra la ubicación (`no se encontró la ubicación del evento: ...`). O sea, crear o editar un
+  evento **necesita que el backend tenga internet y que la dirección exista**. `lugarRecinto`,
+  `localidad` y `direccion` son obligatorios por eso. El 400 llega como banner, igual que el resto
+  de los errores del servidor.
+- **`tipoAcceso` / arancel**: `DE_PAGO` exige `montoEstimado` y `sitioOficial` (URL `http(s)`);
+  `GRATUITO` los ignora. `estadoPropuesta` **no se manda** (lo fija el server en `INICIADO`).
+  Cambiar a `GRATUITO` limpia el arancel en `toEventoRequest` para no dejar un monto colgado.
 - **El email duplicado responde 400 con un string plano** (`"ya existe un publicador con ese
   email"`), no con errores por campo. `PublicadorService` lo anticipa con `existsByEmail` para dar
   un mensaje claro en vez del error de constraint de H2.
@@ -106,6 +119,57 @@ Decisiones que conviene no deshacer:
   sin salida, así que se avisa con un link al alta.
 - **El selector de publicadores pide `size=100`**: es un tope deliberado
   (`PUBLICADORES_MAX_SIZE`). Con más de 100 hay que agregar un buscador o paginar el select.
+
+## Mapa del evento
+
+`src/components/evento-mapa.tsx` muestra la ubicación del evento en el detalle.
+
+- **Leaflet directo, sin `react-leaflet`.** `react-leaflet` no soporta React 19; el wrapper
+  nativo son ~30 líneas. Dependencias: `leaflet` + `@types/leaflet`.
+- **El mapa se monta a mano en un `useEffect`** (crear `L.map`, tile layer, marcador) sobre un
+  `div` con `ref`, y se destruye con `map.remove()` en el cleanup. Leaflet es imperativo: no
+  intentar manejarlo con estado de React.
+- **`L.map(..., { scrollWheelZoom: false })`**: sin esto, la rueda del mouse sobre el mapa se
+  come el scroll de la página.
+- **La burbuja del marcador se arma con nodos DOM, no con HTML string**: `bindPopup` acepta un
+  `HTMLElement` y así el nombre de la dirección no se interpola como HTML.
+- Los tiles son de OpenStreetMap (`https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png`) con la
+  atribución obligatoria. El contenedor va con `role="img"` y `aria-label`.
+- El detalle pinta la tarjeta del mapa **solo si hay `latitud`/`longitud`**: un evento sin
+  coordenadas (no debería pasar, el backend las exige) no rompe la página.
+- En tests el mapa se mockea (`vi.mock('@/components/evento-mapa')` en el test del detalle; en el
+  test propio del componente se mockea `leaflet` con `vi.hoisted`). jsdom no tiene layout ni
+  canvas, así que un Leaflet real ahí revienta.
+
+## Selector de ubicación (formulario)
+
+`src/components/ubicacion-selector.tsx` es el buscador que va en la Sección 3 del alta/edición de
+evento, para no tener que tipear `lugarRecinto` / `localidad` / `direccion` a mano.
+
+- **La geocodificación del cliente es solo UX.** El backend vuelve a geocodificar con Nominatim y
+  es el que guarda `latitud`/`longitud` (y rechaza con 400 si no encuentra la dirección). El
+  buscador no manda coordenadas: solo completa los tres campos de texto que exige `EventoRequest`.
+- **No toca `EventoFormValues` ni `toEventoRequest`.** El selector es estado efímero de UI y
+  comunica los campos por callbacks (`onLugarRecintoChange` & cia.), que el form enchufa a
+  `setValue`. El schema y el contrato de la API quedan igual.
+- **`direccion` se arma a nivel calle, nunca con el `display_name`.** `geocoding.ts` toma
+  `address.road` (sin el número: con número, la búsqueda free-form de un POI devuelve vacío),
+  con fallback a barrio y a la localidad. Mandar el `display_name` entero hacía que el backend,
+  que **vuelve a concatenar** los tres campos, arme una query irresoluble → 400. Por eso el
+  backend además deduplica (ver el `AGENTS.md` de `../turismo-backend`).
+- **Las llamadas a Nominatim viven en `src/lib/geocoding.ts`** (`buscarLugar`,
+  `geocodificarInverso`), un helper puro sin React, con la misma regla de "ningún componente hace
+  `fetch`". Tolerante a fallos: un error de red devuelve `[]` / `null`, nunca tira.
+- **El transporte va por el proxy `/nominatim` de Vite** (`vite.config.ts`), igual que `/api`:
+  rutas relativas, nunca el dominio absoluto de OpenStreetMap.
+- **El mapa se monta recién cuando hay coordenadas** (un resultado elegido, o el evento en edición
+  con `latitudInicial`/`longitudInicial`). Se carga con `lazy()` + `Suspense` para no arrastrar
+  Leaflet al bundle inicial. Un alta que no toca la ubicación no carga el mapa.
+- **El pin es arrastrable y dispara *reverse geocoding*** al soltarlo, con debounce (default
+  1000 ms) para respetar el límite ~1 req/s de Nominatim. La prop `reverseDelayMs` existe para
+  bajarlo a 0 en los tests y no esperar un segundo real.
+- `src/components/ubicacion-preview-mapa.tsx` es el mapa de preview (Leaflet directo, mismo patrón
+  que `evento-mapa.tsx`), separado del buscador para que el `lazy()` tenga un módulo propio.
 
 ## Estructura
 
@@ -159,13 +223,21 @@ Cuidado con los bordes de la paginación: `pointer-events-none` depende del CSS 
   `asChild`: cuando el título tiene que ser un heading de verdad, se compone el `<h2>` a mano.
 - **Tokens semánticos de shadcn** (`bg-secondary`, `text-muted-foreground`) en vez de colores
   crudos (`bg-emerald-500`), así el tema funciona en claro y oscuro.
-- **Los dos warnings de `only-export-components` en `ui/badge.tsx` y `ui/button.tsx` se dejan
+- **Los warnings de `only-export-components` en `ui/badge.tsx` y `ui/button.tsx` se dejan
   como están**: son exports de `cva` del propio shadcn. En los archivos propios sí se separan
-  los helpers puros (ver `lib/group-by-day.ts` y `components/day-heading.tsx`).
+  los helpers puros (ver `lib/group-by-day.ts` y `components/day-heading.tsx`). Hay además un
+  warning de `react(incompatible-library)` en `evento-form.tsx` por `useForm` de RHF: es
+  inherente a la librería, se deja.
 
 ## Tests
 
-Vitest + Testing Library + MSW. 120 tests en 12 archivos.
+Vitest + Testing Library + MSW. 151 tests en 15 archivos (2 del `planificador-page` en rojo, de
+otro sprint).
+
+- **Nominatim se mockea con handlers MSW** (`/nominatim/search` y `/nominatim/reverse`), igual que
+  la API: `onUnhandledRequest: 'error'` no perdona una request real. El test del selector mockea
+  `leaflet` con `vi.hoisted` (fábricas encadenables + el callback de `dragend` guardado para
+  simular el arrastre del pin) y usa `reverseDelayMs={0}`.
 
 - **MSW corre con `onUnhandledRequest: 'error'`**: una request sin handler falla el test en vez
   de salir a la red. Por eso un test que "funciona" y en realidad pegó a internet no puede pasar.
@@ -234,5 +306,5 @@ Migrar a 4 no es un bump de versión.
 Commits con [Conventional Commits](https://www.conventionalcommits.com/): `feat:`, `fix:`,
 `chore:`, `docs:`.
 
-El repositorio **todavía no es un repositorio git**: hay que hacer `git init` antes de poder
-commitear.
+El repositorio **es un repo git único** con los dos proyectos como subcarpetas (`turismo-backend`
+y `turismo-frontend`); se commitea desde la raíz, con el `.gitignore` de la raíz.

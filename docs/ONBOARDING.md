@@ -41,6 +41,9 @@ El `AGENTS.md` es denso y está escrito también para agentes de IA. No lo leas 
 4. [`turismo-backend/AGENTS.md`](../turismo-backend/AGENTS.md) — por secciones, a medida que
    aparezcan dudas; no de un tirón.
 
+Como complemento, [`SPRINT-1.md`](./SPRINT-1.md) es el as-built del Sprint 1 (endpoints, modelo y
+decisiones) y [`OPENSTREETMAP.md`](./OPENSTREETMAP.md) desarrolla la integración con Nominatim.
+
 El repo tiene también un skill de terceros en `turismo-backend/.agents/skills/java-springboot`.
 Ojo: donde ese skill y `AGENTS.md` difieran, **manda `AGENTS.md`**.
 

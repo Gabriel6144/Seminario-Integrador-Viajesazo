@@ -42,7 +42,7 @@ desarrollo; en producción hay que poner un proxy inverso delante o agregar CORS
 | --- | --- |
 | `npm run dev` | Servidor de desarrollo con proxy a la API. |
 | `npm run build` | Typecheck (`tsc -b`) + build de producción. |
-| `npm test` | 120 tests (Vitest + Testing Library + MSW). |
+| `npm test` | 151 tests (Vitest + Testing Library + MSW). |
 | `npm run test:watch` | Tests en watch. |
 | `npm run lint` | oxlint. |
 | `npm run typecheck` | Solo tipos. |

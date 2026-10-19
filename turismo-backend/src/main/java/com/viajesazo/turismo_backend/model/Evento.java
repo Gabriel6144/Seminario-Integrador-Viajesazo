@@ -1,5 +1,6 @@
 package com.viajesazo.turismo_backend.model;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
@@ -30,11 +31,47 @@ public class Evento {
 	@Column(length = 32)
 	private InteresCategoria categoria;
 
+	/**
+	 * Gratuito o arancelado. Se inicializa en {@link TipoAcceso#GRATUITO}; el service fuerza
+	 * este valor cuando el request no lo trae.
+	 */
+	@Enumerated(EnumType.STRING)
+	@Column(name = "tipo_acceso", length = 16, nullable = false)
+	@Builder.Default
+	private TipoAcceso tipoAcceso = TipoAcceso.GRATUITO;
+
+	/**
+	 * Estado de la propuesta. Se inicializa en {@link EstadoPropuesta#INICIADO} al registrar el
+	 * evento y solo cambia por reglas de negocio (todavía sin definir), nunca desde el request.
+	 */
+	@Enumerated(EnumType.STRING)
+	@Column(name = "estado_propuesta", length = 16, nullable = false)
+	@Builder.Default
+	private EstadoPropuesta estadoPropuesta = EstadoPropuesta.INICIADO;
+
+	@Column(name = "monto_estimado", precision = 12, scale = 2)
+	private BigDecimal montoEstimado;
+
+	@Column(name = "descripcion_arancel", length = 1000)
+	private String descripcionArancel;
+
+	@Column(name = "sitio_oficial", length = 500)
+	private String sitioOficial;
+
+	@Column(name = "lugar_recinto", length = 200)
+	private String lugarRecinto;
+
 	@Column(length = 120)
 	private String localidad;
 
 	@Column(length = 200)
 	private String direccion;
+
+	@Column(precision = 10, scale = 8)
+	private BigDecimal latitud;
+
+	@Column(precision = 11, scale = 8)
+	private BigDecimal longitud;
 
 	@Column(name = "fecha_inicio", nullable = false)
 	private LocalDate fechaInicio;

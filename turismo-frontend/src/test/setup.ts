@@ -17,6 +17,7 @@ Element.prototype.hasPointerCapture ??= () => false
 Element.prototype.setPointerCapture ??= () => {}
 Element.prototype.releasePointerCapture ??= () => {}
 Element.prototype.scrollIntoView ??= () => {}
+window.scrollTo = () => {}
 
 /**
  * Ciclo de vida de MSW.

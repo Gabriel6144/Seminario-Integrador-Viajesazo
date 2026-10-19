@@ -15,6 +15,9 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import jakarta.validation.ConstraintViolationException;
 
@@ -101,6 +104,35 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<ErrorResponse> handleIntegrityViolation(DataIntegrityViolationException ex) {
 		logger.warn("Violación de integridad al escribir: probablemente email duplicado", ex);
 		return build(HttpStatus.BAD_REQUEST, "ya existe un publicador con ese email");
+	}
+
+	/**
+	 * El request multipart supera el tope del contenedor
+	 * ({@code spring.servlet.multipart.max-file-size}). Sin este handler caería en el catch-all y
+	 * respondería 500, cuando en realidad es un problema del archivo que subió el usuario.
+	 */
+	@ExceptionHandler(MaxUploadSizeExceededException.class)
+	public ResponseEntity<ErrorResponse> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
+		return build(HttpStatus.BAD_REQUEST, "la imagen supera el tamaño máximo permitido (5 MB)");
+	}
+
+	/**
+	 * Falta la parte {@code archivo} en un request multipart. Sin este handler caería en el
+	 * catch-all y respondería 500 en lugar de 400.
+	 */
+	@ExceptionHandler(MissingServletRequestPartException.class)
+	public ResponseEntity<ErrorResponse> handleMissingPart(MissingServletRequestPartException ex) {
+		return build(HttpStatus.BAD_REQUEST, "falta el archivo a subir");
+	}
+
+	/**
+	 * Un recurso estático inexistente (una imagen subida que se borró, o una URL vieja en la base).
+	 * Lo lanza el resource handler de {@code WebConfig}. Sin este handler cae en el catch-all y
+	 * responde 500; en realidad la respuesta correcta es 404.
+	 */
+	@ExceptionHandler(NoResourceFoundException.class)
+	public ResponseEntity<ErrorResponse> handleMissingResource(NoResourceFoundException ex) {
+		return build(HttpStatus.NOT_FOUND, "no existe el recurso solicitado");
 	}
 
 	/**

@@ -23,8 +23,16 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { ImagenUploader } from '@/components/imagen-uploader'
+import { UbicacionSelector } from '@/components/ubicacion-selector'
 import { eventoSchema, type EventoFormValues } from '@/lib/schemas'
-import { CATEGORIA_LABELS, CATEGORIAS, type PublicadorResponse } from '@/types/api'
+import {
+  CATEGORIA_LABELS,
+  CATEGORIAS,
+  TIPO_ACCESO_LABELS,
+  TIPOS_ACCESO,
+  type PublicadorResponse,
+} from '@/types/api'
 
 interface EventoFormProps {
   defaultValues: EventoFormValues
@@ -35,6 +43,8 @@ interface EventoFormProps {
   serverError: string | null
   submitLabel: string
   cancelTo: string
+  /** Coordenadas del evento en edición, para que el mapa del selector arranque centrado. */
+  ubicacionInicial?: { latitud: number | null; longitud: number | null }
 }
 
 /**
@@ -57,6 +67,7 @@ export function EventoForm({
   serverError,
   submitLabel,
   cancelTo,
+  ubicacionInicial,
 }: EventoFormProps) {
   const form = useForm<EventoFormValues>({
     resolver: zodResolver(eventoSchema),
@@ -66,9 +77,12 @@ export function EventoForm({
     mode: 'onSubmit',
   })
 
-  const { register, control, formState } = form
+  const { register, control, formState, watch, setValue } = form
   const { errors } = formState
   const { fields, append, remove } = useFieldArray({ control, name: 'imagenes' })
+
+  // El bloque de arancel solo se muestra (y solo se exige) cuando el evento es arancelado.
+  const esDePago = watch('tipoAcceso') === 'DE_PAGO'
 
   return (
     <form
@@ -142,9 +156,78 @@ export function EventoForm({
         </FieldGroup>
       </FormSection>
 
-      {/* Sección 2: Ubicación */}
+      {/* Sección 2: Acceso y Arancel */}
       <FormSection
         number={2}
+        title="Tipo de Acceso y Arancel"
+        icon={
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
+            <rect x="2" y="5" width="20" height="14" rx="2" />
+            <line x1="2" y1="10" x2="22" y2="10" />
+          </svg>
+        }
+      >
+        <FieldGroup>
+          <Controller
+            control={control}
+            name="tipoAcceso"
+            render={({ field }) => (
+              <Field data-invalid={errors.tipoAcceso !== undefined}>
+                <FieldLabel htmlFor="tipoAcceso">Tipo de acceso</FieldLabel>
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger id="tipoAcceso" aria-invalid={errors.tipoAcceso !== undefined}>
+                    <SelectValue placeholder="Gratuito" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIPOS_ACCESO.map((tipo) => (
+                      <SelectItem key={tipo} value={tipo}>
+                        {TIPO_ACCESO_LABELS[tipo]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldError>{errors.tipoAcceso?.message}</FieldError>
+              </Field>
+            )}
+          />
+
+          {esDePago ? (
+            <>
+              <TextField
+                id="montoEstimado"
+                label="Monto estimado"
+                type="number"
+                description="Obligatorio para un evento arancelado."
+                error={errors.montoEstimado}
+                inputProps={{ step: '0.01', min: '0', ...register('montoEstimado') }}
+              />
+              <TextField
+                id="sitioOficial"
+                label="Sitio oficial de la boletería o entradas"
+                description="URL completa, con http:// o https://."
+                error={errors.sitioOficial}
+                inputProps={{ type: 'url', ...register('sitioOficial') }}
+              />
+              <Field data-invalid={errors.descripcionArancel !== undefined}>
+                <FieldLabel htmlFor="descripcionArancel">Detalle del arancel</FieldLabel>
+                <Textarea
+                  id="descripcionArancel"
+                  rows={2}
+                  placeholder="Ej.: entrada general $1500, menores gratis"
+                  aria-invalid={errors.descripcionArancel !== undefined}
+                  {...register('descripcionArancel')}
+                />
+                <FieldDescription>Opcional.</FieldDescription>
+                <FieldError>{errors.descripcionArancel?.message}</FieldError>
+              </Field>
+            </>
+          ) : null}
+        </FieldGroup>
+      </FormSection>
+
+      {/* Sección 3: Ubicación */}
+      <FormSection
+        number={3}
         title="Ubicación en Córdoba"
         icon={
           <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
@@ -153,10 +236,28 @@ export function EventoForm({
           </svg>
         }
       >
+        <FieldDescription>
+          Con estos datos el backend ubica el evento en el mapa (OpenStreetMap). Si la dirección
+          no se puede geocodificar, el evento no se guarda.
+        </FieldDescription>
+        <UbicacionSelector
+          onLugarRecintoChange={(value) => setValue('lugarRecinto', value)}
+          onLocalidadChange={(value) => setValue('localidad', value)}
+          onDireccionChange={(value) => setValue('direccion', value)}
+          latitudInicial={ubicacionInicial?.latitud ?? null}
+          longitudInicial={ubicacionInicial?.longitud ?? null}
+        />
         <FieldGroup>
           <TextField
+            id="lugarRecinto"
+            label="Lugar o recinto"
+            description="Ej.: Anfiteatro José Hernández, Plaza San Martín."
+            error={errors.lugarRecinto}
+            inputProps={register('lugarRecinto')}
+          />
+          <TextField
             id="localidad"
-            label="Localidad"
+            label="Ciudad / Localidad"
             error={errors.localidad}
             inputProps={register('localidad')}
           />
@@ -169,9 +270,9 @@ export function EventoForm({
         </FieldGroup>
       </FormSection>
 
-      {/* Sección 3: Calendario y Horarios */}
+      {/* Sección 4: Calendario y Horarios */}
       <FormSection
-        number={3}
+        number={4}
         title="Calendario y Horarios"
         icon={
           <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
@@ -219,9 +320,9 @@ export function EventoForm({
         </FieldGroup>
       </FormSection>
 
-      {/* Sección 4: Imágenes */}
+      {/* Sección 5: Imágenes */}
       <FormSection
-        number={4}
+        number={5}
         title="Imágenes del Evento"
         icon={
           <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
@@ -232,9 +333,11 @@ export function EventoForm({
         }
       >
         <FieldDescription>
-          URLs completas, una por fila. Para sacar todas, quitá las filas: una lista vacía las
-          borra del evento.
+          Subí archivos o pegá URLs completas, una por fila. Para sacar todas, quitá las filas: una
+          lista vacía las borra del evento.
         </FieldDescription>
+
+        <ImagenUploader onUploaded={(url) => append({ url })} />
 
         <FieldGroup>
           {fields.length === 0 ? (
@@ -284,9 +387,9 @@ export function EventoForm({
         </FieldGroup>
       </FormSection>
 
-      {/* Sección 5: Publicador */}
+      {/* Sección 6: Publicador */}
       <FormSection
-        number={5}
+        number={6}
         title="Publicador"
         icon={
           <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>

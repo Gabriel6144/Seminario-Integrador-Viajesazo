@@ -24,6 +24,9 @@ function formValido(overrides: Partial<EventoFormValues> = {}): EventoFormValues
   return {
     ...EVENTO_FORM_DEFAULT,
     nombre: 'Festival de Folklore',
+    lugarRecinto: 'Anfiteatro José Hernández',
+    localidad: 'Jesús María',
+    direccion: 'Av. San Martín 100',
     fechaInicio: '2026-10-01',
     fechaFin: '2026-10-04',
     publicadorId: '1',
@@ -109,6 +112,70 @@ describe('eventoSchema', () => {
     expect(eventoSchema.safeParse(formValido({ publicadorId: '0' })).success).toBe(false)
     expect(eventoSchema.safeParse(formValido({ publicadorId: 'abc' })).success).toBe(false)
   })
+
+  it('exige el lugar, la ciudad y la dirección, que son la base del geocoding', () => {
+    const resultado = eventoSchema.safeParse(
+      formValido({ lugarRecinto: '', localidad: '   ', direccion: '' }),
+    )
+
+    expect(resultado.success).toBe(false)
+    if (resultado.success) return
+    const campos = resultado.error.issues.map((issue) => issue.path.join('.'))
+    expect(campos).toEqual(
+      expect.arrayContaining(['lugarRecinto', 'localidad', 'direccion']),
+    )
+  })
+
+  it('acepta un evento arancelado con monto y link', () => {
+    const resultado = eventoSchema.safeParse(
+      formValido({
+        tipoAcceso: 'DE_PAGO',
+        montoEstimado: '1500.50',
+        sitioOficial: 'https://entradas.cordoba.gob.ar/evento',
+      }),
+    )
+
+    expect(resultado.success).toBe(true)
+  })
+
+  it('exige monto y link cuando el evento es arancelado', () => {
+    const resultado = eventoSchema.safeParse(formValido({ tipoAcceso: 'DE_PAGO' }))
+
+    expect(resultado.success).toBe(false)
+    if (resultado.success) return
+    const campos = resultado.error.issues.map((issue) => issue.path.join('.'))
+    expect(campos).toEqual(expect.arrayContaining(['montoEstimado', 'sitioOficial']))
+  })
+
+  it('no exige el arancel si el evento es gratuito', () => {
+    expect(eventoSchema.safeParse(formValido({ tipoAcceso: 'GRATUITO' })).success).toBe(true)
+  })
+
+  it('rechaza un monto con formato inválido', () => {
+    const resultado = eventoSchema.safeParse(
+      formValido({
+        tipoAcceso: 'DE_PAGO',
+        montoEstimado: 'mil quinientos',
+        sitioOficial: 'https://entradas.cordoba.gob.ar/evento',
+      }),
+    )
+
+    expect(resultado.success).toBe(false)
+    if (resultado.success) return
+    expect(resultado.error.issues[0]?.message).toBe('el monto estimado no tiene un formato válido')
+  })
+
+  it('rechaza un link que no es http(s)', () => {
+    const resultado = eventoSchema.safeParse(
+      formValido({ tipoAcceso: 'DE_PAGO', montoEstimado: '100', sitioOficial: 'ftp://entradas' }),
+    )
+
+    expect(resultado.success).toBe(false)
+    if (resultado.success) return
+    expect(resultado.error.issues[0]?.message).toBe(
+      'el link al sitio oficial debe ser una URL http(s)',
+    )
+  })
 })
 
 describe('toEventoRequest', () => {
@@ -119,14 +186,45 @@ describe('toEventoRequest', () => {
     // `LocalTime` sin `@NotNull` se guarda vacío con 201 y eso tampoco es lo que el usuario
     // quiso al dejar el campo en blanco.)
     const request = toEventoRequest(
-      formValido({ descripcion: '   ', localidad: '', horarioInicio: '', imagenes: [] }),
+      formValido({ descripcion: '   ', horarioInicio: '', imagenes: [] }),
     )
 
     expect(request.descripcion).toBeNull()
-    expect(request.localidad).toBeNull()
-    expect(request.direccion).toBeNull()
     expect(request.horarioInicio).toBeNull()
     expect(request.categoria).toBeNull()
+  })
+
+  it('manda el tipo de acceso elegido y limpia el arancel de un evento gratuito', () => {
+    // Al cambiar de arancelado a gratuito, el monto y el link viejos no pueden quedar colgados
+    // en la base: los tres campos de arancel viajan como null.
+    const request = toEventoRequest(
+      formValido({
+        tipoAcceso: 'GRATUITO',
+        montoEstimado: '1500',
+        descripcionArancel: 'Entrada general',
+        sitioOficial: 'https://entradas.cordoba.gob.ar/evento',
+      }),
+    )
+
+    expect(request.tipoAcceso).toBe('GRATUITO')
+    expect(request.montoEstimado).toBeNull()
+    expect(request.descripcionArancel).toBeNull()
+    expect(request.sitioOficial).toBeNull()
+  })
+
+  it('manda el monto como número y el link tal cual para un evento arancelado', () => {
+    const request = toEventoRequest(
+      formValido({
+        tipoAcceso: 'DE_PAGO',
+        montoEstimado: '1500.50',
+        descripcionArancel: 'Entrada general',
+        sitioOficial: 'https://entradas.cordoba.gob.ar/evento',
+      }),
+    )
+
+    expect(request.montoEstimado).toBe(1500.5)
+    expect(request.descripcionArancel).toBe('Entrada general')
+    expect(request.sitioOficial).toBe('https://entradas.cordoba.gob.ar/evento')
   })
 
   it('manda el aplanado de las filas de imágenes como string[]', () => {
@@ -200,6 +298,12 @@ describe('toEventoFormValues', () => {
       nombre: FOLKLORE.nombre,
       descripcion: FOLKLORE.descripcion,
       categoria: FOLKLORE.categoria,
+      tipoAcceso: FOLKLORE.tipoAcceso,
+      // FOLKLORE es gratuito: los campos de arancel vuelven en null.
+      montoEstimado: null,
+      descripcionArancel: null,
+      sitioOficial: null,
+      lugarRecinto: FOLKLORE.lugarRecinto,
       localidad: FOLKLORE.localidad,
       direccion: FOLKLORE.direccion,
       fechaInicio: FOLKLORE.fechaInicio,

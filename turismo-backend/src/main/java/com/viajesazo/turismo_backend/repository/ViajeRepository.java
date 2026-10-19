@@ -1,5 +1,6 @@
 package com.viajesazo.turismo_backend.repository;
 
+import java.util.Collection;
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
@@ -12,21 +13,30 @@ import com.viajesazo.turismo_backend.model.Viaje;
 public interface ViajeRepository extends JpaRepository<Viaje, Long> {
 
     /**
-     * VZ-22: listado de viajes "activos" (todo lo que no fue dado de baja) de un turista.
-     * El orden va en el nombre del método porque es parte del contrato de la API, no una
-     * preferencia del cliente, igual que en {@code EventoRepository}.
-     *
-     * <p>Un viaje dado de baja lógica queda con {@code estado = CANCELADO}, así que se excluye
-     * con {@code Not}. Los viajes sembrados sin estado quedarían fuera por el {@code NULL};
-     * por eso el seed siempre setea {@code PLANIFICADO}.
+     * Listado de viajes activos (todo lo que no sea borrador ni cancelado) de un turista.
      */
-    Page<Viaje> findByUsuarioAndEstadoNotOrderByFechaInicioAsc(String usuario, EstadoViaje estado,
+    Page<Viaje> findByUsuarioAndEstadoNotInOrderByFechaInicioAsc(String usuario,
+            Collection<EstadoViaje> estados, Pageable pageable);
+
+    /**
+     * Detalle y modificación de un viaje no borrador y no cancelado.
+     */
+    Optional<Viaje> findByIdAndEstadoNotIn(Long id, Collection<EstadoViaje> estados);
+
+    /**
+     * Listado de borradores de un turista, del más reciente al más antiguo.
+     */
+    Page<Viaje> findByUsuarioAndEstadoOrderByIdDesc(String usuario, EstadoViaje estado,
             Pageable pageable);
 
     /**
-     * Detalle y modificación de un viaje activo. Un viaje con baja lógica no existe para la API
-     * (VZ-23 CA2), así que se busca excluyendo {@code CANCELADO}.
+     * Detalle de un borrador por id y estado (dueño validado en service).
      */
-    Optional<Viaje> findByIdAndEstadoNot(Long id, EstadoViaje estado);
+    Optional<Viaje> findByIdAndEstado(Long id, EstadoViaje estado);
+
+    /**
+     * Detalle/edición de un borrador, validando a su dueño.
+     */
+    Optional<Viaje> findByIdAndUsuarioAndEstado(Long id, String usuario, EstadoViaje estado);
 
 }

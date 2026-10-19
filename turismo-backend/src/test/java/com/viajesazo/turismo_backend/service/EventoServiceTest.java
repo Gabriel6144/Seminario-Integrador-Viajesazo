@@ -4,10 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -32,9 +34,11 @@ import com.viajesazo.turismo_backend.dto.response.EventoResponse;
 import com.viajesazo.turismo_backend.exception.BusinessRuleException;
 import com.viajesazo.turismo_backend.exception.ResourceNotFoundException;
 import com.viajesazo.turismo_backend.mapper.EventoMapperImpl;
-import com.viajesazo.turismo_backend.model.InteresCategoria;
+import com.viajesazo.turismo_backend.model.EstadoPropuesta;
 import com.viajesazo.turismo_backend.model.Evento;
+import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.model.Publicador;
+import com.viajesazo.turismo_backend.model.TipoAcceso;
 import com.viajesazo.turismo_backend.repository.EventoRepository;
 import com.viajesazo.turismo_backend.repository.PublicadorRepository;
 
@@ -47,13 +51,21 @@ class EventoServiceTest {
 	@Mock
 	private PublicadorRepository publicadorRepository;
 
+	@Mock
+	private GeocodingService geocodingService;
+
 	private EventoService service;
 
 	@BeforeEach
 	void setUp() {
 		Clock clock = Clock.fixed(LocalDate.parse("2026-09-23").atStartOfDay(ZoneId.of("America/Argentina/Buenos_Aires")).toInstant(),
 				ZoneId.of("America/Argentina/Buenos_Aires"));
-		service = new EventoService(eventoRepository, publicadorRepository, clock, new EventoMapperImpl());
+		service = new EventoService(eventoRepository, publicadorRepository, clock, new EventoMapperImpl(),
+				geocodingService);
+		// La mayoría de los tests no ejercita el camino de la geocodificación; queda lenient para
+		// que los que fallan antes (validaciones) no rompan por strict stubs.
+		lenient().when(geocodingService.geocode(any(), any(), any())).thenReturn(Optional
+				.of(new GeocodingService.Coordenadas(new BigDecimal("-31.41350000"), new BigDecimal("-64.49470000"))));
 	}
 
 	@Test
@@ -76,12 +88,35 @@ class EventoServiceTest {
 	}
 
 	@Test
+	@DisplayName("US1: un evento nuevo arranca como INICIADO y guarda las coordenadas geocodificadas")
+	void setsInitialStateAndCoordinates() {
+		when(publicadorRepository.findById(1L)).thenReturn(Optional.of(publisher()));
+		when(eventoRepository.save(any(Evento.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		EventoResponse result = service.create(request());
+
+		assertThat(result.estadoPropuesta()).isEqualTo(EstadoPropuesta.INICIADO);
+		assertThat(result.latitud()).isEqualByComparingTo("-31.41350000");
+		assertThat(result.longitud()).isEqualByComparingTo("-64.49470000");
+	}
+
+	@Test
+	@DisplayName("US1: sin tipo de acceso se asume GRATUITO")
+	void defaultsToGratuito() {
+		when(publicadorRepository.findById(1L)).thenReturn(Optional.of(publisher()));
+		when(eventoRepository.save(any(Evento.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		assertThat(service.create(request()).tipoAcceso()).isEqualTo(TipoAcceso.GRATUITO);
+	}
+
+	@Test
 	@DisplayName("US1: sin lista de imágenes, el evento se guarda con la lista vacía y no con null")
 	void savesEmptyImagesWhenNoneGiven() {
 		when(publicadorRepository.findById(1L)).thenReturn(Optional.of(publisher()));
 		when(eventoRepository.save(any(Evento.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-		EventoRequest request = new EventoRequest("Evento", null, null, null, null,
+		EventoRequest request = new EventoRequest("Evento", null, null, null, null, null, null,
+				"Plaza San Martín", "Córdoba", "Av. Colón 100, Córdoba",
 				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-02"), null, null, null, 1L);
 
 		EventoResponse result = service.create(request);
@@ -94,7 +129,8 @@ class EventoServiceTest {
 	void failsWhenPublisherNotFound() {
 		when(publicadorRepository.findById(99L)).thenReturn(Optional.empty());
 
-		EventoRequest request = new EventoRequest("Festival de Folklore", null, null, null, null,
+		EventoRequest request = new EventoRequest("Festival de Folklore", null, null, null, null, null, null,
+				"Plaza San Martín", "Córdoba", "Av. Colón 100, Córdoba",
 				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-03"), null, null, null, 99L);
 
 		assertThatThrownBy(() -> service.create(request))
@@ -106,7 +142,8 @@ class EventoServiceTest {
 	@Test
 	@DisplayName("la fecha de finalización no puede ser anterior a la de inicio")
 	void rejectsInvalidDateRange() {
-		EventoRequest request = new EventoRequest("Evento", null, null, null, null,
+		EventoRequest request = new EventoRequest("Evento", null, null, null, null, null, null,
+				"Plaza San Martín", "Córdoba", "Av. Colón 100, Córdoba",
 				LocalDate.parse("2026-10-10"), LocalDate.parse("2026-10-01"), null, null, null, 1L);
 
 		assertThatThrownBy(() -> service.create(request))
@@ -118,7 +155,8 @@ class EventoServiceTest {
 	@Test
 	@DisplayName("el horario de finalización debe ser posterior al de inicio")
 	void rejectsInvalidTimeRange() {
-		EventoRequest request = new EventoRequest("Evento", null, null, null, null,
+		EventoRequest request = new EventoRequest("Evento", null, null, null, null, null, null,
+				"Plaza San Martín", "Córdoba", "Av. Colón 100, Córdoba",
 				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-02"),
 				LocalTime.of(22, 0), LocalTime.of(20, 0), null, 1L);
 
@@ -128,12 +166,51 @@ class EventoServiceTest {
 	}
 
 	@Test
+	@DisplayName("un evento arancelado exige monto estimado")
+	void rejectsPaidEventWithoutAmount() {
+		EventoRequest request = new EventoRequest("Evento", null, null, TipoAcceso.DE_PAGO, null, null,
+				"https://evento.gob.ar", "Plaza San Martín", "Córdoba", "Av. Colón 100, Córdoba",
+				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-02"), null, null, null, 1L);
+
+		assertThatThrownBy(() -> service.create(request))
+				.isInstanceOf(BusinessRuleException.class)
+				.hasMessageContaining("monto estimado");
+		verify(eventoRepository, never()).save(any(Evento.class));
+	}
+
+	@Test
+	@DisplayName("un evento arancelado exige link al sitio oficial")
+	void rejectsPaidEventWithoutSite() {
+		EventoRequest request = new EventoRequest("Evento", null, null, TipoAcceso.DE_PAGO, new BigDecimal("1500"),
+				null, null, "Plaza San Martín", "Córdoba", "Av. Colón 100, Córdoba",
+				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-02"), null, null, null, 1L);
+
+		assertThatThrownBy(() -> service.create(request))
+				.isInstanceOf(BusinessRuleException.class)
+				.hasMessageContaining("sitio oficial");
+		verify(eventoRepository, never()).save(any(Evento.class));
+	}
+
+	@Test
+	@DisplayName("si la ubicación no se encuentra, rechaza el alta")
+	void rejectsWhenGeocodingNotFound() {
+		when(publicadorRepository.findById(1L)).thenReturn(Optional.of(publisher()));
+		when(geocodingService.geocode(any(), any(), any())).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> service.create(request()))
+				.isInstanceOf(BusinessRuleException.class)
+				.hasMessageContaining("no se encontró la ubicación");
+		verify(eventoRepository, never()).save(any(Evento.class));
+	}
+
+	@Test
 	@DisplayName("un único día de evento es válido: inicio y fin iguales")
 	void acceptsSingleDayEvent() {
 		when(publicadorRepository.findById(1L)).thenReturn(Optional.of(publisher()));
 		when(eventoRepository.save(any(Evento.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-		EventoRequest request = new EventoRequest("Evento", null, null, null, null,
+		EventoRequest request = new EventoRequest("Evento", null, null, null, null, null, null,
+				"Plaza San Martín", "Córdoba", "Av. Colón 100, Córdoba",
 				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-01"), null, null, null, 1L);
 
 		assertThat(service.create(request).nombre()).isEqualTo("Evento");
@@ -288,7 +365,9 @@ class EventoServiceTest {
 
 	private EventoRequest request() {
 		return new EventoRequest("Festival de Folklore", "Encuentro de Syrigamis", InteresCategoria.CULTURA,
-				"Cosquín", "Plaza Pringles", LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-03"),
+				null, null, null, null,
+				"Plaza Pringles", "Cosquín", "Av. San Martín 800, Cosquín",
+				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-03"),
 				LocalTime.of(20, 0), LocalTime.of(23, 30), List.of("https://cdn.cordoba.gob.ar/folklore.jpg"), 1L);
 	}
 

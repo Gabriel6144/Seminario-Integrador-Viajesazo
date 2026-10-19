@@ -23,21 +23,21 @@ public class Viaje {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
-    @Column(nullable = false, length = 120)
+    @Column(length = 120)
     private String nombre;
 
 
-    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL, optional = false)
-    @JoinColumn(name = "zona_interes_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL, optional = true)
+    @JoinColumn(name = "zona_interes_id", nullable = true)
     private Ubicacion zonaInteres; 
 
-    @Column(nullable = false)
-    private double rangoInteresKm;
+    @Column
+    private Double rangoInteresKm;
 
-    @Column(nullable = false)
+    @Column
     private LocalDateTime fechaInicio;
 
-    @Column(nullable = false)
+    @Column
     private LocalDateTime fechaFin;
 
     @Enumerated(EnumType.STRING)
@@ -58,6 +58,9 @@ public class Viaje {
     @Enumerated(EnumType.STRING)
     @Column(length = 50)
     private EstadoViaje estado;
+
+    @Column
+    private Integer pasoActual;
 
     // Usuario entiendo lo vemos en el utlimo Sprint, por ahora diría dejarlo como String
     @Column(nullable = false, length = 120)

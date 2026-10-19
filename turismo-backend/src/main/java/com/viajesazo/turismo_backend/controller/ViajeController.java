@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.viajesazo.turismo_backend.dto.request.ViajeBorradorRequest;
 import com.viajesazo.turismo_backend.dto.request.ViajeRequest;
 import com.viajesazo.turismo_backend.dto.response.ViajeResponse;
 import com.viajesazo.turismo_backend.service.ViajeService;
@@ -54,6 +55,44 @@ public class ViajeController {
     @GetMapping("/{id}")
     public ViajeResponse findById(@PathVariable Long id) {
         return viajeService.findById(id);
+    }
+
+    /** Guarda un borrador parcial del circuito. */
+    @PostMapping("/borradores")
+    public ResponseEntity<ViajeResponse> saveDraft(@Valid @RequestBody ViajeBorradorRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(viajeService.saveDraft(request));
+    }
+
+    /** Lista los borradores de un turista, paginados. */
+    @GetMapping("/borradores")
+    public PagedModel<ViajeResponse> listDrafts(@RequestParam String usuario,
+            @PageableDefault(size = 20) Pageable pageable) {
+        return new PagedModel<>(viajeService.listDrafts(usuario, pageable));
+    }
+
+    /** Modifica/reanuda un borrador. */
+    @PutMapping("/borradores/{id}")
+    public ViajeResponse updateDraft(@PathVariable Long id, @Valid @RequestBody ViajeBorradorRequest request) {
+        return viajeService.updateDraft(id, request);
+    }
+
+    /** Recupera un borrador para continuar su planificación. */
+    @GetMapping("/borradores/{id}")
+    public ViajeResponse findDraft(@PathVariable Long id) {
+        return viajeService.findDraftById(id);
+    }
+
+    /** Completa el borrador y lo deja como viaje PLANIFICADO. */
+    @PostMapping("/borradores/{id}/completar")
+    public ViajeResponse completeDraft(@PathVariable Long id) {
+        return viajeService.completeDraft(id);
+    }
+
+    /** Descarta un borrador (baja física). */
+    @DeleteMapping("/borradores/{id}")
+    public ResponseEntity<Void> deleteDraft(@PathVariable Long id) {
+        viajeService.deleteDraft(id);
+        return ResponseEntity.noContent().build();
     }
 
     /**

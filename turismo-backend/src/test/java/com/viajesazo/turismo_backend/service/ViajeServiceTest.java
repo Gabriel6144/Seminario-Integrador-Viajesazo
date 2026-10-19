@@ -85,7 +85,7 @@ class ViajeServiceTest {
 	@Test
 	@DisplayName("VZ-21 CA2: modifica los datos del viaje existente")
 	void updatesTrip() {
-		when(viajeRepository.findByIdAndEstadoNot(7L, EstadoViaje.CANCELADO))
+		when(viajeRepository.findByIdAndEstadoNotIn(7L, List.of(EstadoViaje.BORRADOR, EstadoViaje.CANCELADO)))
 				.thenReturn(Optional.of(persistedTrip()));
 		when(viajeRepository.save(any(Viaje.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -104,7 +104,7 @@ class ViajeServiceTest {
 	@Test
 	@DisplayName("VZ-21: modificar un viaje inexistente devuelve 404")
 	void failsWhenUpdatingMissingTrip() {
-		when(viajeRepository.findByIdAndEstadoNot(404L, EstadoViaje.CANCELADO)).thenReturn(Optional.empty());
+		when(viajeRepository.findByIdAndEstadoNotIn(404L, List.of(EstadoViaje.BORRADOR, EstadoViaje.CANCELADO))).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> service.update(404L, request()))
 				.isInstanceOf(ResourceNotFoundException.class);
@@ -113,7 +113,7 @@ class ViajeServiceTest {
 	@Test
 	@DisplayName("VZ-22: consultar un viaje inexistente o dado de baja devuelve 404")
 	void failsWhenFindingMissingTrip() {
-		when(viajeRepository.findByIdAndEstadoNot(404L, EstadoViaje.CANCELADO)).thenReturn(Optional.empty());
+		when(viajeRepository.findByIdAndEstadoNotIn(404L, List.of(EstadoViaje.BORRADOR, EstadoViaje.CANCELADO))).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> service.findById(404L))
 				.isInstanceOf(ResourceNotFoundException.class)
@@ -124,7 +124,7 @@ class ViajeServiceTest {
 	@DisplayName("VZ-23: la baja es lógica, marca CANCELADO y no borra la fila")
 	void deletesLogically() {
 		Viaje persisted = persistedTrip();
-		when(viajeRepository.findByIdAndEstadoNot(7L, EstadoViaje.CANCELADO)).thenReturn(Optional.of(persisted));
+		when(viajeRepository.findByIdAndEstadoNotIn(7L, List.of(EstadoViaje.BORRADOR, EstadoViaje.CANCELADO))).thenReturn(Optional.of(persisted));
 		when(viajeRepository.save(any(Viaje.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
 		service.delete(7L);
@@ -136,8 +136,8 @@ class ViajeServiceTest {
 	@Test
 	@DisplayName("VZ-22: lista los viajes activos del turista, paginados")
 	void listsActiveTripsOfTourist() {
-		when(viajeRepository.findByUsuarioAndEstadoNotOrderByFechaInicioAsc(
-				eq("turista@test.com"), eq(EstadoViaje.CANCELADO), any(Pageable.class)))
+		when(viajeRepository.findByUsuarioAndEstadoNotInOrderByFechaInicioAsc(
+				eq("turista@test.com"), eq(List.of(EstadoViaje.BORRADOR, EstadoViaje.CANCELADO)), any(Pageable.class)))
 				.thenReturn(new PageImpl<>(List.of(persistedTrip()), PageRequest.of(0, 10), 1));
 
 		Page<ViajeResponse> result = service.findAll("turista@test.com", PageRequest.of(0, 10));
@@ -168,7 +168,7 @@ class ViajeServiceTest {
 						.latitud(new java.math.BigDecimal("-31.95"))
 						.longitud(new java.math.BigDecimal("-64.55"))
 						.build())
-				.rangoInteresKm(35)
+				.rangoInteresKm(35.0)
 				.fechaInicio(java.time.LocalDateTime.parse("2026-10-20T00:00:00"))
 				.fechaFin(java.time.LocalDateTime.parse("2026-10-22T00:00:00"))
 				.ritmo(TipoRitmo.EQUILIBRADO)

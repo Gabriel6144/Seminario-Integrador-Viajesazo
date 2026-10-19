@@ -1,18 +1,24 @@
 import { http, HttpResponse } from 'msw'
 
-import { errorBody, page } from './fixtures'
+import { errorBody, NOMINATIM_REVERSE, NOMINATIM_SEARCH, page } from './fixtures'
 import {
+  allBorradores,
   allEventos,
   allPublicadores,
+  completeBorrador,
+  createBorrador,
   createEvento,
   createPublicador,
+  deleteBorrador,
   deleteEvento,
+  findBorrador,
   findEvento,
   findPublicador,
   findPublicadorByEmail,
+  updateBorrador,
   updateEvento,
 } from './store'
-import type { EventoRequest, PublicadorRequest } from '@/types/api'
+import type { EventoRequest, PublicadorRequest, ViajeBorradorRequest } from '@/types/api'
 
 /**
  * Handlers de MSW que replican la API real.
@@ -130,10 +136,86 @@ export const handlers = [
     return HttpResponse.json(createPublicador(body as PublicadorRequest), { status: 201 })
   }),
 
+  http.get('/api/viajes/borradores', ({ request }) => {
+    const { content, meta } = paginate(allBorradores(), request.url)
+    return HttpResponse.json(page(content, meta))
+  }),
+
+  http.get('/api/viajes/borradores/:id', ({ params }) => {
+    const borrador = findBorrador(Number(params.id))
+    if (borrador === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el borrador con id ${String(params.id)}`), { status: 404 })
+    }
+    return HttpResponse.json(borrador)
+  }),
+
+  http.post('/api/viajes/borradores', async ({ request }) => {
+    const body = await readJson<Partial<ViajeBorradorRequest>>(request)
+    return HttpResponse.json(createBorrador(body as ViajeBorradorRequest), { status: 201 })
+  }),
+
+  http.put('/api/viajes/borradores/:id', async ({ params, request }) => {
+    const body = await readJson<Partial<ViajeBorradorRequest>>(request)
+    const actualizado = updateBorrador(Number(params.id), body as ViajeBorradorRequest)
+    if (actualizado === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el borrador con id ${String(params.id)}`), { status: 404 })
+    }
+    return HttpResponse.json(actualizado)
+  }),
+
+  http.post('/api/viajes/borradores/:id/completar', ({ params }) => {
+    const completado = completeBorrador(Number(params.id))
+    if (completado === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el borrador con id ${String(params.id)}`), { status: 404 })
+    }
+    return HttpResponse.json(completado)
+  }),
+
+  http.delete('/api/viajes/borradores/:id', ({ params }) => {
+    if (!deleteBorrador(Number(params.id))) {
+      return HttpResponse.json(errorBody(404, `No existe el borrador con id ${String(params.id)}`), { status: 404 })
+    }
+    return new HttpResponse(null, { status: 204 })
+  }),
+
   http.get('/api/agenda/semanal', ({ request }) => {
     const { content, meta } = paginate(allEventos(), request.url)
     return HttpResponse.json(page(content, meta))
   }),
+
+  /**
+   * Subida de imágenes. Devuelve una **URL fija** para que el test compruebe que esa URL es la que
+   * viaja después en el `imagenes` del evento.
+   *
+   * No deriva del `archivo.name` a propósito: en jsdom el `File` es de otro realm que el `fetch` de
+   * Node (undici), que al serializar el `FormData` lo trata como un `Blob` anónimo y pierde el
+   * filename (queda `"blob"`). En el navegador real el nombre se preserva; el componente igual no
+   * lo usa, lo resuelve el backend.
+   *
+   * Tampoco valida el contenido (el backend lo hace por firma de bytes): alcanza con rechazar la
+   * parte faltante y el archivo vacío, que son los dos errores que el componente sabe mostrar.
+   */
+  http.post('/api/imagenes', async ({ request }) => {
+    const formData = await request.formData()
+    const archivo = formData.get('archivo')
+
+    if (archivo === null || typeof archivo === 'string') {
+      return HttpResponse.json(errorBody(400, 'falta el archivo a subir'), { status: 400 })
+    }
+    if (archivo.size === 0) {
+      return HttpResponse.json(errorBody(400, 'no se recibió ningún archivo de imagen'), {
+        status: 400,
+      })
+    }
+
+    return HttpResponse.json({ url: '/api/archivos/subida.png' }, { status: 201 })
+  }),
+
+  // Nominatim (OpenStreetMap) para el buscador de ubicación del formulario. Rutas relativas como
+  // las de la API: el frontend las pide por el proxy de Vite, nunca al dominio absoluto.
+  http.get('/nominatim/search', () => HttpResponse.json(NOMINATIM_SEARCH)),
+
+  http.get('/nominatim/reverse', () => HttpResponse.json(NOMINATIM_REVERSE)),
 ]
 
 /**
@@ -166,6 +248,25 @@ function validateEvento(body: Partial<EventoRequest>): string | null {
   }
   if (body.publicadorId === undefined) {
     errores.push('publicadorId: el publicador es obligatorio')
+  }
+  if (body.lugarRecinto === undefined || body.lugarRecinto.trim().length === 0) {
+    errores.push('lugarRecinto: el lugar o recinto es obligatorio')
+  }
+  if (body.localidad === undefined || body.localidad.trim().length === 0) {
+    errores.push('localidad: la ciudad es obligatoria')
+  }
+  if (body.direccion === undefined || body.direccion.trim().length === 0) {
+    errores.push('direccion: la dirección exacta es obligatoria')
+  }
+
+  // Misma regla de `EventoService.validateAcceso`: un evento arancelado exige monto y link.
+  if (body.tipoAcceso === 'DE_PAGO') {
+    if (body.montoEstimado === undefined || body.montoEstimado === null) {
+      errores.push('montoEstimado: el monto estimado es obligatorio para un evento arancelado')
+    }
+    if (body.sitioOficial === undefined || (body.sitioOficial ?? '').trim().length === 0) {
+      errores.push('sitioOficial: el link al sitio oficial es obligatorio para un evento arancelado')
+    }
   }
 
   if (
