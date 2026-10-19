@@ -65,7 +65,7 @@ Los cuatro listados (`/api/eventos`, `/api/publicadores`, `/api/agenda/semanal` 
 | `Evento` | la propuesta turística | ver tabla abajo |
 | `InteresCategoria` | categoría del evento | `NATURALEZA`, `GASTRONOMIA`, `CULTURA`, `HISTORIA`, `AVENTURA`, `VIDA_NOCTURNA`, `MUSICA`, `COMPRAS`, `FAMILIAR_Y_RELAX` |
 | `TipoAcceso` | gratuito o arancelado | `GRATUITO`, `DE_PAGO` |
-| `EstadoPropuesta` | ciclo de vida de la propuesta | `INICIADO`, `REPROGRAMADO`, `CANCELADO`, `FINALIZADO` |
+| `EstadoPropuesta` | catálogo del ciclo de vida de la propuesta | entidad con `nombre` y `descripcion`: `INICIADO`, `REPROGRAMADO`, `CANCELADO`, `FINALIZADO` |
 
 Campos de `Evento` (`turismo-backend/src/main/java/com/viajesazo/turismo_backend/model/Evento.java`):
 
@@ -76,7 +76,7 @@ Campos de `Evento` (`turismo-backend/src/main/java/com/viajesazo/turismo_backend
 | `descripcion` | `String` | 1000 |
 | `categoria` | `InteresCategoria` | `STRING` |
 | `tipoAcceso` | `TipoAcceso` | `STRING`, `NOT NULL`, default `GRATUITO` |
-| `estadoPropuesta` | `EstadoPropuesta` | `STRING`, `NOT NULL`, default `INICIADO` |
+| `estadoPropuesta` | `EstadoPropuesta` | FK a `estado_propuesta`, `NOT NULL`, estado inicial `INICIADO` |
 | `montoEstimado` | `BigDecimal` | solo arancelados, `precision 12 scale 2` |
 | `descripcionArancel` | `String` | opcional |
 | `sitioOficial` | `String` | URL `http(s)`, solo arancelados |
@@ -200,7 +200,7 @@ proyectos.
   `GRATUITO`, para no dejar un monto colgado en la base.
 
 ### 5.2 Estado de la propuesta
-- **Modelo:** enum `EstadoPropuesta`; `EventoService.create` fuerza `INICIADO`.
+- **Modelo:** entidad catálogo `EstadoPropuesta`; `EventoService.create` resuelve y asigna el estado `INICIADO`.
 - **No lo manda el cliente:** solo cambia por reglas de negocio (todavía sin definir). Por eso el
   `EventoMapper` **ignora** `estadoPropuesta` y el front nunca lo incluye en el request. El
   `Response` sí lo expone, y si llega `null` la UI cae en el label de `INICIADO`.

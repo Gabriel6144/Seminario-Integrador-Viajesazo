@@ -20,6 +20,7 @@ import com.viajesazo.turismo_backend.model.Evento;
 import com.viajesazo.turismo_backend.model.Publicador;
 import com.viajesazo.turismo_backend.model.TipoAcceso;
 import com.viajesazo.turismo_backend.repository.EventoRepository;
+import com.viajesazo.turismo_backend.repository.EstadoPropuestaRepository;
 import com.viajesazo.turismo_backend.repository.PublicadorRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ public class EventoService {
 
 	private final EventoRepository eventoRepository;
 	private final PublicadorRepository publicadorRepository;
+	private final EstadoPropuestaRepository estadoPropuestaRepository;
 	private final Clock clock;
 	private final EventoMapper mapper;
 	private final GeocodingService geocodingService;
@@ -40,7 +42,7 @@ public class EventoService {
 		validateAcceso(request);
 		Evento evento = mapper.toEntity(request);
 		evento.setTipoAcceso(request.tipoAcceso() == null ? TipoAcceso.GRATUITO : request.tipoAcceso());
-		evento.setEstadoPropuesta(EstadoPropuesta.INICIADO);
+		evento.setEstadoPropuesta(getInitialState());
 		evento.setPublicador(getPublicadorOrThrow(request.publicadorId()));
 		applyUbicacion(evento, request);
 		return mapper.toResponse(eventoRepository.save(evento));
@@ -112,6 +114,12 @@ public class EventoService {
 		return publicadorRepository.findById(publicadorId)
 				.orElseThrow(() -> new ResourceNotFoundException(
 						"No existe el publicador con id " + publicadorId));
+	}
+
+	private EstadoPropuesta getInitialState() {
+		return estadoPropuestaRepository.findByNombre("INICIADO")
+				.orElseThrow(() -> new IllegalStateException(
+						"No existe el estado de propuesta inicial INICIADO"));
 	}
 
 	private void validateRange(EventoRequest request) {

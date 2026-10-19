@@ -20,6 +20,15 @@ INSERT INTO publicador (nombre, email, telefono) VALUES ('Municipalidad de Cosqu
 INSERT INTO publicador (nombre, email, telefono) VALUES ('Asociación de Artesanos', 'artesanos@cordoba.gob.ar', NULL);
 
 -- ============================================================
+-- ESTADOS DE PROPUESTA
+-- ============================================================
+
+INSERT INTO estado_propuesta (nombre, descripcion) VALUES ('INICIADO', 'Propuesta registrada y pendiente de ejecución');
+INSERT INTO estado_propuesta (nombre, descripcion) VALUES ('REPROGRAMADO', 'Propuesta cuya fecha fue modificada');
+INSERT INTO estado_propuesta (nombre, descripcion) VALUES ('CANCELADO', 'Propuesta cancelada');
+INSERT INTO estado_propuesta (nombre, descripcion) VALUES ('FINALIZADO', 'Propuesta ejecutada');
+
+-- ============================================================
 -- EVENTOS TURÍSTICOS - CÓRDOBA 2026
 -- ============================================================
 
@@ -27,12 +36,12 @@ INSERT INTO publicador (nombre, email, telefono) VALUES ('Asociación de Artesan
 -- 1. COSQUÍN ROCK
 -- ------------------------------------------------------------
 
-INSERT INTO evento (nombre, descripcion, tipo_acceso, estado_propuesta, monto_estimado, sitio_oficial, lugar_recinto, localidad, direccion, latitud, longitud, fecha_inicio, fecha_fin, publicador_id)
+INSERT INTO evento (nombre, descripcion, tipo_acceso, estado_propuesta_id, monto_estimado, sitio_oficial, lugar_recinto, localidad, direccion, latitud, longitud, fecha_inicio, fecha_fin, publicador_id)
 VALUES (
     'Cosquín Rock',
     'Uno de los festivales de música más importantes de Argentina, con artistas nacionales e internacionales y múltiples escenarios.',
     'DE_PAGO',
-    'INICIADO',
+    (SELECT id FROM estado_propuesta WHERE nombre = 'INICIADO'),
     70000,
     'https://cosquinrock.net',
     'Aeródromo de Santa María de Punilla',
@@ -56,12 +65,12 @@ VALUES (
 -- 2. FESTIVAL NACIONAL DE FOLKLORE DE COSQUÍN
 -- ------------------------------------------------------------
 
-INSERT INTO evento (nombre, descripcion, tipo_acceso, estado_propuesta, monto_estimado, sitio_oficial, lugar_recinto, localidad, direccion, latitud, longitud, fecha_inicio, fecha_fin, publicador_id)
+INSERT INTO evento (nombre, descripcion, tipo_acceso, estado_propuesta_id, monto_estimado, sitio_oficial, lugar_recinto, localidad, direccion, latitud, longitud, fecha_inicio, fecha_fin, publicador_id)
 VALUES (
     'Festival Nacional de Folklore de Cosquín',
     'Tradicional festival folklórico que reúne música, danza y expresiones culturales argentinas en la ciudad de Cosquín.',
     'DE_PAGO',
-    'INICIADO',
+    (SELECT id FROM estado_propuesta WHERE nombre = 'INICIADO'),
     25000,
     'https://festivaldecosquin.com',
     'Plaza Próspero Molina',
@@ -85,12 +94,12 @@ VALUES (
 -- 3. OKTOBERFEST
 -- ------------------------------------------------------------
 
-INSERT INTO evento (nombre, descripcion, tipo_acceso, estado_propuesta, monto_estimado, sitio_oficial, lugar_recinto, localidad, direccion, latitud, longitud, fecha_inicio, fecha_fin, publicador_id)
+INSERT INTO evento (nombre, descripcion, tipo_acceso, estado_propuesta_id, monto_estimado, sitio_oficial, lugar_recinto, localidad, direccion, latitud, longitud, fecha_inicio, fecha_fin, publicador_id)
 VALUES (
     'Oktoberfest',
     'Fiesta Nacional de la Cerveza celebrada en Villa General Belgrano, con gastronomía, música, espectáculos y tradiciones centroeuropeas.',
     'DE_PAGO',
-    'INICIADO',
+    (SELECT id FROM estado_propuesta WHERE nombre = 'INICIADO'),
     15000,
     'https://oktoberfestargentina.com.ar',
     'Parque Cervecero',
@@ -114,12 +123,12 @@ VALUES (
 -- 4. FIESTA NACIONAL DEL MANÍ - PEPERINA
 -- ------------------------------------------------------------
 
-INSERT INTO evento (nombre, descripcion, tipo_acceso, estado_propuesta, monto_estimado, sitio_oficial, lugar_recinto, localidad, direccion, latitud, longitud, fecha_inicio, fecha_fin, publicador_id)
+INSERT INTO evento (nombre, descripcion, tipo_acceso, estado_propuesta_id, monto_estimado, sitio_oficial, lugar_recinto, localidad, direccion, latitud, longitud, fecha_inicio, fecha_fin, publicador_id)
 VALUES (
     'Peperina',
     'Festival gastronómico que reúne productores, cocineros y propuestas de la gastronomía argentina en Alta Gracia.',
     'DE_PAGO',
-    'INICIADO',
+    (SELECT id FROM estado_propuesta WHERE nombre = 'INICIADO'),
     10000,
     'https://peperina.gob.ar',
     'Predio del Ferrocarril',
@@ -143,12 +152,12 @@ VALUES (
 -- 5. FIESTA DE LAS COLECTIVIDADES
 -- ------------------------------------------------------------
 
-INSERT INTO evento (nombre, descripcion, tipo_acceso, estado_propuesta, lugar_recinto, localidad, direccion, latitud, longitud, fecha_inicio, fecha_fin, publicador_id)
+INSERT INTO evento (nombre, descripcion, tipo_acceso, estado_propuesta_id, lugar_recinto, localidad, direccion, latitud, longitud, fecha_inicio, fecha_fin, publicador_id)
 VALUES (
     'Fiesta de las Colectividades',
     'Evento cultural y gastronómico que reúne las tradiciones, comidas, música y danzas de diferentes comunidades en Alta Gracia.',
     'GRATUITO',
-    'INICIADO',
+    (SELECT id FROM estado_propuesta WHERE nombre = 'INICIADO'),
     'Parque García Lorca',
     'Alta Gracia',
     'Av. Presidente Perón 1000, Alta Gracia',
@@ -170,12 +179,12 @@ VALUES (
 -- 6. FESTIVAL NACIONAL DE DOMA Y FOLKLORE DE JESÚS MARÍA
 -- ------------------------------------------------------------
 
-INSERT INTO evento (nombre, descripcion, tipo_acceso, estado_propuesta, monto_estimado, sitio_oficial, lugar_recinto, localidad, direccion, latitud, longitud, fecha_inicio, fecha_fin, publicador_id)
+INSERT INTO evento (nombre, descripcion, tipo_acceso, estado_propuesta_id, monto_estimado, sitio_oficial, lugar_recinto, localidad, direccion, latitud, longitud, fecha_inicio, fecha_fin, publicador_id)
 VALUES (
     'Festival Nacional de Doma y Folklore de Jesús María',
     'Festival tradicional argentino que combina espectáculos de doma, música folklórica, gastronomía y actividades culturales.',
     'DE_PAGO',
-    'INICIADO',
+    (SELECT id FROM estado_propuesta WHERE nombre = 'INICIADO'),
     30000,
     'https://festival.org.ar',
     'Campo de la Doma',
@@ -199,12 +208,12 @@ VALUES (
 -- 7. FESTIVAL INTERNACIONAL DE PEÑAS
 -- ------------------------------------------------------------
 
-INSERT INTO evento (nombre, descripcion, tipo_acceso, estado_propuesta, monto_estimado, sitio_oficial, lugar_recinto, localidad, direccion, latitud, longitud, fecha_inicio, fecha_fin, publicador_id)
+INSERT INTO evento (nombre, descripcion, tipo_acceso, estado_propuesta_id, monto_estimado, sitio_oficial, lugar_recinto, localidad, direccion, latitud, longitud, fecha_inicio, fecha_fin, publicador_id)
 VALUES (
     'Festival Internacional de Peñas',
     'Importante festival musical de Villa María que reúne artistas nacionales e internacionales y propuestas culturales.',
     'DE_PAGO',
-    'INICIADO',
+    (SELECT id FROM estado_propuesta WHERE nombre = 'INICIADO'),
     20000,
     'https://festivaldepenas.com.ar',
     'Anfiteatro de Villa María',
@@ -228,12 +237,12 @@ VALUES (
 -- 8. MASA VIENESA
 -- ------------------------------------------------------------
 
-INSERT INTO evento (nombre, descripcion, tipo_acceso, estado_propuesta, lugar_recinto, localidad, direccion, latitud, longitud, fecha_inicio, fecha_fin, publicador_id)
+INSERT INTO evento (nombre, descripcion, tipo_acceso, estado_propuesta_id, lugar_recinto, localidad, direccion, latitud, longitud, fecha_inicio, fecha_fin, publicador_id)
 VALUES (
     'Masa Vienesa',
     'Tradicional celebración gastronómica de Villa General Belgrano con productos de pastelería, chocolate y especialidades centroeuropeas.',
     'GRATUITO',
-    'INICIADO',
+    (SELECT id FROM estado_propuesta WHERE nombre = 'INICIADO'),
     'Plaza José Hernández',
     'Villa General Belgrano',
     'Av. San Martín 100, Villa General Belgrano',

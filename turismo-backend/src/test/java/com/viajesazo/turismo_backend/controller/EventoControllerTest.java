@@ -265,7 +265,7 @@ class EventoControllerTest {
 
 	private EventoResponse response() {
 		return new EventoResponse(7L, "Festival de Folklore", "Encuentro de syrigamis", InteresCategoria.CULTURA,
-				TipoAcceso.DE_PAGO, EstadoPropuesta.INICIADO, new BigDecimal("25000"), null,
+				TipoAcceso.DE_PAGO, new EstadoPropuesta(1L, "INICIADO", "Propuesta iniciada"), new BigDecimal("25000"), null,
 				"https://festivaldecosquin.com", "Plaza Próspero Molina", "Cosquín", "Av. San Martín 800, Cosquín",
 				new BigDecimal("-31.41350000"), new BigDecimal("-64.49470000"),
 				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-03"),

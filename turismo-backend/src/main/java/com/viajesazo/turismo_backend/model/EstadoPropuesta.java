@@ -1,12 +1,33 @@
 package com.viajesazo.turismo_backend.model;
 
-/**
- * Estado de la propuesta del evento. Se inicializa en {@link #INICIADO} al registrar el evento;
- * las transiciones las aplican las reglas de negocio (todavía sin definir).
- */
-public enum EstadoPropuesta {
-	INICIADO,
-	REPROGRAMADO,
-	CANCELADO,
-	FINALIZADO
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "estado_propuesta")
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class EstadoPropuesta {
+
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	private Long id;
+
+	@Column(nullable = false, unique = true, length = 32)
+	private String nombre;
+
+	@Column(length = 255)
+	private String descripcion;
 }

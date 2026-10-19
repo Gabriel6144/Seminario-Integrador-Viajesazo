@@ -165,3 +165,204 @@ para completar el alcance funcional previsto en la planificación de Sprint 2:
 Estas decisiones deben confirmarse antes de construir la capa REST definitiva para evitar que el
 contrato del backend se aparte de las historias de usuario VZ-19, VZ-21, VZ-22 y VZ-23.
 
+
+# Implementación tests con EstadoPropuesta como clase de dominio persistente
+
+## Informe final
+
+Se adaptó el backend para que `EstadoPropuesta` funcione como una clase de dominio persistente y no como un `enum`.
+
+### Cambios realizados
+
+- `EstadoPropuesta.java`
+  - Convertida en entidad JPA.
+  - Tabla asociada: `estado_propuesta`.
+  - Campos:
+    - `id`
+    - `nombre`
+    - `descripcion`
+  - `nombre` configurado como único.
+
+- `PropuestaTuristica.java`
+  - Se reemplazó `@Enumerated` por una relación:
+
+```java
+@ManyToOne(fetch = FetchType.LAZY, optional = false)
+@JoinColumn(name = "estado_propuesta_id", nullable = false)
+protected EstadoPropuesta estadoPropuesta;
+```
+
+- `EstadoPropuestaRepository.java`
+  - Se agregó repositorio para buscar estados por nombre.
+
+- `EventoService.java`
+  - El alta de eventos ahora busca el estado `INICIADO` desde la base de datos.
+  - Si el estado no existe, se informa explícitamente mediante `IllegalStateException`.
+  - Ya no se utiliza `EstadoPropuesta.INICIADO`.
+
+- `data.sql`
+  - Se agregaron los estados:
+    - `INICIADO`
+    - `REPROGRAMADO`
+    - `CANCELADO`
+    - `FINALIZADO`
+  - Los eventos ahora utilizan `estado_propuesta_id`.
+  - Se agregó la carga de estados antes de insertar los eventos.
+
+- Tests adaptados:
+  - `EventoServiceTest.java`
+  - `EventoRepositoryTest.java`
+  - `AgendaSemanalTest.java`
+  - `EventoControllerTest.java`
+
+- Documentación actualizada:
+  - `SPRINT-1.md`
+  - Se reemplazaron las referencias a `EstadoPropuesta` como enum por su representación como entidad catálogo y clave foránea.
+
+## Limpieza de artefactos
+
+Se eliminó específicamente:
+
+```text
+turismo-backend\target
+```
+
+Luego se regeneraron los artefactos ejecutando nuevamente Maven. El `target` actual contiene clases y reportes generados correctamente.
+
+También se detuvo el proceso Java específico que estaba relacionado con el bloqueo anterior del directorio. No se eliminaron otros directorios ni se ejecutaron comandos destructivos sobre el repositorio.
+
+## Validaciones
+
+### Suite completa
+
+```text
+Tests run: 134
+Failures: 0
+Errors: 0
+Skipped: 0
+```
+
+Comando utilizado:
+
+```text
+mvnw.cmd -q test
+```
+
+### Validaciones adicionales
+
+- Compilación de producción exitosa.
+- Compilación de tests exitosa.
+- Tests específicos de eventos, repositorios, agenda y controladores exitosos.
+- `git diff --check` sin errores.
+- No quedan referencias a:
+  - `EstadoPropuesta.INICIADO`
+  - `enum EstadoPropuesta`
+  - La antigua columna `estado_propuesta` como texto.
+
+## Errores encontrados y resueltos
+
+| Error | Estado |
+|---|---|
+| `EstadoPropuesta` utilizado como enum aunque el modelo requería una clase | Resuelto |
+| `@Enumerated` incompatible con la nueva clase de dominio | Resuelto |
+| Falta de una tabla y repositorio para los estados | Resuelto |
+| Eventos de prueba sin estado persistente | Resuelto |
+| Seed SQL incompatible con la nueva clave foránea | Resuelto |
+| Artefactos inválidos/bloqueados en `target` | Limpiados y regenerados |
+| Fallos finales en la suite de tests | Ninguno |
+
+El modelo actual queda consistente entre dominio, entidades JPA, base de datos, servicios, seed inicial y pruebas automatizadas.
+
+
+
+# Causa y corrección del error de ejecución en Backend
+Causa raíz confirmada
+El error no era realmente que Actividad no existiera.
+
+El archivo .class sí estaba presente, pero estaba generado incorrectamente. Al inspeccionarlo se encontró que sus constructores contenían:
+
+
+En consecuencia, Hibernate informaba:
+
+
+aunque el archivo Actividad.class existiera físicamente.
+
+Origen
+El proyecto está configurado para Java 17:
+
+
+pero Maven se estaba ejecutando con:
+
+
+Además, la jerarquía utilizaba Lombok @SuperBuilder en:
+
+PropuestaTuristica.java
+Evento.java
+Actividad.java
+La combinación de JDK 25, compilación con release 17 y @SuperBuilder generaba bytecode inválido con stubs de error.
+
+Corrección aplicada
+Se eliminó @SuperBuilder de la jerarquía.
+
+En Evento.java se agregó un builder explícito que conserva el uso actual:
+
+
+y soporta también los atributos heredados:
+
+id
+nombre
+descripcion
+categoria
+tipoAcceso
+estadoPropuesta
+localidad
+direccion
+latitud
+longitud
+publicador
+Además, se eliminaron las anotaciones @Builder.Default que ya no correspondían al nuevo esquema de builders.
+
+Validaciones realizadas
+Compilación limpia
+Se ejecutó con JDK 21:
+
+
+Resultado:
+
+
+Validación del bytecode
+Se verificó el bytecode de Actividad.class.
+
+Resultado:
+
+
+Ya no aparecen:
+
+
+Tests
+Se ejecutó:
+
+
+Resultado del proceso:
+
+
+Importante para ejecutar localmente
+El backend debe ejecutarse con un JDK compatible con la configuración del proyecto. En el equipo hay un JDK 21 instalado:
+
+
+Antes de iniciar el backend desde PowerShell, utilizar:
+
+
+Para verificar:
+
+
+Debe mostrar:
+
+
+Estado del error 502
+El 502 Bad Gateway del frontend era una consecuencia del cierre del backend:
+
+
+Al corregir los artefactos inválidos y eliminar @SuperBuilder, Hibernate ya puede cargar Actividad.
+
+Si VS Code continúa intentando iniciar con JDK 25, puede volver a aparecer el problema aunque el código fuente esté corregido. En ese caso, hay que configurar VS Code para utilizar el JDK 21 mediante java.jdt.ls.java.home o ejecutar Maven desde una terminal con JAVA_HOME apuntando a JDK 21.

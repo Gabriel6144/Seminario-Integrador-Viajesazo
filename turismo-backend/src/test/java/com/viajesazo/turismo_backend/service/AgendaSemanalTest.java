@@ -28,6 +28,7 @@ import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.model.Evento;
 import com.viajesazo.turismo_backend.model.Publicador;
 import com.viajesazo.turismo_backend.repository.EventoRepository;
+import com.viajesazo.turismo_backend.repository.EstadoPropuestaRepository;
 import com.viajesazo.turismo_backend.repository.PublicadorRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -40,6 +41,9 @@ class AgendaSemanalTest {
 
 	@Mock
 	private PublicadorRepository publicadorRepository;
+
+	@Mock
+	private EstadoPropuestaRepository estadoPropuestaRepository;
 
 	@Mock
 	private GeocodingService geocodingService;
@@ -145,7 +149,7 @@ class AgendaSemanalTest {
 
 	private EventoService serviceAt(String today) {
 		Clock fixed = Clock.fixed(LocalDate.parse(today).atStartOfDay(ZONE).toInstant(), ZONE);
-		return new EventoService(eventoRepository, publicadorRepository, fixed, new EventoMapperImpl(),
+		return new EventoService(eventoRepository, publicadorRepository, estadoPropuestaRepository, fixed, new EventoMapperImpl(),
 				geocodingService);
 	}
 

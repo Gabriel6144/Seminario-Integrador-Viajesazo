@@ -17,6 +17,7 @@ import org.springframework.data.domain.Pageable;
 
 import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.model.Evento;
+import com.viajesazo.turismo_backend.model.EstadoPropuesta;
 import com.viajesazo.turismo_backend.model.Publicador;
 
 @DataJpaTest
@@ -31,13 +32,21 @@ class EventoRepositoryTest {
 	@Autowired
 	private PublicadorRepository publicadorRepository;
 
+	@Autowired
+	private EstadoPropuestaRepository estadoPropuestaRepository;
+
 	private Publicador publisher;
+	private EstadoPropuesta initialState;
 
 	@BeforeEach
 	void setUp() {
 		publisher = publicadorRepository.save(Publicador.builder()
 				.nombre("Turismo Córdoba")
 				.email("info@cordoba.gob.ar")
+				.build());
+		initialState = estadoPropuestaRepository.save(EstadoPropuesta.builder()
+				.nombre("INICIADO")
+				.descripcion("Propuesta iniciada")
 				.build());
 	}
 
@@ -265,6 +274,7 @@ class EventoRepositoryTest {
 				.localidad("Cosquín")
 				.fechaInicio(from)
 				.fechaFin(to)
+				.estadoPropuesta(initialState)
 				.publicador(owner)
 				.build());
 	}
@@ -278,6 +288,7 @@ class EventoRepositoryTest {
 				.fechaFin(date)
 				.horarioInicio(startTime)
 				.horarioFin(startTime.plusHours(3))
+				.estadoPropuesta(initialState)
 				.publicador(publisher)
 				.build());
 	}

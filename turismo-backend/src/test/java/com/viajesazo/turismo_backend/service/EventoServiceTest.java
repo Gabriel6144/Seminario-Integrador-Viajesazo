@@ -40,6 +40,7 @@ import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.model.Publicador;
 import com.viajesazo.turismo_backend.model.TipoAcceso;
 import com.viajesazo.turismo_backend.repository.EventoRepository;
+import com.viajesazo.turismo_backend.repository.EstadoPropuestaRepository;
 import com.viajesazo.turismo_backend.repository.PublicadorRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -52,6 +53,9 @@ class EventoServiceTest {
 	private PublicadorRepository publicadorRepository;
 
 	@Mock
+	private EstadoPropuestaRepository estadoPropuestaRepository;
+
+	@Mock
 	private GeocodingService geocodingService;
 
 	private EventoService service;
@@ -60,12 +64,14 @@ class EventoServiceTest {
 	void setUp() {
 		Clock clock = Clock.fixed(LocalDate.parse("2026-09-23").atStartOfDay(ZoneId.of("America/Argentina/Buenos_Aires")).toInstant(),
 				ZoneId.of("America/Argentina/Buenos_Aires"));
-		service = new EventoService(eventoRepository, publicadorRepository, clock, new EventoMapperImpl(),
+		service = new EventoService(eventoRepository, publicadorRepository, estadoPropuestaRepository, clock, new EventoMapperImpl(),
 				geocodingService);
 		// La mayoría de los tests no ejercita el camino de la geocodificación; queda lenient para
 		// que los que fallan antes (validaciones) no rompan por strict stubs.
 		lenient().when(geocodingService.geocode(any(), any(), any())).thenReturn(Optional
 				.of(new GeocodingService.Coordenadas(new BigDecimal("-31.41350000"), new BigDecimal("-64.49470000"))));
+		lenient().when(estadoPropuestaRepository.findByNombre("INICIADO"))
+				.thenReturn(Optional.of(initialState()));
 	}
 
 	@Test
@@ -95,9 +101,13 @@ class EventoServiceTest {
 
 		EventoResponse result = service.create(request());
 
-		assertThat(result.estadoPropuesta()).isEqualTo(EstadoPropuesta.INICIADO);
+		assertThat(result.estadoPropuesta().getNombre()).isEqualTo("INICIADO");
 		assertThat(result.latitud()).isEqualByComparingTo("-31.41350000");
 		assertThat(result.longitud()).isEqualByComparingTo("-64.49470000");
+	}
+
+	private EstadoPropuesta initialState() {
+		return new EstadoPropuesta(1L, "INICIADO", "Propuesta iniciada");
 	}
 
 	@Test
