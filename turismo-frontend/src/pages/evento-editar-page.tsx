@@ -74,7 +74,7 @@ export function EventoEditarPage() {
       <div className="flex flex-col gap-1">
         <h2 className="text-xl font-semibold tracking-tight">Editar evento</h2>
         <p className="text-sm text-muted-foreground">
-          Modificando “{actual.nombre}”, evento #{actual.id}.
+          Modificando “{actual.nombre}”.
         </p>
       </div>
 

@@ -2,11 +2,15 @@ import { z } from 'zod'
 
 import {
   CATEGORIAS,
+  MODALIDADES,
   TIPOS_ACCESO,
+  TIPOS_PROPUESTA,
   type Categoria,
   type EventoRequest,
+  type Modalidad,
   type PublicadorRequest,
   type TipoAcceso,
+  type TipoPropuesta,
 } from '@/types/api'
 
 /**
@@ -79,14 +83,29 @@ export function toPublicadorRequest(values: PublicadorFormValues): PublicadorReq
 // ---------------------------------------------------------------------------
 
 /**
- * `categoria` es `''` mientras no se eligió nada en el `<Select>`, que es como un `<select>`
- * HTML representa "sin valor". La alternativa sería un string separado con un valor centinela,
- * pero el `''` ya cumple el papel y evita un estado más.
+ * `categoria`, `tipoPropuesta` y `modalidad` arrancan en `''` mientras no se eligió nada en el
+ * `<Select>`, igual que `publicadorId`, y son obligatorios al enviar el formulario.
  */
-const categoriaSchema = z.union([
-  z.literal(''),
-  z.enum(CATEGORIAS, { message: 'la categoría no es válida' }),
-])
+const categoriaSchema = z
+  .string()
+  .refine(
+    (value): value is Categoria => (CATEGORIAS as readonly string[]).includes(value),
+    'la categoría es obligatoria',
+  )
+
+const tipoPropuestaSchema = z
+  .string()
+  .refine(
+    (value): value is TipoPropuesta => (TIPOS_PROPUESTA as readonly string[]).includes(value),
+    'el tipo de propuesta es obligatorio',
+  )
+
+const modalidadSchema = z
+  .string()
+  .refine(
+    (value): value is Modalidad => (MODALIDADES as readonly string[]).includes(value),
+    'la modalidad es obligatoria',
+  )
 
 /**
  * `publicadorId` es **string** y no number porque el `<Select>` de Radix entrega
@@ -136,6 +155,8 @@ export const eventoSchema = z
     nombre: z.string().trim().min(1, 'el nombre es obligatorio'),
     descripcion: z.string(),
     categoria: categoriaSchema,
+    tipoPropuesta: tipoPropuestaSchema,
+    modalidad: modalidadSchema,
     tipoAcceso: tipoAccesoSchema,
     montoEstimado: montoEstimadoSchema,
     descripcionArancel: z.string(),
@@ -219,6 +240,8 @@ export function toEventoRequest(values: EventoFormValues): EventoRequest {
     nombre: values.nombre.trim(),
     descripcion: blankToNull(values.descripcion),
     categoria: values.categoria === '' ? null : (values.categoria as Categoria),
+    tipoPropuesta: values.tipoPropuesta === '' ? null : (values.tipoPropuesta as TipoPropuesta),
+    modalidad: values.modalidad === '' ? null : (values.modalidad as Modalidad),
     tipoAcceso: values.tipoAcceso === '' ? null : (values.tipoAcceso as TipoAcceso),
     // Los campos de arancel solo viajan si el evento es arancelado: si el usuario cambia a
     // "Gratuito", se limpian para no dejar un monto colgado en la base.
@@ -242,6 +265,8 @@ export const EVENTO_FORM_DEFAULT: EventoFormValues = {
   nombre: '',
   descripcion: '',
   categoria: '',
+  tipoPropuesta: '',
+  modalidad: '',
   tipoAcceso: 'GRATUITO',
   montoEstimado: '',
   descripcionArancel: '',
@@ -270,6 +295,8 @@ export function toEventoFormValues(evento: {
   nombre: string
   descripcion: string | null
   categoria: Categoria | null
+  tipoPropuesta?: TipoPropuesta | null
+  modalidad?: Modalidad | null
   tipoAcceso: TipoAcceso | null
   montoEstimado: number | null
   descripcionArancel: string | null
@@ -288,6 +315,8 @@ export function toEventoFormValues(evento: {
     nombre: evento.nombre,
     descripcion: evento.descripcion ?? '',
     categoria: evento.categoria ?? '',
+    tipoPropuesta: evento.tipoPropuesta ?? '',
+    modalidad: evento.modalidad ?? '',
     tipoAcceso: evento.tipoAcceso ?? 'GRATUITO',
     // El backend serializa `BigDecimal` como número (`1500.00`); el input necesita string.
     montoEstimado: evento.montoEstimado === null ? '' : String(evento.montoEstimado),

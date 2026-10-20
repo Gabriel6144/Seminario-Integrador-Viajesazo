@@ -22,7 +22,10 @@ import type { Page } from '@/types/api'
  * `string[]`, que es lo que rompería el type-checking de `queryKey`.
  */
 export const queryKeys = {
-  agenda: (page: number, size: number) => ['agenda', { page, size }] as const,
+  agenda: (page: number, size: number, filters?: Record<string, string>) =>
+    filters && Object.keys(filters).length > 0
+      ? (['agenda', { page, size, ...filters }] as const)
+      : (['agenda', { page, size }] as const),
   agendaAll: () => ['agenda'] as const,
   eventos: (page: number, size: number) => ['eventos', { page, size }] as const,
   eventosAll: () => ['eventos'] as const,

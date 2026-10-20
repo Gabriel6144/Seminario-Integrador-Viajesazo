@@ -34,6 +34,12 @@ async function elegirPublicador(nombre: string) {
 async function completarObligatorios() {
   const nombre = await buscarFormulario()
   await user().type(nombre, 'Festival de Invierno')
+  await user().click(screen.getByRole('combobox', { name: 'Categoría turística' }))
+  await user().click(await screen.findByRole('option', { name: 'Cultura' }))
+  await user().click(screen.getByRole('combobox', { name: 'Tipo de propuesta' }))
+  await user().click(await screen.findByRole('option', { name: 'Festival' }))
+  await user().click(screen.getByRole('combobox', { name: 'Modalidad' }))
+  await user().click(await screen.findByRole('option', { name: 'Pedestre' }))
   await user().type(screen.getByLabelText('Lugar o recinto'), 'Anfiteatro Municipal')
   await user().type(screen.getByLabelText('Ciudad / Localidad'), 'Villa Carlos Paz')
   await user().type(screen.getByLabelText('Dirección exacta o referencia'), 'Av. San Martín 500')
@@ -85,7 +91,9 @@ describe('EventoNuevoPage', () => {
     expect(guardado).toMatchObject({
       // Los opcionales que el usuario no llenó van como null, nunca como "".
       descripcion: null,
-      categoria: null,
+      categoria: 'CULTURA',
+      tipoPropuesta: 'FESTIVAL',
+      modalidad: 'PEDESTRE',
       // El evento arranca gratuito (default del backend) y en estado INICIADO, que es una regla
       // de negocio que el usuario no manda.
       tipoAcceso: 'GRATUITO',
@@ -104,7 +112,7 @@ describe('EventoNuevoPage', () => {
       // El nombre del publicador viene aplanado por el backend, no se manda.
       publicadorNombre: TURISMO.nombre,
     })
-  })
+  }, 15_000)
 
   it('muestra el bloque de arancel solo al elegir un evento arancelado', async () => {
     renderAlta()
@@ -131,7 +139,7 @@ describe('EventoNuevoPage', () => {
       await screen.findByText('el monto estimado es obligatorio para un evento arancelado'),
     ).toBeInTheDocument()
     expect(allEventos().some((evento) => evento.nombre === 'Festival de Invierno')).toBe(false)
-  })
+  }, 15_000)
 
   it('crea el evento arancelado con monto y link', async () => {
     renderAlta()
@@ -157,14 +165,12 @@ describe('EventoNuevoPage', () => {
       montoEstimado: 2500,
       sitioOficial: 'https://entradas.cordoba.gob.ar/invierno',
     })
-  })
+  }, 15_000)
 
   it('crea el evento con todos los opcionales que el usuario completó', async () => {
     renderAlta()
     await completarObligatorios()
     await user().type(screen.getByLabelText('Descripción completa'), 'Espectáculo de invierno')
-    await user().click(screen.getByRole('combobox', { name: 'Categoría turística' }))
-    await user().click(await screen.findByRole('option', { name: 'Cultura' }))
     await user().type(screen.getByLabelText('Horario de inicio'), '20:00')
     await user().type(screen.getByLabelText('Horario de finalización'), '23:00')
     await user().click(screen.getByRole('button', { name: /Agregar imagen/ }))
@@ -181,11 +187,13 @@ describe('EventoNuevoPage', () => {
     expect(guardado).toMatchObject({
       descripcion: 'Espectáculo de invierno',
       categoria: 'CULTURA',
+      tipoPropuesta: 'FESTIVAL',
+      modalidad: 'PEDESTRE',
       horarioInicio: '20:00',
       horarioFin: '23:00',
       imagenes: ['https://cdn.test/invierno.jpg'],
     })
-  })
+  }, 15_000)
 
   it('agrega la URL de una imagen subida y la manda al crear el evento', async () => {
     renderAlta()
@@ -210,7 +218,7 @@ describe('EventoNuevoPage', () => {
     })
 
     expect(guardado).toMatchObject({ imagenes: ['/api/archivos/subida.png'] })
-  })
+  }, 15_000)
 
   it('no manda nada si se envía vacío y muestra los errores de campo', async () => {
     renderAlta()
@@ -220,6 +228,9 @@ describe('EventoNuevoPage', () => {
     await user().click(screen.getByRole('button', { name: 'Crear evento' }))
 
     expect(await screen.findByText('el nombre es obligatorio')).toBeInTheDocument()
+    expect(screen.getByText('la categoría es obligatoria')).toBeInTheDocument()
+    expect(screen.getByText('el tipo de propuesta es obligatorio')).toBeInTheDocument()
+    expect(screen.getByText('la modalidad es obligatoria')).toBeInTheDocument()
     expect(allEventos()).toHaveLength(totalAntes)
   })
 

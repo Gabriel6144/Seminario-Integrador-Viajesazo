@@ -150,6 +150,8 @@ export function updateEvento(id: number, request: EventoRequest): EventoResponse
     nombre: request.nombre,
     descripcion: request.descripcion,
     categoria: request.categoria,
+    tipoPropuesta: request.tipoPropuesta,
+    modalidad: request.modalidad,
     tipoAcceso: request.tipoAcceso ?? evento.tipoAcceso,
     // El backend calcula las coordenadas al guardar: un mock no las geocodifica y las conserva
     // como están. El arancel solo tiene sentido para un evento arancelado.
@@ -179,6 +181,8 @@ export function createEvento(request: EventoRequest): EventoResponse {
     nombre: request.nombre,
     descripcion: request.descripcion,
     categoria: request.categoria,
+    tipoPropuesta: request.tipoPropuesta,
+    modalidad: request.modalidad,
     tipoAcceso: request.tipoAcceso ?? 'GRATUITO',
     // Igual que el backend real: el estado es una regla de negocio, no algo que manda el usuario.
     estadoPropuesta: 'INICIADO',

@@ -24,6 +24,9 @@ function formValido(overrides: Partial<EventoFormValues> = {}): EventoFormValues
   return {
     ...EVENTO_FORM_DEFAULT,
     nombre: 'Festival de Folklore',
+    categoria: 'CULTURA',
+    tipoPropuesta: 'FESTIVAL',
+    modalidad: 'PEDESTRE',
     lugarRecinto: 'Anfiteatro José Hernández',
     localidad: 'Jesús María',
     direccion: 'Av. San Martín 100',
@@ -35,13 +38,13 @@ function formValido(overrides: Partial<EventoFormValues> = {}): EventoFormValues
 }
 
 describe('eventoSchema', () => {
-  it('acepta un evento mínimo con los cuatro campos obligatorios', () => {
+  it('acepta un evento mínimo con los campos obligatorios', () => {
     const resultado = eventoSchema.safeParse(formValido())
 
     expect(resultado.success).toBe(true)
   })
 
-  it('exige nombre, fecha de inicio, fecha de finalización y publicador', () => {
+  it('exige nombre, categoría, tipo de propuesta, modalidad, fechas y publicador', () => {
     const resultado = eventoSchema.safeParse(EVENTO_FORM_DEFAULT)
 
     expect(resultado.success).toBe(false)
@@ -49,7 +52,15 @@ describe('eventoSchema', () => {
 
     const campos = resultado.error.issues.map((issue) => issue.path.join('.'))
     expect(campos).toEqual(
-      expect.arrayContaining(['nombre', 'fechaInicio', 'fechaFin', 'publicadorId']),
+      expect.arrayContaining([
+        'nombre',
+        'categoria',
+        'tipoPropuesta',
+        'modalidad',
+        'fechaInicio',
+        'fechaFin',
+        'publicadorId',
+      ]),
     )
   })
 
@@ -191,7 +202,9 @@ describe('toEventoRequest', () => {
 
     expect(request.descripcion).toBeNull()
     expect(request.horarioInicio).toBeNull()
-    expect(request.categoria).toBeNull()
+    expect(request.categoria).toBe('CULTURA')
+    expect(request.tipoPropuesta).toBe('FESTIVAL')
+    expect(request.modalidad).toBe('PEDESTRE')
   })
 
   it('manda el tipo de acceso elegido y limpia el arancel de un evento gratuito', () => {
@@ -245,11 +258,20 @@ describe('toEventoRequest', () => {
     expect(request.imagenes).toEqual([])
   })
 
-  it('convierte el publicador a número y la categoría a su nombre del enum', () => {
-    const request = toEventoRequest(formValido({ publicadorId: '3', categoria: 'CULTURA' }))
+  it('convierte el publicador a número y los selectores de categoría, propuesta y modalidad a sus enums', () => {
+    const request = toEventoRequest(
+      formValido({
+        publicadorId: '3',
+        categoria: 'CULTURA',
+        tipoPropuesta: 'FESTIVAL',
+        modalidad: 'PEDESTRE',
+      }),
+    )
 
     expect(request.publicadorId).toBe(3)
     expect(request.categoria).toBe('CULTURA')
+    expect(request.tipoPropuesta).toBe('FESTIVAL')
+    expect(request.modalidad).toBe('PEDESTRE')
   })
 })
 
@@ -298,6 +320,8 @@ describe('toEventoFormValues', () => {
       nombre: FOLKLORE.nombre,
       descripcion: FOLKLORE.descripcion,
       categoria: FOLKLORE.categoria,
+      tipoPropuesta: FOLKLORE.tipoPropuesta ?? null,
+      modalidad: FOLKLORE.modalidad ?? null,
       tipoAcceso: FOLKLORE.tipoAcceso,
       // FOLKLORE es gratuito: los campos de arancel vuelven en null.
       montoEstimado: null,

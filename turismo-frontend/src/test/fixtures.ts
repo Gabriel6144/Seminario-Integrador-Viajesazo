@@ -39,6 +39,8 @@ export const FOLKLORE: EventoResponse = {
   descripcion:
     'La mayor fiesta de la tradición gaucha y música folklórica en el norte cordobés, con destacados artistas nacionales y destrezas criollas.',
   categoria: 'CULTURA',
+  tipoPropuesta: 'FESTIVAL',
+  modalidad: 'ECUESTRE',
   tipoAcceso: 'GRATUITO',
   estadoPropuesta: 'INICIADO',
   montoEstimado: null,
@@ -67,6 +69,8 @@ export const ARTESANIAS: EventoResponse = {
   descripcion:
     'Sabores típicos, cocina criolla y cata de vinos regionales en el corazón de las Sierras Chicas.',
   categoria: 'GASTRONOMIA',
+  tipoPropuesta: 'FERIA',
+  modalidad: 'PEDESTRE',
   tipoAcceso: 'GRATUITO',
   estadoPropuesta: 'INICIADO',
   montoEstimado: null,
@@ -94,6 +98,8 @@ export const GASTRONOMIA_ESTANCIA: EventoResponse = {
   descripcion:
     'Recorrido patrimonial guiado por templos, claustros y museos fundacionales de la Manzana Jesuítica.',
   categoria: 'CULTURA',
+  tipoPropuesta: 'VISITA_GUIADA',
+  modalidad: 'PEDESTRE',
   // Arancelado a propósito: es el único fixture que ejercita el bloque de arancel del detalle.
   tipoAcceso: 'DE_PAGO',
   estadoPropuesta: 'INICIADO',

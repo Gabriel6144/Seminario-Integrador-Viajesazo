@@ -29,8 +29,12 @@ import { eventoSchema, type EventoFormValues } from '@/lib/schemas'
 import {
   CATEGORIA_LABELS,
   CATEGORIAS,
+  MODALIDAD_LABELS,
+  MODALIDADES,
   TIPO_ACCESO_LABELS,
+  TIPO_PROPUESTA_LABELS,
   TIPOS_ACCESO,
+  TIPOS_PROPUESTA,
   type PublicadorResponse,
 } from '@/types/api'
 
@@ -139,7 +143,7 @@ export function EventoForm({
                 <FieldLabel htmlFor="categoria">Categoría turística</FieldLabel>
                 <Select value={field.value} onValueChange={field.onChange}>
                   <SelectTrigger id="categoria" aria-invalid={errors.categoria !== undefined}>
-                    <SelectValue placeholder="Sin categoría" />
+                    <SelectValue placeholder="Elegí una categoría" />
                   </SelectTrigger>
                   <SelectContent>
                     {CATEGORIAS.map((categoria) => (
@@ -150,6 +154,52 @@ export function EventoForm({
                   </SelectContent>
                 </Select>
                 <FieldError>{errors.categoria?.message}</FieldError>
+              </Field>
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="tipoPropuesta"
+            render={({ field }) => (
+              <Field data-invalid={errors.tipoPropuesta !== undefined}>
+                <FieldLabel htmlFor="tipoPropuesta">Tipo de propuesta</FieldLabel>
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger id="tipoPropuesta" aria-invalid={errors.tipoPropuesta !== undefined}>
+                    <SelectValue placeholder="Elegí un tipo de propuesta" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TIPOS_PROPUESTA.map((tipo) => (
+                      <SelectItem key={tipo} value={tipo}>
+                        {TIPO_PROPUESTA_LABELS[tipo]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldError>{errors.tipoPropuesta?.message}</FieldError>
+              </Field>
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="modalidad"
+            render={({ field }) => (
+              <Field data-invalid={errors.modalidad !== undefined}>
+                <FieldLabel htmlFor="modalidad">Modalidad</FieldLabel>
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger id="modalidad" aria-invalid={errors.modalidad !== undefined}>
+                    <SelectValue placeholder="Elegí una modalidad" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MODALIDADES.map((modalidad) => (
+                      <SelectItem key={modalidad} value={modalidad}>
+                        {MODALIDAD_LABELS[modalidad]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldError>{errors.modalidad?.message}</FieldError>
               </Field>
             )}
           />

@@ -50,9 +50,6 @@ export function Paso2Nombre({
           onClick={onRandomName}
           className="mt-3.5 flex w-full items-center justify-center gap-2 rounded-xl border border-amber-200/90 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-900 transition-all hover:bg-amber-100/80 active:scale-[0.98]"
         >
-          <span className="material-symbols-outlined fill text-[18px] text-amber-500">
-            casino
-          </span>
           <span>Sorprendeme con un nombre</span>
         </button>
 

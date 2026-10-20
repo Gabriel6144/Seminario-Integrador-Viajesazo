@@ -64,6 +64,60 @@ export const CATEGORIA_LABELS: Record<Categoria, string> = {
   AVENTURA: 'Aventura',
 }
 
+/**
+ * `TipoPropuesta` del backend, en mayúsculas y sin tildes porque se persiste como `STRING`.
+ */
+export const TIPOS_PROPUESTA = [
+  'FERIA',
+  'CONGRESO',
+  'ENCUENTRO',
+  'DEPORTIVO',
+  'ESPECTACULO',
+  'JORNADA',
+  'EXPOSICION',
+  'VISITA_GUIADA',
+  'FESTIVAL',
+] as const
+
+export type TipoPropuesta = (typeof TIPOS_PROPUESTA)[number]
+
+export const TIPO_PROPUESTA_LABELS: Record<TipoPropuesta, string> = {
+  FERIA: 'Feria',
+  CONGRESO: 'Congreso',
+  ENCUENTRO: 'Encuentro',
+  DEPORTIVO: 'Deportivo',
+  ESPECTACULO: 'Espectáculo',
+  JORNADA: 'Jornada',
+  EXPOSICION: 'Exposición',
+  VISITA_GUIADA: 'Visita guiada',
+  FESTIVAL: 'Festival',
+}
+
+/**
+ * `Modalidad` del backend, en mayúsculas y sin tildes porque se persiste como `STRING`.
+ */
+export const MODALIDADES = [
+  'PEDESTRE',
+  'CICLISTA',
+  'AUTOMOVILISTICA',
+  'FERROVIARIA',
+  'NAUTICA',
+  'ECUESTRE',
+  'ACCESIBLE',
+] as const
+
+export type Modalidad = (typeof MODALIDADES)[number]
+
+export const MODALIDAD_LABELS: Record<Modalidad, string> = {
+  PEDESTRE: 'Pedestre',
+  CICLISTA: 'Ciclista',
+  AUTOMOVILISTICA: 'Automovilística',
+  FERROVIARIA: 'Ferroviaria',
+  NAUTICA: 'Náutica',
+  ECUESTRE: 'Ecuestre',
+  ACCESIBLE: 'Accesible',
+}
+
 /** `LocalDate` de Java serializado como `yyyy-MM-dd`, por ejemplo `"2026-10-01"`. */
 export type LocalDate = string
 
@@ -99,6 +153,8 @@ export interface EventoResponse {
   nombre: string
   descripcion: string | null
   categoria: Categoria | null
+  tipoPropuesta?: TipoPropuesta | null
+  modalidad?: Modalidad | null
   tipoAcceso: TipoAcceso | null
   /** Lo asigna el backend al registrar el evento; puede cambiar por reglas de negocio. */
   estadoPropuesta: EstadoPropuesta | null
@@ -153,6 +209,8 @@ export interface EventoRequest {
   nombre: string
   descripcion: string | null
   categoria: Categoria | null
+  tipoPropuesta: TipoPropuesta | null
+  modalidad: Modalidad | null
   /** `null` deja que el backend aplique el default `GRATUITO`. */
   tipoAcceso: TipoAcceso | null
   /** Obligatorio si `tipoAcceso` es `DE_PAGO`; el backend responde 400 si falta. */
