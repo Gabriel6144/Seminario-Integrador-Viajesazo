@@ -4,6 +4,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.ArrayList;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -40,11 +43,13 @@ public class Viaje {
     @Column
     private LocalDateTime fechaFin;
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Enumerated(EnumType.STRING)
     @Column(length = 50)
     private TipoRitmo ritmo;
 
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @ElementCollection
     @Enumerated(EnumType.STRING)
     @CollectionTable(
@@ -55,6 +60,7 @@ public class Viaje {
     @Builder.Default
     private List<InteresCategoria> interesesCategoria = new ArrayList<>();
 
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Enumerated(EnumType.STRING)
     @Column(length = 50)
     private EstadoViaje estado;

@@ -6,7 +6,9 @@ import java.time.LocalTime;
 import java.util.List;
 
 import com.viajesazo.turismo_backend.model.InteresCategoria;
+import com.viajesazo.turismo_backend.model.Modalidad;
 import com.viajesazo.turismo_backend.model.TipoAcceso;
+import com.viajesazo.turismo_backend.model.TipoPropuesta;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -19,6 +21,8 @@ public record EventoRequest(
 
 		String descripcion,
 		InteresCategoria categoria,
+		Modalidad modalidad,
+		TipoPropuesta tipoPropuesta,
 
 		TipoAcceso tipoAcceso,
 

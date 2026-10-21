@@ -7,7 +7,9 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -39,6 +41,32 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(BusinessRuleException.class)
 	public ResponseEntity<ErrorResponse> handleBusinessRule(BusinessRuleException ex) {
 		return build(HttpStatus.BAD_REQUEST, ex.getMessage());
+	}
+
+	/**
+	 * El agregado quedaría en un estado inconsistente. Se responde con el formato estándar
+	 * {@code application/problem+json} (RFC 7807) porque es un error de semántica del dominio, no
+	 * un dato mal formado. Los errores históricos siguen usando {@link ErrorResponse}; migrar el
+	 * resto queda fuera de este sprint.
+	 */
+	@ExceptionHandler(InvariantViolationException.class)
+	public ResponseEntity<ProblemDetail> handleInvariantViolation(InvariantViolationException ex) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
+		problem.setTitle("Regla de dominio incumplida");
+		return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(problem);
+	}
+
+	/**
+	 * Dos ediciones concurrentes sobre la misma propuesta: la segunda choca contra el
+	 * {@code @Version} y Hibernate lanza una excepción de bloqueo optimista. El cliente tiene que
+	 * recargar y reintentar, así que 409 Conflict es más preciso que un 500.
+	 */
+	@ExceptionHandler(OptimisticLockingFailureException.class)
+	public ResponseEntity<ProblemDetail> handleOptimisticLock(OptimisticLockingFailureException ex) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+				"la propuesta fue modificada por otra persona; recargala e intentá de nuevo");
+		problem.setTitle("Conflicto de concurrencia");
+		return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
 	}
 
 	/** Violaciones del {@code @Valid} sobre el body de la petición. */

@@ -24,6 +24,7 @@ public class Ubicacion {
 
     private String ciudad;
     private String localidad;
+    private String direccion;
 
     @Column(precision = 10, scale = 8)
     private BigDecimal latitud;

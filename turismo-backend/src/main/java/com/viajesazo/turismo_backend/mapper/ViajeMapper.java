@@ -77,9 +77,11 @@ public interface ViajeMapper {
     // ==========================================
 
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "direccion", ignore = true)
     Ubicacion toUbicacionEntity(UbicacionRequest request);
 
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "direccion", ignore = true)
     void updateUbicacion(UbicacionRequest request, @MappingTarget Ubicacion ubicacion);
 
     @Mapping(target = "nombre", source = "ciudad")

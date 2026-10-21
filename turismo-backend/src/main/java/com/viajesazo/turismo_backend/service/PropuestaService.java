@@ -19,19 +19,22 @@ import com.viajesazo.turismo_backend.model.EstadoPropuesta;
 import com.viajesazo.turismo_backend.model.Evento;
 import com.viajesazo.turismo_backend.model.Publicador;
 import com.viajesazo.turismo_backend.model.TipoAcceso;
+import com.viajesazo.turismo_backend.model.Ubicacion;
 import com.viajesazo.turismo_backend.repository.EventoRepository;
 import com.viajesazo.turismo_backend.repository.EstadoPropuestaRepository;
 import com.viajesazo.turismo_backend.repository.PublicadorRepository;
+import com.viajesazo.turismo_backend.repository.UbicacionRepository;
 
 import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
-public class EventoService {
+public class PropuestaService {
 
 	private final EventoRepository eventoRepository;
 	private final PublicadorRepository publicadorRepository;
 	private final EstadoPropuestaRepository estadoPropuestaRepository;
+	private final UbicacionRepository ubicacionRepository;
 	private final Clock clock;
 	private final EventoMapper mapper;
 	private final GeocodingService geocodingService;
@@ -45,6 +48,7 @@ public class EventoService {
 		evento.setEstadoPropuesta(getInitialState());
 		evento.setPublicador(getPublicadorOrThrow(request.publicadorId()));
 		applyUbicacion(evento, request);
+		evento.validarInvariantes();
 		return mapper.toResponse(eventoRepository.save(evento));
 	}
 
@@ -53,12 +57,14 @@ public class EventoService {
 		validateRange(request);
 		validateAcceso(request);
 		Evento evento = getOrThrow(id);
+		evento.validarEditable();
 		mapper.updateEntity(request, evento);
 		if (request.tipoAcceso() != null) {
 			evento.setTipoAcceso(request.tipoAcceso());
 		}
 		evento.setPublicador(getPublicadorOrThrow(request.publicadorId()));
 		applyUbicacion(evento, request);
+		evento.validarInvariantes();
 		return mapper.toResponse(eventoRepository.save(evento));
 	}
 
@@ -158,8 +164,14 @@ public class EventoService {
 				.geocode(request.lugarRecinto(), request.localidad(), request.direccion())
 				.orElseThrow(() -> new BusinessRuleException(
 						"no se encontró la ubicación del evento: revisá el lugar, la ciudad y la dirección"));
-		evento.setLatitud(coordenadas.latitud());
-		evento.setLongitud(coordenadas.longitud());
+		Ubicacion ubicacion = Ubicacion.builder()
+				.ciudad(request.localidad())
+				.localidad(request.localidad())
+				.direccion(request.direccion())
+				.latitud(coordenadas.latitud())
+				.longitud(coordenadas.longitud())
+				.build();
+		evento.setUbicacion(ubicacionRepository.save(ubicacion));
 	}
 
 }

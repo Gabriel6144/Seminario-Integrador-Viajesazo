@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.viajesazo.turismo_backend.dto.response.EventoResponse;
 import com.viajesazo.turismo_backend.dto.request.PublicadorRequest;
 import com.viajesazo.turismo_backend.dto.response.PublicadorResponse;
-import com.viajesazo.turismo_backend.service.EventoService;
+import com.viajesazo.turismo_backend.service.PropuestaService;
 import com.viajesazo.turismo_backend.service.PublicadorService;
 
 import jakarta.validation.Valid;
@@ -27,11 +27,11 @@ import jakarta.validation.Valid;
 public class PublicadorController {
 
 	private final PublicadorService publicadorService;
-	private final EventoService eventoService;
+	private final PropuestaService propuestaService;
 
-	public PublicadorController(PublicadorService publicadorService, EventoService eventoService) {
+	public PublicadorController(PublicadorService publicadorService, PropuestaService propuestaService) {
 		this.publicadorService = publicadorService;
-		this.eventoService = eventoService;
+		this.propuestaService = propuestaService;
 	}
 
 	@PostMapping
@@ -61,7 +61,7 @@ public class PublicadorController {
 	@GetMapping("/{id}/eventos")
 	public PagedModel<EventoResponse> findEventos(@PathVariable Long id,
 			@PageableDefault(size = 20) Pageable pageable) {
-		return new PagedModel<>(eventoService.findByPublicadorId(id, pageable));
+		return new PagedModel<>(propuestaService.findByPublicadorId(id, pageable));
 	}
 
 }
