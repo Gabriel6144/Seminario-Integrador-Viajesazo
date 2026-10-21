@@ -30,7 +30,9 @@ import com.viajesazo.turismo_backend.dto.response.PublicadorResponse;
 import com.viajesazo.turismo_backend.exception.BusinessRuleException;
 import com.viajesazo.turismo_backend.exception.ResourceNotFoundException;
 import com.viajesazo.turismo_backend.model.InteresCategoria;
-import com.viajesazo.turismo_backend.service.EventoService;
+import com.viajesazo.turismo_backend.model.TipoPropuesta;
+import com.viajesazo.turismo_backend.model.TipoRegistro;
+import com.viajesazo.turismo_backend.service.PropuestaService;
 import com.viajesazo.turismo_backend.service.PublicadorService;
 
 @WebMvcTest(PublicadorController.class)
@@ -46,7 +48,7 @@ class PublicadorControllerTest {
 	private PublicadorService publicadorService;
 
 	@MockitoBean
-	private EventoService eventoService;
+	private PropuestaService propuestaService;
 
 	@Test
 	@DisplayName("registra el publicador y responde 201")
@@ -118,9 +120,9 @@ class PublicadorControllerTest {
 	@Test
 	@DisplayName("US5: devuelve los eventos del publicador en la ruta anidada, paginados")
 	void returnsPublisherEvents() throws Exception {
-		when(eventoService.findByPublicadorId(eq(1L), any(Pageable.class))).thenReturn(
-				new PageImpl<>(List.of(new EventoResponse(7L, "Festival de Folklore", null, InteresCategoria.CULTURA,
-						null, null, null, null, null, null, "Cosquín", null, null, null,
+		when(propuestaService.findByPublicadorId(eq(1L), any(Pageable.class))).thenReturn(
+				new PageImpl<>(List.of(new EventoResponse(7L, TipoRegistro.EVENTO, "Festival de Folklore", null, TipoPropuesta.FESTIVAL, InteresCategoria.CULTURA,
+						null, null, null, null, null, null, "Cosquín", null, null, null, null,
 						LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-03"),
 						null, null, List.of(), 1L, "Turismo Córdoba")), PageRequest.of(0, 20), 1));
 
@@ -135,7 +137,7 @@ class PublicadorControllerTest {
 	@Test
 	@DisplayName("US5: un publicador sin eventos devuelve una página vacía, no un 404")
 	void returnsEmptyPageWhenNoEvents() throws Exception {
-		when(eventoService.findByPublicadorId(eq(1L), any(Pageable.class)))
+		when(propuestaService.findByPublicadorId(eq(1L), any(Pageable.class)))
 				.thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
 		mockMvc.perform(get("/api/publicadores/1/eventos"))
@@ -146,7 +148,7 @@ class PublicadorControllerTest {
 	@Test
 	@DisplayName("US5: consultar los eventos de un publicador inexistente devuelve 404")
 	void returns404WhenPublisherNotFound() throws Exception {
-		when(eventoService.findByPublicadorId(eq(404L), any(Pageable.class)))
+		when(propuestaService.findByPublicadorId(eq(404L), any(Pageable.class)))
 				.thenThrow(new ResourceNotFoundException("No existe el publicador con id 404"));
 
 		mockMvc.perform(get("/api/publicadores/404/eventos"))

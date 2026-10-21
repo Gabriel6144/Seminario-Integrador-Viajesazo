@@ -2,6 +2,7 @@ package com.viajesazo.turismo_backend.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -15,9 +16,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
-import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.model.Evento;
+import com.viajesazo.turismo_backend.model.EstadoPropuesta;
+import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.model.Publicador;
+import com.viajesazo.turismo_backend.model.TipoPropuesta;
+import com.viajesazo.turismo_backend.model.Ubicacion;
 
 @DataJpaTest
 class EventoRepositoryTest {
@@ -31,13 +35,24 @@ class EventoRepositoryTest {
 	@Autowired
 	private PublicadorRepository publicadorRepository;
 
+	@Autowired
+	private EstadoPropuestaRepository estadoPropuestaRepository;
+
+	@Autowired
+	private UbicacionRepository ubicacionRepository;
+
 	private Publicador publisher;
+	private EstadoPropuesta initialState;
 
 	@BeforeEach
 	void setUp() {
 		publisher = publicadorRepository.save(Publicador.builder()
 				.nombre("Turismo Córdoba")
 				.email("info@cordoba.gob.ar")
+				.build());
+		initialState = estadoPropuestaRepository.save(EstadoPropuesta.builder()
+				.nombre("INICIADO")
+				.descripcion("Propuesta iniciada")
 				.build());
 	}
 
@@ -261,10 +276,12 @@ class EventoRepositoryTest {
 	private Evento save(String name, LocalDate from, LocalDate to, Publicador owner) {
 		return eventoRepository.save(Evento.builder()
 				.nombre(name)
+				.tipoPropuesta(TipoPropuesta.FESTIVAL)
 				.categoria(InteresCategoria.CULTURA)
-				.localidad("Cosquín")
+				.ubicacion(persistUbicacion())
 				.fechaInicio(from)
 				.fechaFin(to)
+				.estadoPropuesta(initialState)
 				.publicador(owner)
 				.build());
 	}
@@ -272,13 +289,25 @@ class EventoRepositoryTest {
 	private Evento saveTimed(String name, LocalDate date, LocalTime startTime) {
 		return eventoRepository.save(Evento.builder()
 				.nombre(name)
+				.tipoPropuesta(TipoPropuesta.FESTIVAL)
 				.categoria(InteresCategoria.CULTURA)
-				.localidad("Cosquín")
+				.ubicacion(persistUbicacion())
 				.fechaInicio(date)
 				.fechaFin(date)
 				.horarioInicio(startTime)
 				.horarioFin(startTime.plusHours(3))
+				.estadoPropuesta(initialState)
 				.publicador(publisher)
+				.build());
+	}
+
+	private Ubicacion persistUbicacion() {
+		return ubicacionRepository.save(Ubicacion.builder()
+				.ciudad("Cosquín")
+				.localidad("Cosquín")
+				.direccion("Av. San Martín 800")
+				.latitud(new BigDecimal("-31.41350000"))
+				.longitud(new BigDecimal("-64.49470000"))
 				.build());
 	}
 

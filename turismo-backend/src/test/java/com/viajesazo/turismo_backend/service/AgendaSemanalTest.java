@@ -24,11 +24,14 @@ import org.springframework.data.domain.Pageable;
 
 import com.viajesazo.turismo_backend.dto.response.EventoResponse;
 import com.viajesazo.turismo_backend.mapper.EventoMapperImpl;
-import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.model.Evento;
+import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.model.Publicador;
+import com.viajesazo.turismo_backend.model.Ubicacion;
 import com.viajesazo.turismo_backend.repository.EventoRepository;
+import com.viajesazo.turismo_backend.repository.EstadoPropuestaRepository;
 import com.viajesazo.turismo_backend.repository.PublicadorRepository;
+import com.viajesazo.turismo_backend.repository.UbicacionRepository;
 
 @ExtendWith(MockitoExtension.class)
 class AgendaSemanalTest {
@@ -40,6 +43,12 @@ class AgendaSemanalTest {
 
 	@Mock
 	private PublicadorRepository publicadorRepository;
+
+	@Mock
+	private EstadoPropuestaRepository estadoPropuestaRepository;
+
+	@Mock
+	private UbicacionRepository ubicacionRepository;
 
 	@Mock
 	private GeocodingService geocodingService;
@@ -143,26 +152,27 @@ class AgendaSemanalTest {
 		return Page.empty();
 	}
 
-	private EventoService serviceAt(String today) {
+	private PropuestaService serviceAt(String today) {
 		Clock fixed = Clock.fixed(LocalDate.parse(today).atStartOfDay(ZONE).toInstant(), ZONE);
-		return new EventoService(eventoRepository, publicadorRepository, fixed, new EventoMapperImpl(),
+		return new PropuestaService(eventoRepository, publicadorRepository, estadoPropuestaRepository, ubicacionRepository, fixed, new EventoMapperImpl(),
 				geocodingService);
 	}
 
 	private Evento testEvent() {
 		Publicador publicador = Publicador.builder().id(1L).nombre("Turismo Córdoba").build();
-		return Evento.builder()
+		Evento evento = Evento.builder()
 				.id(10L)
 				.nombre("Festival de Folklore")
 				.categoria(InteresCategoria.CULTURA)
-				.localidad("Cosquín")
 				.fechaInicio(LocalDate.parse("2026-09-25"))
 				.fechaFin(LocalDate.parse("2026-09-27"))
 				.horarioInicio(LocalTime.of(20, 0))
 				.horarioFin(LocalTime.of(23, 30))
-				.imagenes(List.of("https://cdn.turismo.cordoba.gob.ar/folklore.jpg"))
 				.publicador(publicador)
 				.build();
+		evento.setImagenes(List.of("https://cdn.turismo.cordoba.gob.ar/folklore.jpg"));
+		evento.setUbicacion(Ubicacion.builder().id(5L).localidad("Cosquín").direccion("Av. San Martín 800").latitud(java.math.BigDecimal.valueOf(-31.4135)).longitud(java.math.BigDecimal.valueOf(-64.4947)).build());
+		return evento;
 	}
 
 }

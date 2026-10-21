@@ -23,7 +23,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.viajesazo.turismo_backend.config.AppConfig;
 import com.viajesazo.turismo_backend.dto.response.EventoResponse;
 import com.viajesazo.turismo_backend.model.InteresCategoria;
-import com.viajesazo.turismo_backend.service.EventoService;
+import com.viajesazo.turismo_backend.model.TipoPropuesta;
+import com.viajesazo.turismo_backend.model.TipoRegistro;
+import com.viajesazo.turismo_backend.service.PropuestaService;
 
 @WebMvcTest(AgendaController.class)
 // @WebMvcTest es un slice: solo carga beans web, así que el Clock que inyecta
@@ -35,12 +37,12 @@ class AgendaControllerTest {
 	private MockMvc mockMvc;
 
 	@MockitoBean
-	private EventoService eventoService;
+	private PropuestaService propuestaService;
 
 	@Test
 	@DisplayName("US6: devuelve la agenda semanal en orden, dentro de la página pedida")
 	void returnsWeeklyAgenda() throws Exception {
-		when(eventoService.findWeeklyAgenda(any(Pageable.class)))
+		when(propuestaService.findWeeklyAgenda(any(Pageable.class)))
 				.thenReturn(new PageImpl<>(List.of(
 						event(7L, "Festival de Folklore", LocalDate.parse("2026-09-25")),
 						event(8L, "Exposición de artesanías", LocalDate.parse("2026-09-26"))),
@@ -62,7 +64,7 @@ class AgendaControllerTest {
 	@Test
 	@DisplayName("US6: si no hay eventos en la semana devuelve una página vacía")
 	void returnsEmptyAgenda() throws Exception {
-		when(eventoService.findWeeklyAgenda(any(Pageable.class)))
+		when(propuestaService.findWeeklyAgenda(any(Pageable.class)))
 				.thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
 		mockMvc.perform(get("/api/agenda/semanal"))
@@ -76,7 +78,7 @@ class AgendaControllerTest {
 	void mapsQueryParamsToPageable() throws Exception {
 		// El echo del Pageable muestra el viaje redondo: lo que el controller arma de la query
 		// es lo que el service recibe y lo que la respuesta termina reportando.
-		when(eventoService.findWeeklyAgenda(any(Pageable.class))).thenAnswer(invocation -> {
+		when(propuestaService.findWeeklyAgenda(any(Pageable.class))).thenAnswer(invocation -> {
 			Pageable pageable = invocation.getArgument(0);
 			return new PageImpl<>(List.of(), pageable, 17);
 		});
@@ -92,7 +94,7 @@ class AgendaControllerTest {
 	@Test
 	@DisplayName("un size por encima del máximo se recorta al tope configurado en vez de reventar")
 	void clampsSizeToMax() throws Exception {
-		when(eventoService.findWeeklyAgenda(any(Pageable.class))).thenAnswer(invocation -> {
+		when(propuestaService.findWeeklyAgenda(any(Pageable.class))).thenAnswer(invocation -> {
 			Pageable pageable = invocation.getArgument(0);
 			return new PageImpl<>(List.of(), pageable, 0);
 		});
@@ -103,8 +105,8 @@ class AgendaControllerTest {
 	}
 
 	private EventoResponse event(Long id, String nombre, LocalDate fecha) {
-		return new EventoResponse(id, nombre, null, InteresCategoria.CULTURA, null, null, null, null, null, null,
-				"Cosquín", null, null, null, fecha, fecha, null, null, List.of(), 1L, "Turismo Córdoba");
+		return new EventoResponse(id, TipoRegistro.EVENTO, nombre, null, TipoPropuesta.FESTIVAL, InteresCategoria.CULTURA, null, null, null, null, null, null,
+				"Cosquín", null, null, null, null, fecha, fecha, null, null, List.of(), 1L, "Turismo Córdoba");
 	}
 
 }

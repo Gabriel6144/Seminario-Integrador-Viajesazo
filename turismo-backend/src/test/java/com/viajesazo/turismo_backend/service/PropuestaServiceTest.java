@@ -37,13 +37,18 @@ import com.viajesazo.turismo_backend.mapper.EventoMapperImpl;
 import com.viajesazo.turismo_backend.model.EstadoPropuesta;
 import com.viajesazo.turismo_backend.model.Evento;
 import com.viajesazo.turismo_backend.model.InteresCategoria;
+import com.viajesazo.turismo_backend.model.Modalidad;
 import com.viajesazo.turismo_backend.model.Publicador;
 import com.viajesazo.turismo_backend.model.TipoAcceso;
+import com.viajesazo.turismo_backend.model.TipoPropuesta;
+import com.viajesazo.turismo_backend.model.Ubicacion;
 import com.viajesazo.turismo_backend.repository.EventoRepository;
+import com.viajesazo.turismo_backend.repository.EstadoPropuestaRepository;
 import com.viajesazo.turismo_backend.repository.PublicadorRepository;
+import com.viajesazo.turismo_backend.repository.UbicacionRepository;
 
 @ExtendWith(MockitoExtension.class)
-class EventoServiceTest {
+class PropuestaServiceTest {
 
 	@Mock
 	private EventoRepository eventoRepository;
@@ -52,20 +57,30 @@ class EventoServiceTest {
 	private PublicadorRepository publicadorRepository;
 
 	@Mock
+	private EstadoPropuestaRepository estadoPropuestaRepository;
+
+	@Mock
+	private UbicacionRepository ubicacionRepository;
+
+	@Mock
 	private GeocodingService geocodingService;
 
-	private EventoService service;
+	private PropuestaService service;
 
 	@BeforeEach
 	void setUp() {
 		Clock clock = Clock.fixed(LocalDate.parse("2026-09-23").atStartOfDay(ZoneId.of("America/Argentina/Buenos_Aires")).toInstant(),
 				ZoneId.of("America/Argentina/Buenos_Aires"));
-		service = new EventoService(eventoRepository, publicadorRepository, clock, new EventoMapperImpl(),
+		service = new PropuestaService(eventoRepository, publicadorRepository, estadoPropuestaRepository, ubicacionRepository, clock, new EventoMapperImpl(),
 				geocodingService);
 		// La mayoría de los tests no ejercita el camino de la geocodificación; queda lenient para
 		// que los que fallan antes (validaciones) no rompan por strict stubs.
 		lenient().when(geocodingService.geocode(any(), any(), any())).thenReturn(Optional
 				.of(new GeocodingService.Coordenadas(new BigDecimal("-31.41350000"), new BigDecimal("-64.49470000"))));
+		lenient().when(estadoPropuestaRepository.findByNombre("INICIADO"))
+				.thenReturn(Optional.of(initialState()));
+		lenient().when(ubicacionRepository.save(any(Ubicacion.class)))
+				.thenAnswer(invocation -> invocation.getArgument(0));
 	}
 
 	@Test
@@ -95,9 +110,13 @@ class EventoServiceTest {
 
 		EventoResponse result = service.create(request());
 
-		assertThat(result.estadoPropuesta()).isEqualTo(EstadoPropuesta.INICIADO);
+		assertThat(result.estadoPropuesta().getNombre()).isEqualTo("INICIADO");
 		assertThat(result.latitud()).isEqualByComparingTo("-31.41350000");
 		assertThat(result.longitud()).isEqualByComparingTo("-64.49470000");
+	}
+
+	private EstadoPropuesta initialState() {
+		return new EstadoPropuesta(1L, "INICIADO", "Propuesta iniciada");
 	}
 
 	@Test
@@ -115,7 +134,7 @@ class EventoServiceTest {
 		when(publicadorRepository.findById(1L)).thenReturn(Optional.of(publisher()));
 		when(eventoRepository.save(any(Evento.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-		EventoRequest request = new EventoRequest("Evento", null, null, null, null, null, null,
+		EventoRequest request = new EventoRequest("Evento", null, null, null, TipoPropuesta.FESTIVAL, null, null, null, null,
 				"Plaza San Martín", "Córdoba", "Av. Colón 100, Córdoba",
 				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-02"), null, null, null, 1L);
 
@@ -129,7 +148,7 @@ class EventoServiceTest {
 	void failsWhenPublisherNotFound() {
 		when(publicadorRepository.findById(99L)).thenReturn(Optional.empty());
 
-		EventoRequest request = new EventoRequest("Festival de Folklore", null, null, null, null, null, null,
+		EventoRequest request = new EventoRequest("Festival de Folklore", null, null, null, TipoPropuesta.FESTIVAL, null, null, null, null,
 				"Plaza San Martín", "Córdoba", "Av. Colón 100, Córdoba",
 				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-03"), null, null, null, 99L);
 
@@ -142,7 +161,7 @@ class EventoServiceTest {
 	@Test
 	@DisplayName("la fecha de finalización no puede ser anterior a la de inicio")
 	void rejectsInvalidDateRange() {
-		EventoRequest request = new EventoRequest("Evento", null, null, null, null, null, null,
+		EventoRequest request = new EventoRequest("Evento", null, null, null, TipoPropuesta.FESTIVAL, null, null, null, null,
 				"Plaza San Martín", "Córdoba", "Av. Colón 100, Córdoba",
 				LocalDate.parse("2026-10-10"), LocalDate.parse("2026-10-01"), null, null, null, 1L);
 
@@ -155,7 +174,7 @@ class EventoServiceTest {
 	@Test
 	@DisplayName("el horario de finalización debe ser posterior al de inicio")
 	void rejectsInvalidTimeRange() {
-		EventoRequest request = new EventoRequest("Evento", null, null, null, null, null, null,
+		EventoRequest request = new EventoRequest("Evento", null, null, null, TipoPropuesta.FESTIVAL, null, null, null, null,
 				"Plaza San Martín", "Córdoba", "Av. Colón 100, Córdoba",
 				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-02"),
 				LocalTime.of(22, 0), LocalTime.of(20, 0), null, 1L);
@@ -168,7 +187,7 @@ class EventoServiceTest {
 	@Test
 	@DisplayName("un evento arancelado exige monto estimado")
 	void rejectsPaidEventWithoutAmount() {
-		EventoRequest request = new EventoRequest("Evento", null, null, TipoAcceso.DE_PAGO, null, null,
+		EventoRequest request = new EventoRequest("Evento", null, null, null, null, TipoAcceso.DE_PAGO, null, null,
 				"https://evento.gob.ar", "Plaza San Martín", "Córdoba", "Av. Colón 100, Córdoba",
 				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-02"), null, null, null, 1L);
 
@@ -181,7 +200,7 @@ class EventoServiceTest {
 	@Test
 	@DisplayName("un evento arancelado exige link al sitio oficial")
 	void rejectsPaidEventWithoutSite() {
-		EventoRequest request = new EventoRequest("Evento", null, null, TipoAcceso.DE_PAGO, new BigDecimal("1500"),
+		EventoRequest request = new EventoRequest("Evento", null, null, null, null, TipoAcceso.DE_PAGO, new BigDecimal("1500"),
 				null, null, "Plaza San Martín", "Córdoba", "Av. Colón 100, Córdoba",
 				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-02"), null, null, null, 1L);
 
@@ -209,7 +228,7 @@ class EventoServiceTest {
 		when(publicadorRepository.findById(1L)).thenReturn(Optional.of(publisher()));
 		when(eventoRepository.save(any(Evento.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-		EventoRequest request = new EventoRequest("Evento", null, null, null, null, null, null,
+		EventoRequest request = new EventoRequest("Evento", null, null, null, TipoPropuesta.FESTIVAL, null, null, null, null,
 				"Plaza San Martín", "Córdoba", "Av. Colón 100, Córdoba",
 				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-01"), null, null, null, 1L);
 
@@ -222,6 +241,7 @@ class EventoServiceTest {
 		when(eventoRepository.findById(7L)).thenReturn(Optional.of(persistedEvent()));
 		when(publicadorRepository.findById(1L)).thenReturn(Optional.of(publisher()));
 		when(eventoRepository.save(any(Evento.class))).thenAnswer(invocation -> invocation.getArgument(0));
+		when(ubicacionRepository.save(any(Ubicacion.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
 		EventoResponse result = service.update(7L, request());
 
@@ -364,7 +384,7 @@ class EventoServiceTest {
 	}
 
 	private EventoRequest request() {
-		return new EventoRequest("Festival de Folklore", "Encuentro de Syrigamis", InteresCategoria.CULTURA,
+		return new EventoRequest("Festival de Folklore", "Encuentro de Syrigamis", InteresCategoria.CULTURA, Modalidad.AUTOMOVILÍSTICA, TipoPropuesta.FESTIVAL,
 				null, null, null, null,
 				"Plaza Pringles", "Cosquín", "Av. San Martín 800, Cosquín",
 				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-03"),
@@ -376,15 +396,18 @@ class EventoServiceTest {
 	}
 
 	private Evento persistedEvent() {
-		return Evento.builder()
+		Evento evento = Evento.builder()
 				.id(7L)
 				.nombre("Evento Original")
+				.tipoPropuesta(TipoPropuesta.FESTIVAL)
 				.categoria(InteresCategoria.CULTURA)
-				.localidad("Alta Gracia")
+				.estadoPropuesta(initialState())
 				.fechaInicio(LocalDate.parse("2026-09-25"))
 				.fechaFin(LocalDate.parse("2026-09-26"))
 				.publicador(publisher())
 				.build();
+		evento.setUbicacion(Ubicacion.builder().id(10L).localidad("Alta Gracia").direccion("Av. Belgrano 100").latitud(new BigDecimal("-31.65500000")).longitud(new BigDecimal("-64.42970000")).build());
+		return evento;
 	}
 
 }

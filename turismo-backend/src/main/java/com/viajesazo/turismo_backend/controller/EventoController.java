@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.viajesazo.turismo_backend.dto.request.EventoRequest;
 import com.viajesazo.turismo_backend.dto.response.EventoResponse;
-import com.viajesazo.turismo_backend.service.EventoService;
+import com.viajesazo.turismo_backend.service.PropuestaService;
 
 import jakarta.validation.Valid;
 
@@ -24,31 +24,31 @@ import jakarta.validation.Valid;
 @RequestMapping("/api/eventos")
 public class EventoController {
 
-	private final EventoService eventoService;
+	private final PropuestaService propuestaService;
 
-	public EventoController(EventoService eventoService) {
-		this.eventoService = eventoService;
+	public EventoController(PropuestaService propuestaService) {
+		this.propuestaService = propuestaService;
 	}
 
 	@PostMapping
 	public ResponseEntity<EventoResponse> create(@Valid @RequestBody EventoRequest request) {
-		return ResponseEntity.status(HttpStatus.CREATED).body(eventoService.create(request));
+		return ResponseEntity.status(HttpStatus.CREATED).body(propuestaService.create(request));
 	}
 
 	@PutMapping("/{id}")
 	public EventoResponse update(@PathVariable Long id, @Valid @RequestBody EventoRequest request) {
-		return eventoService.update(id, request);
+		return propuestaService.update(id, request);
 	}
 
 	@DeleteMapping("/{id}")
 	public ResponseEntity<Void> delete(@PathVariable Long id) {
-		eventoService.delete(id);
+		propuestaService.delete(id);
 		return ResponseEntity.noContent().build();
 	}
 
 	@GetMapping("/{id}")
 	public EventoResponse findById(@PathVariable Long id) {
-		return eventoService.findById(id);
+		return propuestaService.findById(id);
 	}
 
 	/**
@@ -57,7 +57,7 @@ public class EventoController {
 	 */
 	@GetMapping
 	public PagedModel<EventoResponse> findAll(@PageableDefault(size = 20) Pageable pageable) {
-		return new PagedModel<>(eventoService.findAll(pageable));
+		return new PagedModel<>(propuestaService.findAll(pageable));
 	}
 
 }
