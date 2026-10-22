@@ -184,6 +184,17 @@ class ViajeControllerTest {
 	}
 
 	@Test
+	@DisplayName("VZ-23: un viaje en curso no se puede dar de baja")
+	void returns400WhenDeletingOngoingTrip() throws Exception {
+		doThrow(new BusinessRuleException("el viaje está en curso y no se puede modificar"))
+				.when(viajeService).delete(7L);
+
+		mockMvc.perform(delete("/api/viajes/7"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.status").value(400));
+	}
+
+	@Test
 	@DisplayName("soporte: consulta el detalle del viaje activo")
 	void findsTripById() throws Exception {
 		when(viajeService.findById(7L)).thenReturn(response());

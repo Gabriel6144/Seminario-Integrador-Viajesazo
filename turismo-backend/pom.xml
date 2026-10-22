@@ -117,6 +117,7 @@
 					-->
 					<systemPropertyVariables>
 						<spring.sql.init.mode>never</spring.sql.init.mode>
+						<app.viajes.transiciones.enabled>false</app.viajes.transiciones.enabled>
 					</systemPropertyVariables>
 				</configuration>
 			</plugin>

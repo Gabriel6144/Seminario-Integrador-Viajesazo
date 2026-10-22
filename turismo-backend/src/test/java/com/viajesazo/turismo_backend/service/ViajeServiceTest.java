@@ -8,7 +8,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
@@ -39,6 +43,8 @@ import com.viajesazo.turismo_backend.repository.ViajeRepository;
 @ExtendWith(MockitoExtension.class)
 class ViajeServiceTest {
 
+	private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-10-15T12:00:00Z"), ZoneOffset.UTC);
+
 	@Mock
 	private ViajeRepository viajeRepository;
 
@@ -46,7 +52,7 @@ class ViajeServiceTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new ViajeService(viajeRepository, new ViajeMapperImpl());
+		service = new ViajeService(viajeRepository, new ViajeMapperImpl(), CLOCK);
 	}
 
 	@Test
@@ -134,6 +140,69 @@ class ViajeServiceTest {
 	}
 
 	@Test
+	@DisplayName("VZ-23: un viaje en curso no se puede cancelar")
+	void cannotCancelOngoingTrip() {
+		Viaje persisted = persistedTrip();
+		persisted.setEstado(EstadoViaje.EN_CURSO);
+		when(viajeRepository.findByIdAndEstadoNotIn(7L, List.of(EstadoViaje.BORRADOR, EstadoViaje.CANCELADO)))
+				.thenReturn(Optional.of(persisted));
+
+		assertThatThrownBy(() -> service.delete(7L))
+				.isInstanceOf(BusinessRuleException.class)
+				.hasMessageContaining("EN_CURSO");
+		assertThat(persisted.getEstado()).isEqualTo(EstadoViaje.EN_CURSO);
+		verify(viajeRepository, never()).save(any(Viaje.class));
+	}
+
+	@Test
+	@DisplayName("VZ-21: un viaje en curso no se puede modificar")
+	void cannotUpdateOngoingTrip() {
+		Viaje persisted = persistedTrip();
+		persisted.setEstado(EstadoViaje.EN_CURSO);
+		when(viajeRepository.findByIdAndEstadoNotIn(7L, List.of(EstadoViaje.BORRADOR, EstadoViaje.CANCELADO)))
+				.thenReturn(Optional.of(persisted));
+
+		assertThatThrownBy(() -> service.update(7L, request()))
+				.isInstanceOf(BusinessRuleException.class)
+				.hasMessageContaining("en curso");
+	}
+
+	@Test
+	@DisplayName("completar un borrador lo deja PLANIFICADO y en el paso 8")
+	void completesDraft() {
+		Viaje draft = persistedTrip();
+		draft.setEstado(EstadoViaje.BORRADOR);
+		when(viajeRepository.findByIdAndEstado(7L, EstadoViaje.BORRADOR)).thenReturn(Optional.of(draft));
+		when(viajeRepository.save(any(Viaje.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		ViajeResponse result = service.completeDraft(7L);
+
+		assertThat(result.estado()).isEqualTo(EstadoViaje.PLANIFICADO);
+		assertThat(result.pasoActual()).isEqualTo(8);
+	}
+
+	@Test
+	@DisplayName("el scheduler pasa los viajes por fecha a EN_CURSO o FINALIZADO")
+	void appliesAutomaticTransitions() {
+		Viaje enCurso = persistedTrip();
+		enCurso.setEstado(EstadoViaje.PLANIFICADO);
+		enCurso.setFechaInicio(LocalDateTime.parse("2026-10-14T00:00:00"));
+		enCurso.setFechaFin(LocalDateTime.parse("2026-10-16T00:00:00"));
+
+		Viaje vencido = persistedTrip();
+		vencido.setEstado(EstadoViaje.PLANIFICADO);
+		vencido.setFechaInicio(LocalDateTime.parse("2026-10-10T00:00:00"));
+		vencido.setFechaFin(LocalDateTime.parse("2026-10-12T00:00:00"));
+
+		when(viajeRepository.findByEstadoIn(any())).thenReturn(List.of(enCurso, vencido));
+
+		service.aplicarTransicionesAutomaticas();
+
+		assertThat(enCurso.getEstado()).isEqualTo(EstadoViaje.EN_CURSO);
+		assertThat(vencido.getEstado()).isEqualTo(EstadoViaje.FINALIZADO);
+	}
+
+	@Test
 	@DisplayName("VZ-22: lista los viajes activos del turista, paginados")
 	void listsActiveTripsOfTourist() {
 		when(viajeRepository.findByUsuarioAndEstadoNotInOrderByFechaInicioAsc(
@@ -172,6 +241,7 @@ class ViajeServiceTest {
 				.fechaInicio(java.time.LocalDateTime.parse("2026-10-20T00:00:00"))
 				.fechaFin(java.time.LocalDateTime.parse("2026-10-22T00:00:00"))
 				.ritmo(TipoRitmo.EQUILIBRADO)
+				.interesesCategoria(new java.util.ArrayList<>(List.of(InteresCategoria.CULTURA)))
 				.estado(EstadoViaje.PLANIFICADO)
 				.usuario("turista@test.com")
 				.build();

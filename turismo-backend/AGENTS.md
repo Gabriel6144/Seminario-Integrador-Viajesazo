@@ -201,8 +201,9 @@ de nombres").
   (`LocalDateTime`), `ritmo` (`TipoRitmo`), `interesesCategoria` (`@ElementCollection` de
   `InteresCategoria`) y `usuario` (`String`). La baja lógica se modela con `estado` (`EstadoViaje`),
   **no** con un `activo` booleano (ver "API del Sprint 2").
-- `EstadoViaje` — **ya existe**: `PLANIFICADO`, `EN_CURSO`, `FINALIZADO`, `CANCELADO`. VZ-23 usa
-  `CANCELADO` para la baja lógica.
+- `EstadoViaje` — **ya existe**: `BORRADOR`, `PLANIFICADO`, `EN_CURSO`, `FINALIZADO`, `CANCELADO`.
+  Las transiciones válidas viven en el enum (`puedeTransicionarA`); `FINALIZADO` y `CANCELADO` son
+  terminales. `CANCELADO` se usa para la baja lógica tanto de viajes como de borradores.
 - `TipoRitmo` — **ya existe**: `TRANQUILO`, `EQUILIBRADO`, `INTENSIVO`.
 - `Preferencia` / nivel de interés por categoría — se apoya en `Categoria`.
 - `Actividad` — descripción, categoría, ubicación, horarios de disponibilidad, duración estimada,
@@ -308,8 +309,9 @@ Decisiones que no son obvias y conviene no deshacer sin motivo:
 - **La API expone `LocalDate`; la entidad guarda `LocalDateTime`.** `ViajeMapper` convierte con
   helpers `default` (medianoche). El tipo de persistencia no se filtra al contrato de la API.
 - **`POST` fuerza `estado = PLANIFICADO`** e ignora el `estado` que viniera en el body; `PUT`
-  tampoco permite cambiarlo (el mapeo de update lo ignora). El único cambio de `estado` es el que
-  hace el `DELETE`.
+  tampoco permite cambiarlo (el mapeo de update lo ignora). Los cambios de `estado` los hacen las
+  transiciones de dominio (`completar borrador`, `DELETE`) y el scheduler de fechas; el cliente
+  nunca manda el estado.
 - **La confirmación previa de VZ-23 CA1 es de la UI** (AlertDialog); el backend solo expone el
   `DELETE`.
 

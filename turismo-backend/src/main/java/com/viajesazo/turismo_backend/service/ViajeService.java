@@ -1,5 +1,7 @@
 package com.viajesazo.turismo_backend.service;
 
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,6 +28,7 @@ public class ViajeService {
 
 	private final ViajeRepository viajeRepository;
 	private final ViajeMapper mapper;
+	private final Clock clock;
 
 	/** VZ-19: registra el viaje. Nace {@code PLANIFICADO} y asociado a su turista. */
 	@Transactional
@@ -41,6 +44,7 @@ public class ViajeService {
 	public ViajeResponse update(Long id, ViajeRequest request) {
 		validateRange(request);
 		Viaje viaje = getOrThrow(id);
+		viaje.validarEditable();
 		mapper.updateEntity(request, viaje);
 		mapper.updateUbicacion(request.ubicacion(), viaje.getZonaInteres());
 		return mapper.toResponse(viajeRepository.save(viaje));
@@ -53,7 +57,7 @@ public class ViajeService {
 	@Transactional
 	public void delete(Long id) {
 		Viaje viaje = getOrThrow(id);
-		viaje.setEstado(EstadoViaje.CANCELADO);
+		viaje.cancelar();
 		viajeRepository.save(viaje);
 	}
 
@@ -115,18 +119,32 @@ public class ViajeService {
 	public ViajeResponse completeDraft(Long id) {
 		Viaje viaje = viajeRepository.findByIdAndEstado(id, EstadoViaje.BORRADOR)
 				.orElseThrow(() -> new ResourceNotFoundException("No existe el borrador con id " + id));
-		validateCompleteness(viaje);
-		viaje.setEstado(EstadoViaje.PLANIFICADO);
+		viaje.planificar(clock);
 		viaje.setPasoActual(8);
 		return mapper.toResponse(viajeRepository.save(viaje));
 	}
 
-	/** Baja física de un borrador. */
+	/** Baja lógica de un borrador: pasa a CANCELADO y deja de listarse. */
 	@Transactional
 	public void deleteDraft(Long id) {
 		Viaje viaje = viajeRepository.findByIdAndEstado(id, EstadoViaje.BORRADOR)
 				.orElseThrow(() -> new ResourceNotFoundException("No existe el borrador con id " + id));
-		viajeRepository.delete(viaje);
+		viaje.cancelar();
+		viajeRepository.save(viaje);
+	}
+
+	/**
+	 * Materializa las transiciones automáticas por fecha: PLANIFICADO → EN_CURSO al
+	 * comenzar el viaje y EN_CURSO → FINALIZADO al terminar. Los borradores y los
+	 * estados terminales no se tocan.
+	 */
+	@Transactional
+	public void aplicarTransicionesAutomaticas() {
+		LocalDate hoy = LocalDate.now(clock);
+		for (Viaje viaje : viajeRepository.findByEstadoIn(
+				List.of(EstadoViaje.PLANIFICADO, EstadoViaje.EN_CURSO))) {
+			viaje.actualizarEstadoPorFechas(hoy);
+		}
 	}
 
 	private void validateDraftRange(ViajeBorradorRequest request) {
@@ -136,33 +154,6 @@ public class ViajeService {
 		}
 		if (request.rangoInteresKm() != null && request.rangoInteresKm() <= 0) {
 			throw new BusinessRuleException("El rango de interés debe ser mayor a cero");
-		}
-	}
-
-	private void validateCompleteness(Viaje viaje) {
-		if (viaje.getNombre() == null || viaje.getNombre().isBlank()) {
-			throw new BusinessRuleException("El nombre del viaje no puede estar vacío");
-		}
-		if (viaje.getZonaInteres() == null) {
-			throw new BusinessRuleException("La ubicación de interés no puede estar vacía");
-		}
-		if (viaje.getRangoInteresKm() == null || viaje.getRangoInteresKm() <= 0) {
-			throw new BusinessRuleException("El rango de interés debe ser mayor a cero");
-		}
-		if (viaje.getFechaInicio() == null) {
-			throw new BusinessRuleException("La fecha de inicio no puede estar vacía");
-		}
-		if (viaje.getFechaFin() == null) {
-			throw new BusinessRuleException("La fecha de finalización no puede estar vacía");
-		}
-		if (viaje.getFechaFin().isBefore(viaje.getFechaInicio())) {
-			throw new BusinessRuleException("la fecha de finalización no puede ser anterior a la de inicio");
-		}
-		if (viaje.getRitmo() == null) {
-			throw new BusinessRuleException("El ritmo del viaje no puede estar vacío");
-		}
-		if (viaje.getUsuario() == null || viaje.getUsuario().isBlank()) {
-			throw new BusinessRuleException("El turista no puede estar vacío");
 		}
 	}
 
