@@ -65,7 +65,7 @@ describe('PublicadorNuevoPage', () => {
     await user().click(screen.getByRole('button', { name: 'Crear publicador' }))
 
     expect(
-      await screen.findByText('ya existe un publicador con ese email'),
+      await screen.findByText('Ya existe un publicador con ese email.'),
     ).toBeInTheDocument()
     // El rechazo tiene que ser real: no se agrega un publicador con el mismo email.
     expect(allPublicadores().filter((p) => p.email === COSQUIN.email)).toHaveLength(1)
@@ -79,7 +79,7 @@ describe('PublicadorNuevoPage', () => {
     await user().type(screen.getByLabelText('Email'), 'esto-no-es-un-mail')
     await user().click(screen.getByRole('button', { name: 'Crear publicador' }))
 
-    expect(await screen.findByText('el email no tiene un formato válido')).toBeInTheDocument()
+    expect(await screen.findByText('El email no tiene un formato válido.')).toBeInTheDocument()
     expect(allPublicadores()).toHaveLength(totalAntes)
   })
 
@@ -90,7 +90,7 @@ describe('PublicadorNuevoPage', () => {
     await user().type(await screen.findByLabelText('Email'), 'nuevo@cordoba.gob.ar')
     await user().click(screen.getByRole('button', { name: 'Crear publicador' }))
 
-    expect(await screen.findByText('el nombre es obligatorio')).toBeInTheDocument()
+    expect(await screen.findByText('El nombre es obligatorio.')).toBeInTheDocument()
     expect(allPublicadores()).toHaveLength(totalAntes)
   })
 
@@ -102,7 +102,7 @@ describe('PublicadorNuevoPage', () => {
     await user().type(await screen.findByLabelText('Nombre'), 'Instituto del Agua')
     await user().type(screen.getByLabelText('Email'), COSQUIN.email)
     await user().click(screen.getByRole('button', { name: 'Crear publicador' }))
-    await screen.findByText('ya existe un publicador con ese email')
+    await screen.findByText('Ya existe un publicador con ese email.')
 
     await user().clear(screen.getByLabelText('Email'))
     await user().type(screen.getByLabelText('Email'), 'agua@cordoba.gob.ar')

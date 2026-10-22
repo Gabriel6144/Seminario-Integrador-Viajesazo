@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
+import { useForm, type FieldError as RhfFieldError } from 'react-hook-form'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -12,7 +13,7 @@ import {
   FieldSet,
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { publicadorSchema, type PublicadorFormValues } from '@/lib/schemas'
+import { formatValidationMessage, publicadorSchema, type PublicadorFormValues } from '@/lib/schemas'
 
 interface PublicadorFormProps {
   defaultValues: PublicadorFormValues
@@ -39,17 +40,41 @@ export function PublicadorForm({ defaultValues, onSubmit, isPending, serverError
     mode: 'onSubmit',
   })
 
-  const { register, formState } = form
+  const { register, formState, watch } = form
   const { errors } = formState
+
+  const email = watch('email')
+  const [dismissedServerError, setDismissedServerError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setDismissedServerError(null)
+  }, [serverError])
+
+  const activeServerError =
+    serverError !== null && serverError !== dismissedServerError ? serverError : null
+
+  const esErrorEmailServidor =
+    activeServerError !== null && /email/i.test(activeServerError)
+
+  const errorEmail: RhfFieldError | undefined = esErrorEmailServidor
+    ? { type: 'server', message: formatValidationMessage(activeServerError) }
+    : email.trim().length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+      ? { type: 'validate', message: 'El email no tiene un formato válido.' }
+      : errors.email
+
+  const generalServerError =
+    activeServerError !== null && !esErrorEmailServidor
+      ? formatValidationMessage(activeServerError)
+      : null
 
   return (
     <form className="flex max-w-md flex-col gap-6" noValidate onSubmit={form.handleSubmit(onSubmit)}>
-      {serverError === null ? null : (
+      {generalServerError === null ? null : (
         <div
           role="alert"
           className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
         >
-          {serverError}
+          {generalServerError}
         </div>
       )}
 
@@ -62,15 +87,19 @@ export function PublicadorForm({ defaultValues, onSubmit, isPending, serverError
             <FieldError>{errors.nombre?.message}</FieldError>
           </Field>
 
-          <Field data-invalid={errors.email !== undefined}>
+          <Field data-invalid={errorEmail !== undefined}>
             <FieldLabel htmlFor="email">Email</FieldLabel>
             <Input
               id="email"
               type="email"
-              aria-invalid={errors.email !== undefined}
-              {...register('email')}
+              aria-invalid={errorEmail !== undefined}
+              {...register('email', {
+                onChange: () => {
+                  if (serverError !== null) setDismissedServerError(serverError)
+                },
+              })}
             />
-            <FieldError>{errors.email?.message}</FieldError>
+            <FieldError>{errorEmail?.message}</FieldError>
           </Field>
 
           <Field>

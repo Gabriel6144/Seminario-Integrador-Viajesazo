@@ -11,7 +11,7 @@ export class ApiError extends Error {
   readonly body: ApiErrorResponse | null
 
   constructor(status: number, body: ApiErrorResponse | null) {
-    super(body?.message ?? `HTTP ${status}`)
+    super(body?.message ?? body?.detail ?? `HTTP ${status}`)
     this.name = 'ApiError'
     this.status = status
     this.body = body
@@ -31,6 +31,7 @@ export function toUserMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status >= 500) return GENERIC_MESSAGE
     if (error.body?.message) return error.body.message
+    if (error.body?.detail) return error.body.detail
     return `No se pudo completar la petición (${error.status}).`
   }
   if (error instanceof TypeError) {

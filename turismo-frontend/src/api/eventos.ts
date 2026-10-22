@@ -60,6 +60,7 @@ export function useEvento(id: number | null) {
  */
 function invalidateEventoViews(queryClient: QueryClient, publicadorId: number): void {
   void queryClient.invalidateQueries({ queryKey: queryKeys.eventosAll() })
+  void queryClient.invalidateQueries({ queryKey: queryKeys.propuestasAll() })
   void queryClient.invalidateQueries({ queryKey: queryKeys.agendaAll() })
   void queryClient.invalidateQueries({ queryKey: queryKeys.publicadorEventosAll(publicadorId) })
 }

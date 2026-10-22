@@ -2,15 +2,20 @@ import { z } from 'zod'
 
 import {
   CATEGORIAS,
+  DIAS_SEMANA,
   MODALIDADES,
   TIPOS_ACCESO,
   TIPOS_PROPUESTA,
+  type ActividadRequest,
+  type ActividadResponse,
   type Categoria,
+  type DiaSemana,
   type EventoRequest,
   type Modalidad,
   type PublicadorRequest,
   type TipoAcceso,
   type TipoPropuesta,
+  type TipoRegistro,
 } from '@/types/api'
 
 /**
@@ -59,8 +64,8 @@ function blankToNull(value: string): string | null {
 export const publicadorSchema = z.object({
   // Sin `trim()` en el schema a propósito: el mensaje tiene que distinguish "vacío" de
   // "solo espacios", y el backend trata los dos igual con @NotBlank.
-  nombre: z.string().trim().min(1, 'el nombre es obligatorio'),
-  email: z.string().trim().min(1, 'el email es obligatorio').email('el email no tiene un formato válido'),
+  nombre: z.string().trim().min(1, 'El nombre es obligatorio.'),
+  email: z.string().trim().min(1, 'El email es obligatorio.').email('El email no tiene un formato válido.'),
   telefono: z.string(),
 })
 
@@ -89,22 +94,22 @@ export function toPublicadorRequest(values: PublicadorFormValues): PublicadorReq
 const categoriaSchema = z
   .string()
   .refine(
-    (value): value is Categoria => (CATEGORIAS as readonly string[]).includes(value),
-    'la categoría es obligatoria',
+    (value) => (CATEGORIAS as readonly string[]).includes(value),
+    'La categoría es obligatoria.',
   )
 
 const tipoPropuestaSchema = z
   .string()
   .refine(
-    (value): value is TipoPropuesta => (TIPOS_PROPUESTA as readonly string[]).includes(value),
-    'el tipo de propuesta es obligatorio',
+    (value) => (TIPOS_PROPUESTA as readonly string[]).includes(value),
+    'El tipo de propuesta es obligatorio.',
   )
 
 const modalidadSchema = z
   .string()
   .refine(
-    (value): value is Modalidad => (MODALIDADES as readonly string[]).includes(value),
-    'la modalidad es obligatoria',
+    (value) => (MODALIDADES as readonly string[]).includes(value),
+    'La modalidad es obligatoria.',
   )
 
 /**
@@ -114,7 +119,7 @@ const modalidadSchema = z
  */
 const publicadorIdSchema = z
   .string()
-  .refine((value) => /^\d+$/.test(value) && Number(value) > 0, 'el publicador es obligatorio')
+  .refine((value) => /^\d+$/.test(value) && Number(value) > 0, 'El publicador es obligatorio.')
 
 const imagenSchema = z.object({
   // Una fila agregada y no llenada no se manda como `""` al backend (que la rechaza con
@@ -123,13 +128,43 @@ const imagenSchema = z.object({
   url: z.string().trim().min(1, 'Ingresá la URL o quitá la fila.'),
 })
 
+export const disponibilidadSchema = z
+  .object({
+    diaSemana: z
+      .string()
+      .refine(
+        (value) => (DIAS_SEMANA as readonly string[]).includes(value),
+        'El día de la semana es obligatorio.',
+      ),
+    horaInicio: z
+      .string()
+      .trim()
+      .min(1, 'La hora de inicio es obligatoria.')
+      .regex(ISO_TIME, 'La hora de inicio no tiene un formato válido.'),
+    horaFin: z
+      .string()
+      .trim()
+      .min(1, 'La hora de fin es obligatoria.')
+      .regex(ISO_TIME, 'La hora de fin no tiene un formato válido.'),
+  })
+  .refine(
+    (item) =>
+      item.horaInicio.length === 0 ||
+      item.horaFin.length === 0 ||
+      item.horaFin > item.horaInicio,
+    {
+      message: 'La hora de fin de una disponibilidad debe ser posterior a la de inicio.',
+      path: ['horaFin'],
+    },
+  )
+
 /**
  * `tipoAcceso` es `''` mientras no se eligió nada en el `<Select>` (como `categoria`). El adapter
  * lo traduce a `null`, y el backend aplica su default `GRATUITO`.
  */
 const tipoAccesoSchema = z.union([
   z.literal(''),
-  z.enum(TIPOS_ACCESO, { message: 'el tipo de acceso no es válido' }),
+  z.enum(TIPOS_ACCESO, { message: 'El tipo de acceso no es válido.' }),
 ])
 
 /** Decimal con hasta dos decimales. El vacío es válido acá; la obligatoriedad se exige si es `DE_PAGO`. */
@@ -137,8 +172,12 @@ const montoEstimadoSchema = z
   .string()
   .trim()
   .refine(
+    (value) => !/^-\d/.test(value),
+    'El monto estimado no puede ser negativo.',
+  )
+  .refine(
     (value) => value.length === 0 || /^\d+(\.\d{1,2})?$/.test(value),
-    'el monto estimado no tiene un formato válido',
+    'El monto estimado no tiene un formato válido.',
   )
 
 /** `http(s)://...`, el mismo `@Pattern` del `EventoRequest`. Vacío se valida como obligatorio si es `DE_PAGO`. */
@@ -147,12 +186,12 @@ const sitioOficialSchema = z
   .trim()
   .refine(
     (value) => value.length === 0 || /^https?:\/\/.+/.test(value),
-    'el link al sitio oficial debe ser una URL http(s)',
+    'El link al sitio oficial debe ser una URL http(s).',
   )
 
 export const eventoSchema = z
   .object({
-    nombre: z.string().trim().min(1, 'el nombre es obligatorio'),
+    nombre: z.string().trim().min(1, 'El nombre es obligatorio.'),
     descripcion: z.string(),
     categoria: categoriaSchema,
     tipoPropuesta: tipoPropuestaSchema,
@@ -161,32 +200,42 @@ export const eventoSchema = z
     montoEstimado: montoEstimadoSchema,
     descripcionArancel: z.string(),
     sitioOficial: sitioOficialSchema,
-    lugarRecinto: z.string().trim().min(1, 'el lugar o recinto es obligatorio'),
-    localidad: z.string().trim().min(1, 'la ciudad es obligatoria'),
-    direccion: z.string().trim().min(1, 'la dirección exacta es obligatoria'),
+    lugarRecinto: z.string().trim().min(1, 'El lugar o recinto es obligatorio.'),
+    localidad: z.string().trim().min(1, 'La ciudad es obligatoria.'),
+    direccion: z.string().trim().min(1, 'La dirección exacta es obligatoria.'),
     fechaInicio: z
       .string()
       .trim()
-      .min(1, 'la fecha de inicio es obligatoria')
-      .regex(ISO_DATE, 'la fecha de inicio no tiene un formato válido'),
+      .min(1, 'La fecha de inicio es obligatoria.')
+      .regex(ISO_DATE, 'La fecha de inicio no tiene un formato válido.'),
     fechaFin: z
       .string()
       .trim()
-      .min(1, 'la fecha de finalización es obligatoria')
-      .regex(ISO_DATE, 'la fecha de finalización no tiene un formato válido'),
+      .min(1, 'La fecha de finalización es obligatoria.')
+      .regex(ISO_DATE, 'La fecha de finalización no tiene un formato válido.'),
     horarioInicio: z
       .string()
       .trim()
-      .refine((value) => value.length === 0 || ISO_TIME.test(value), 'el horario de inicio no tiene un formato válido'),
+      .refine((value) => value.length === 0 || ISO_TIME.test(value), 'El horario de inicio no tiene un formato válido.'),
     horarioFin: z
       .string()
       .trim()
-      .refine((value) => value.length === 0 || ISO_TIME.test(value), 'el horario de finalización no tiene un formato válido'),
+      .refine((value) => value.length === 0 || ISO_TIME.test(value), 'El horario de finalización no tiene un formato válido.'),
+    duracionMinutos: z.string().optional(),
+    disponibilidades: z
+      .array(
+        z.object({
+          diaSemana: z.string(),
+          horaInicio: z.string(),
+          horaFin: z.string(),
+        }),
+      )
+      .optional(),
     imagenes: z.array(imagenSchema),
     publicadorId: publicadorIdSchema,
   })
   .refine((values) => values.fechaInicio.length === 0 || values.fechaFin.length === 0 || values.fechaFin >= values.fechaInicio, {
-    message: 'la fecha de finalización no puede ser anterior a la de inicio',
+    message: 'La fecha de finalización no puede ser anterior a la de inicio.',
     path: ['fechaFin'],
   })
   .refine(
@@ -195,7 +244,7 @@ export const eventoSchema = z
       values.horarioFin.length === 0 ||
       values.horarioFin > values.horarioInicio,
     {
-      message: 'el horario de finalización debe ser posterior al de inicio',
+      message: 'El horario de finalización debe ser posterior al de inicio.',
       path: ['horarioFin'],
     },
   )
@@ -209,20 +258,111 @@ export const eventoSchema = z
     if (values.montoEstimado.trim().length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'el monto estimado es obligatorio para un evento arancelado',
+        message: 'El monto estimado es obligatorio para un evento arancelado.',
         path: ['montoEstimado'],
       })
     }
     if (values.sitioOficial.trim().length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'el link al sitio oficial es obligatorio para un evento arancelado',
+        message: 'El link al sitio oficial es obligatorio para un evento arancelado.',
         path: ['sitioOficial'],
       })
     }
   })
 
 export type EventoFormValues = z.infer<typeof eventoSchema>
+
+/**
+ * Normaliza mensajes de validación (incluidos los que vienen en minúscula del backend) para que
+ * comiencen con mayúscula y terminen con punto.
+ */
+export function formatValidationMessage(raw: string): string {
+  const trimmed = raw.trim()
+  if (trimmed.length === 0) return trimmed
+  const capitalized = trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
+  return /[.!?]$/.test(capitalized) ? capitalized : `${capitalized}.`
+}
+
+/**
+ * Extiende `eventoSchema` para exigir una fecha mínima de inicio (por ejemplo, hoy en el alta de
+ * un evento nuevo) sin afectar la edición de eventos históricos.
+ */
+export function crearEventoSchema(minFechaInicio?: string) {
+  if (!minFechaInicio) return eventoSchema
+  return eventoSchema.refine(
+    (values) => values.fechaInicio.length === 0 || values.fechaInicio >= minFechaInicio,
+    {
+      message: 'La fecha de inicio no puede ser anterior a la fecha actual.',
+      path: ['fechaInicio'],
+    },
+  )
+}
+
+/**
+ * Schema para el alta de una `Actividad` (`POST /api/actividades`), usando los mismos campos
+ * base de `EventoFormValues` para que cambiar entre Evento y Actividad en el formulario conserve
+ * todo lo que el usuario ya completó.
+ */
+export const actividadSchema = z.object({
+  nombre: z.string().trim().min(1, 'El nombre es obligatorio.'),
+  descripcion: z.string(),
+  categoria: categoriaSchema,
+  tipoPropuesta: tipoPropuestaSchema,
+  modalidad: modalidadSchema,
+  tipoAcceso: tipoAccesoSchema,
+  montoEstimado: z.string(),
+  descripcionArancel: z.string(),
+  sitioOficial: z.string(),
+  lugarRecinto: z.string().trim().min(1, 'El lugar o recinto es obligatorio.'),
+  localidad: z.string().trim().min(1, 'La ciudad es obligatoria.'),
+  direccion: z.string().trim().min(1, 'La dirección exacta es obligatoria.'),
+  fechaInicio: z.string(),
+  fechaFin: z.string(),
+  horarioInicio: z.string(),
+  horarioFin: z.string(),
+  duracionMinutos: z
+    .string()
+    .optional()
+    .refine((value) => (value ?? '').trim().length > 0, 'La duración en minutos es obligatoria.')
+    .refine(
+      (value) => {
+        const trimmed = (value ?? '').trim()
+        return trimmed.length === 0 || (/^\d+$/.test(trimmed) && Number(trimmed) > 0)
+      },
+      'La duración de la actividad debe ser mayor a cero.',
+    ),
+  disponibilidades: z.array(disponibilidadSchema).optional(),
+  imagenes: z.array(imagenSchema),
+  publicadorId: publicadorIdSchema,
+})
+
+export function crearPropuestaSchema(tipoRegistro: TipoRegistro, minFechaInicio?: string) {
+  if (tipoRegistro === 'ACTIVIDAD') return actividadSchema
+  return crearEventoSchema(minFechaInicio)
+}
+
+export function toActividadRequest(values: EventoFormValues): ActividadRequest {
+  return {
+    nombre: values.nombre.trim(),
+    descripcion: blankToNull(values.descripcion),
+    categoria: values.categoria === '' ? null : (values.categoria as Categoria),
+    modalidad: values.modalidad === '' ? null : (values.modalidad as Modalidad),
+    tipoPropuesta: values.tipoPropuesta === '' ? null : (values.tipoPropuesta as TipoPropuesta),
+    tipoAcceso: values.tipoAcceso === '' ? null : (values.tipoAcceso as TipoAcceso),
+    lugarRecinto: values.lugarRecinto.trim(),
+    localidad: values.localidad.trim(),
+    direccion: values.direccion.trim(),
+    duracionMinutos: Number((values.duracionMinutos ?? '0').trim()),
+    disponibilidades: (values.disponibilidades ?? []).map((item) => ({
+      diaSemana: item.diaSemana as DiaSemana,
+      horaInicio: item.horaInicio.trim(),
+      horaFin: item.horaFin.trim(),
+    })),
+    imagenes: values.imagenes.map((imagen) => imagen.url.trim()),
+    publicadorId: Number(values.publicadorId),
+  }
+}
 
 /**
  * `POST /api/eventos` y `PUT /api/eventos/{id}`.
@@ -278,6 +418,8 @@ export const EVENTO_FORM_DEFAULT: EventoFormValues = {
   fechaFin: '',
   horarioInicio: '',
   horarioFin: '',
+  duracionMinutos: '',
+  disponibilidades: [],
   imagenes: [],
   publicadorId: '',
 }
@@ -331,7 +473,41 @@ export function toEventoFormValues(evento: {
     // el input quedaría en blanco y la edición perdería el horario.
     horarioInicio: (evento.horarioInicio ?? '').slice(0, 5),
     horarioFin: (evento.horarioFin ?? '').slice(0, 5),
+    duracionMinutos: '',
+    disponibilidades: [],
     imagenes: evento.imagenes.map((url) => ({ url })),
     publicadorId: String(evento.publicadorId),
+  }
+}
+
+/**
+ * Convierte un `ActividadResponse` en los valores del formulario, para precargar la edición de una actividad.
+ */
+export function toActividadFormValues(actividad: ActividadResponse): EventoFormValues {
+  return {
+    nombre: actividad.nombre,
+    descripcion: actividad.descripcion ?? '',
+    categoria: actividad.categoria ?? '',
+    tipoPropuesta: actividad.tipoPropuesta ?? '',
+    modalidad: actividad.modalidad ?? '',
+    tipoAcceso: actividad.tipoAcceso ?? 'GRATUITO',
+    montoEstimado: '',
+    descripcionArancel: '',
+    sitioOficial: '',
+    lugarRecinto: actividad.lugarRecinto ?? '',
+    localidad: actividad.localidad ?? '',
+    direccion: actividad.direccion ?? '',
+    fechaInicio: '',
+    fechaFin: '',
+    horarioInicio: '',
+    horarioFin: '',
+    duracionMinutos: String(actividad.duracionMinutos),
+    disponibilidades: (actividad.disponibilidades ?? []).map((item) => ({
+      diaSemana: item.diaSemana,
+      horaInicio: (item.horaInicio ?? '').slice(0, 5),
+      horaFin: (item.horaFin ?? '').slice(0, 5),
+    })),
+    imagenes: actividad.imagenes.map((url) => ({ url })),
+    publicadorId: String(actividad.publicadorId),
   }
 }

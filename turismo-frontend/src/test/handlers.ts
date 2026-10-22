@@ -36,6 +36,24 @@ import type { EventoRequest, PublicadorRequest, ViajeBorradorRequest } from '@/t
  * grilla— en vez de solo que se haya hecho un POST.
  */
 export const handlers = [
+  http.get('/api/propuestas', ({ request }) => {
+    const searchParams = new URL(request.url).searchParams
+    const tipo = searchParams.get('tipo')
+    const publicadorId = searchParams.get('publicadorId')
+    const propuestas = allEventos().map((evento) => ({
+      ...evento,
+      tipo: 'EVENTO' as const,
+      duracionMinutos: null,
+    }))
+    const filtradas = propuestas.filter((p) => {
+      if (tipo && p.tipo !== tipo) return false
+      if (publicadorId && p.publicadorId !== Number(publicadorId)) return false
+      return true
+    })
+    const { content, meta } = paginate(filtradas, request.url)
+    return HttpResponse.json(page(content, meta))
+  }),
+
   http.get('/api/eventos', ({ request }) => {
     const { content, meta } = paginate(allEventos(), request.url)
     return HttpResponse.json(page(content, meta))

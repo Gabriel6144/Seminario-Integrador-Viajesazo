@@ -54,15 +54,7 @@ public class Evento extends PropuestaTuristica {
 
 	@Override
 	public Set<TipoPropuesta> tiposPermitidos() {
-		return EnumSet.of(
-				TipoPropuesta.FERIA,
-				TipoPropuesta.CONGRESO,
-				TipoPropuesta.ENCUENTRO,
-				TipoPropuesta.DEPORTIVO,
-				TipoPropuesta.ESPECTACULO,
-				TipoPropuesta.JORNADA,
-				TipoPropuesta.EXPOSICION,
-				TipoPropuesta.FESTIVAL);
+		return EnumSet.allOf(TipoPropuesta.class);
 	}
 
 	@Override

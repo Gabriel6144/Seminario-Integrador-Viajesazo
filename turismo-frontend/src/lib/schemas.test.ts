@@ -72,7 +72,7 @@ describe('eventoSchema', () => {
     expect(resultado.success).toBe(false)
     if (resultado.success) return
     expect(resultado.error.issues[0]?.message).toBe(
-      'la fecha de finalización no puede ser anterior a la de inicio',
+      'La fecha de finalización no puede ser anterior a la de inicio.',
     )
   })
 
@@ -90,7 +90,7 @@ describe('eventoSchema', () => {
     expect(resultado.success).toBe(false)
     if (resultado.success) return
     expect(resultado.error.issues[0]?.message).toBe(
-      'el horario de finalización debe ser posterior al de inicio',
+      'El horario de finalización debe ser posterior al de inicio.',
     )
   })
 
@@ -173,7 +173,7 @@ describe('eventoSchema', () => {
 
     expect(resultado.success).toBe(false)
     if (resultado.success) return
-    expect(resultado.error.issues[0]?.message).toBe('el monto estimado no tiene un formato válido')
+    expect(resultado.error.issues[0]?.message).toBe('El monto estimado no tiene un formato válido.')
   })
 
   it('rechaza un link que no es http(s)', () => {
@@ -184,7 +184,7 @@ describe('eventoSchema', () => {
     expect(resultado.success).toBe(false)
     if (resultado.success) return
     expect(resultado.error.issues[0]?.message).toBe(
-      'el link al sitio oficial debe ser una URL http(s)',
+      'El link al sitio oficial debe ser una URL http(s).',
     )
   })
 })
@@ -347,14 +347,14 @@ describe('publicadorSchema', () => {
 
     expect(resultado.success).toBe(false)
     if (resultado.success) return
-    expect(resultado.error.issues[0]?.message).toBe('el email no tiene un formato válido')
+    expect(resultado.error.issues[0]?.message).toBe('El email no tiene un formato válido.')
   })
 
   it('distingue email vacío de email inválido, como los dos @NotBlank/@Email del backend', () => {
     const vacio = publicadorSchema.safeParse({ nombre: 'X', email: '   ', telefono: '' })
     expect(vacio.success).toBe(false)
     if (vacio.success) return
-    expect(vacio.error.issues[0]?.message).toBe('el email es obligatorio')
+    expect(vacio.error.issues[0]?.message).toBe('El email es obligatorio.')
   })
 })
 

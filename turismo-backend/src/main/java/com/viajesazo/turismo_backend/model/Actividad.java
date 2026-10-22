@@ -49,7 +49,7 @@ public class Actividad extends PropuestaTuristica {
 
 	@Override
 	public Set<TipoPropuesta> tiposPermitidos() {
-		return EnumSet.of(TipoPropuesta.VISITA_GUIADA, TipoPropuesta.DEPORTIVO);
+		return EnumSet.allOf(TipoPropuesta.class);
 	}
 
 	/**

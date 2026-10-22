@@ -122,7 +122,7 @@ describe('EventoEditarPage', () => {
     await user().click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
     expect(
-      await screen.findByText('la fecha de finalización no puede ser anterior a la de inicio'),
+      await screen.findByText('La fecha de finalización no puede ser anterior a la de inicio.'),
     ).toBeInTheDocument()
     expect(findEvento(1)?.fechaFin).toBe(FOLKLORE.fechaFin)
   })
