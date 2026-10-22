@@ -21,7 +21,7 @@ export function ViajeBorradorCard({ borrador, onDescartar, descartando }: Props)
           </h3>
         </div>
         <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
-          ✏️ Borrador · Paso {borrador.pasoActual ?? '?'} de 8
+          Borrador · Paso {borrador.pasoActual ?? '?'} de 8
         </span>
       </header>
 

@@ -29,7 +29,21 @@ import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDateRange, formatLocalDate, formatTimeRange } from '@/lib/dates'
 import { parseId } from '@/lib/parse-id'
-import { TIPO_ACCESO_LABELS, ESTADO_PROPUESTA_LABELS, type EstadoPropuesta } from '@/types/api'
+import {
+  TIPO_ACCESO_LABELS,
+  ESTADO_PROPUESTA_LABELS,
+  MODALIDAD_LABELS,
+  TIPO_PROPUESTA_LABELS,
+  type EstadoPropuesta,
+  type EstadoPropuestaObj,
+} from '@/types/api'
+
+const ESTADO_DOT_COLORS: Record<EstadoPropuesta, string> = {
+  INICIADO: 'bg-emerald-400',
+  REPROGRAMADO: 'bg-amber-400',
+  CANCELADO: 'bg-rose-400',
+  FINALIZADO: 'bg-slate-400',
+}
 
 /** Detalle de un evento — `GET /api/eventos/{id}`. */
 export function EventoDetailPage() {
@@ -74,13 +88,16 @@ export function EventoDetailPage() {
           {/* Badges flotantes */}
           <div className="absolute left-3 right-3 top-3 flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="rounded-full bg-white/95 px-3 py-1 text-xs font-bold text-[#7a5900] shadow-sm backdrop-blur-md">
-                {evento.categoria ? (
-                  <CategoriaBadge categoria={evento.categoria} />
-                ) : (
-                  'Sin categoría'
-                )}
+              <span className="rounded-full bg-[#df2a29] px-3 py-1 text-xs font-bold text-white shadow-sm backdrop-blur-md">
+                Evento
               </span>
+              {evento.categoria ? (
+                <CategoriaBadge categoria={evento.categoria} />
+              ) : (
+                <span className="rounded-full bg-[#d7a73b] px-3 py-1 text-xs font-bold text-white shadow-sm backdrop-blur-md">
+                  Sin categoría
+                </span>
+              )}
               <span className="rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-[#00658d] shadow-sm backdrop-blur-md">
                 {TIPO_ACCESO_LABELS[evento.tipoAcceso ?? 'GRATUITO']}
               </span>
@@ -92,10 +109,18 @@ export function EventoDetailPage() {
 
           {/* Título sobre la imagen */}
           <div className="absolute bottom-3 left-3 right-3 text-white">
-            <p className="mb-1 flex items-center gap-1 text-sm font-medium text-white/90">
+            <div className="mb-1 flex flex-wrap items-center gap-1.5 text-sm font-medium text-white/90">
               <MapPinIcon className="h-4 w-4" aria-hidden />
-              {evento.localidad ?? 'Córdoba'}
-            </p>
+              <span>{evento.localidad ?? 'Córdoba'}</span>
+              <span aria-hidden>·</span>
+              <span className="inline-flex items-center gap-1 font-semibold text-white">
+                <span
+                  className={`h-2 w-2 rounded-full ${ESTADO_DOT_COLORS[estadoKey(evento.estadoPropuesta)]}`}
+                  aria-hidden
+                />
+                {estadoLabel(evento.estadoPropuesta)}
+              </span>
+            </div>
             <h2 className="font-heading text-2xl font-bold leading-tight drop-shadow-sm">
               {evento.nombre}
             </h2>
@@ -106,16 +131,22 @@ export function EventoDetailPage() {
       {/* Card principal */}
       <Card>
         <CardHeader>
-          {!imagen && (
-            <div className="flex items-center gap-2">
-              <CategoriaBadge categoria={evento.categoria} />
-            </div>
-          )}
-          {imagen && (
-            <div className="flex items-center gap-2">
-              <CategoriaBadge categoria={evento.categoria} />
-            </div>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-[#df2a29] px-2.5 py-0.5 text-xs font-semibold text-white">
+              Evento
+            </span>
+            <CategoriaBadge categoria={evento.categoria} />
+            {evento.tipoPropuesta && (
+              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-[#3f484e]">
+                {TIPO_PROPUESTA_LABELS[evento.tipoPropuesta]}
+              </span>
+            )}
+            {evento.modalidad && (
+              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-[#3f484e]">
+                {MODALIDAD_LABELS[evento.modalidad]}
+              </span>
+            )}
+          </div>
           {/*
             `CardTitle` de shadcn es un `div` fijo (no acepta `asChild`), así que el nombre del
             evento se compone como `<h2>` a mano. Sin esto la página no tendría ningún heading y
@@ -284,9 +315,14 @@ function formatArancel(monto: number | null): string {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(monto)
 }
 
+function estadoKey(estado: EstadoPropuesta | EstadoPropuestaObj | null): EstadoPropuesta {
+  const key = typeof estado === 'object' && estado !== null ? estado.nombre : estado
+  return key ?? 'INICIADO'
+}
+
 /** `null` (evento viejo o sin estado) cae en el label de `INICIADO` para no mostrar nada raro. */
-function estadoLabel(estado: EstadoPropuesta | null): string {
-  return ESTADO_PROPUESTA_LABELS[estado ?? 'INICIADO']
+function estadoLabel(estado: EstadoPropuesta | EstadoPropuestaObj | null): string {
+  return ESTADO_PROPUESTA_LABELS[estadoKey(estado)]
 }
 
 function IdInvalido() {

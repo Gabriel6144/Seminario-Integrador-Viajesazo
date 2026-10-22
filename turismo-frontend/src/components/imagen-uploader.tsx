@@ -4,10 +4,13 @@ import { useRef, useState } from 'react'
 
 import { subirImagen } from '@/api/imagenes'
 import { Button } from '@/components/ui/button'
+import { FieldError } from '@/components/ui/field'
 import { toUserMessage } from '@/lib/http'
+import { formatValidationMessage } from '@/lib/schemas'
 
 /** Mismos formatos que valida el backend por firma de bytes. `accept` es solo una ayuda de la UI. */
 const ACCEPT = 'image/png,image/jpeg,image/webp,image/gif'
+const MAX_BYTES = 5 * 1024 * 1024
 
 /**
  * Subida de imágenes del evento.
@@ -34,12 +37,16 @@ export function ImagenUploader({ onUploaded }: { onUploaded: (url: string) => vo
     setError(null)
     try {
       for (const archivo of archivos) {
+        if (archivo.size > MAX_BYTES) {
+          setError('La imagen no puede superar los 5 MB.')
+          return
+        }
         const { url } = await subirImagen(archivo)
         onUploaded(url)
       }
     } catch (cause) {
       // Si el primero falla, los ya subidos quedaron como filas: no se pierde trabajo previo.
-      setError(toUserMessage(cause))
+      setError(formatValidationMessage(toUserMessage(cause)))
     } finally {
       setSubiendo(false)
       // Sin esto, elegir el mismo archivo otra vez no dispara `onChange` (es el mismo valor).
@@ -61,8 +68,12 @@ export function ImagenUploader({ onUploaded }: { onUploaded: (url: string) => vo
           void subir(Array.from(event.dataTransfer.files))
         }}
         className={cn(
-          'flex flex-col items-center gap-2 rounded-lg border border-dashed p-4 text-center text-sm',
-          arrastrando ? 'border-primary bg-secondary' : 'border-border',
+          'flex flex-col items-center gap-2 rounded-lg border border-dashed p-4 text-center text-sm transition-colors',
+          arrastrando
+            ? 'border-primary bg-secondary'
+            : error !== null
+              ? 'border-destructive bg-destructive/5'
+              : 'border-border',
         )}
       >
         <input
@@ -88,11 +99,7 @@ export function ImagenUploader({ onUploaded }: { onUploaded: (url: string) => vo
           Arrastrá los archivos o hacé clic. JPG, PNG, WEBP o GIF, hasta 5 MB cada uno.
         </p>
       </div>
-      {error === null ? null : (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
-      )}
+      {error === null ? null : <FieldError>{error}</FieldError>}
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState, useId } from 'react'
+import { useEffect, useState, useId, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   useBorrador,
@@ -101,6 +101,15 @@ export function PlanificadorPage() {
 
   // Loading animation state
   const [loadingStepIndex, setLoadingStepIndex] = useState<number>(0)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    }
+  }, [])
   const loadingSteps: LoadingStep[] = [
     { title: 'Estamos buscando experiencias para vos...', sub: 'Explorando paradas serranas y recomendaciones locales...', bar: 30 },
     { title: 'Encontramos actividades que coinciden con tus intereses...', sub: `Combinando ${interests.slice(0, 2).join(' & ')}...`, bar: 65 },
@@ -219,14 +228,17 @@ export function PlanificadorPage() {
     setStep(9)
     setLoadingStepIndex(0)
 
+    if (intervalRef.current) clearInterval(intervalRef.current)
+    if (timeoutRef.current) clearTimeout(timeoutRef.current)
+
     let idx = 0
-    const interval = setInterval(() => {
+    intervalRef.current = setInterval(() => {
       idx += 1
       if (idx < loadingSteps.length) {
         setLoadingStepIndex(idx)
       } else {
-        clearInterval(interval)
-        setTimeout(() => {
+        if (intervalRef.current) clearInterval(intervalRef.current)
+        timeoutRef.current = setTimeout(() => {
           setStep(10)
         }, 500)
       }
@@ -276,7 +288,7 @@ export function PlanificadorPage() {
     const payload = buildViajePayload()
     const onSuccess = (data: { id: number; nombre: string | null }) => {
       setBorradorId(data.id)
-      showToast('Borrador guardado correctamente 💾')
+      showToast('Borrador guardado correctamente')
       setTimeout(() => navigate('/borradores'), 1200)
     }
     const onError = (error: unknown) => {

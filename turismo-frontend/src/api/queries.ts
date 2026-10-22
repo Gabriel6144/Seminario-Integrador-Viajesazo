@@ -30,6 +30,11 @@ export const queryKeys = {
   eventos: (page: number, size: number) => ['eventos', { page, size }] as const,
   eventosAll: () => ['eventos'] as const,
   evento: (id: number) => ['evento', id] as const,
+  propuestas: (page: number, size: number, tipo?: string) =>
+    tipo ? (['propuestas', { page, size, tipo }] as const) : (['propuestas', { page, size }] as const),
+  propuestasAll: () => ['propuestas'] as const,
+  actividad: (id: number) => ['actividad', id] as const,
+  actividadesAll: () => ['actividades'] as const,
   publicadores: (page: number, size: number) => ['publicadores', { page, size }] as const,
   publicadoresAll: () => ['publicadores'] as const,
   publicador: (id: number) => ['publicador', id] as const,

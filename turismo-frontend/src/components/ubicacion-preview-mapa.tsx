@@ -78,7 +78,7 @@ export function UbicacionPreviewMapa({ lat, lng, onCoordsChange }: UbicacionPrev
       ref={container}
       role="img"
       aria-label="Mapa de la ubicación elegida"
-      className="h-64 w-full rounded-lg border"
+      className="relative z-0 isolate h-64 w-full rounded-lg border"
     />
   )
 }

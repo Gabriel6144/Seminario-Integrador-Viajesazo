@@ -1,13 +1,95 @@
-import { Link } from 'react-router-dom'
-import { NavLink } from 'react-router-dom';
+import { useEffect, useState } from 'react'
+import { Link, NavLink } from 'react-router-dom'
+
+const CORDOBA_WEATHER_URL =
+  'https://api.open-meteo.com/v1/forecast?latitude=-31.4201&longitude=-64.1888&current=temperature_2m,weather_code,is_day&timezone=America%2FArgentina%2FCordoba'
+
+interface ClimaCordoba {
+  temperatura: number
+  icono: string
+  descripcion: string
+}
+
+function resolverIconoClima(code: number, isDay: number): { icono: string; descripcion: string } {
+  const deDia = isDay === 1
+  if (code === 0) {
+    return {
+      icono: deDia ? 'sunny' : 'clear_night',
+      descripcion: 'Cielo despejado',
+    }
+  }
+  if (code === 1 || code === 2) {
+    return {
+      icono: deDia ? 'partly_cloudy_day' : 'partly_cloudy_night',
+      descripcion: 'Parcialmente nublado',
+    }
+  }
+  if (code === 3) {
+    return { icono: 'cloud', descripcion: 'Nublado' }
+  }
+  if (code === 45 || code === 48) {
+    return { icono: 'foggy', descripcion: 'Neblina' }
+  }
+  if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) {
+    return { icono: 'rainy', descripcion: 'Lluvia' }
+  }
+  if ((code >= 71 && code <= 77) || code === 85 || code === 86) {
+    return { icono: 'ac_unit', descripcion: 'Nieve' }
+  }
+  if (code >= 95) {
+    return { icono: 'thunderstorm', descripcion: 'Tormenta' }
+  }
+  return {
+    icono: deDia ? 'partly_cloudy_day' : 'partly_cloudy_night',
+    descripcion: 'Clima actual en Córdoba',
+  }
+}
 
 /**
- * Header sticky con logo de VIAJESAZO y badge de verificado.
- *
- * En mobile muestra solo el logo y el badge. En desktop (md+) agrega los links de
- * navegación: Eventos, Agenda, Estadísticas y Configuración.
+ * Header sticky con logo de VIAJESAZO y clima en tiempo real de Córdoba.
  */
 export function TopAppBar() {
+  const [clima, setClima] = useState<ClimaCordoba>({
+    temperatura: 18,
+    icono: 'partly_cloudy_day',
+    descripcion: 'Clima actual en Córdoba',
+  })
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    async function cargarClima() {
+      try {
+        const res = await fetch(CORDOBA_WEATHER_URL, { signal: controller.signal })
+        if (!res.ok) return
+        const data = (await res.json()) as {
+          current?: { temperature_2m?: number; weather_code?: number; is_day?: number }
+        }
+        const temp = data.current?.temperature_2m
+        if (typeof temp !== 'number') return
+        const code = data.current?.weather_code ?? 1
+        const isDay = data.current?.is_day ?? 1
+        const { icono, descripcion } = resolverIconoClima(code, isDay)
+        setClima({
+          temperatura: Math.round(temp),
+          icono,
+          descripcion,
+        })
+      } catch {
+        // Si no hay conexión o se aborta el fetch, se conserva el valor de respaldo (18°C).
+      }
+    }
+
+    void cargarClima()
+    // Refrescar cada 15 minutos
+    const intervalId = window.setInterval(() => void cargarClima(), 15 * 60 * 1000)
+
+    return () => {
+      controller.abort()
+      window.clearInterval(intervalId)
+    }
+  }, [])
+
   return (
     <header className="sticky top-0 z-40 bg-[#f7f9fb] shadow-sm">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-2">
@@ -46,7 +128,7 @@ export function TopAppBar() {
               <line x1="8" y1="2" x2="8" y2="6" />
               <line x1="3" y1="10" x2="21" y2="10" />
             </svg>
-            Eventos
+            Propuestas
           </NavLink>
 
           <NavLink
@@ -112,20 +194,30 @@ export function TopAppBar() {
               }`
             }
           >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
-              <path d="M19 21H8V7h11m0-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm-3-4H4a2 2 0 0 0-2 2v14h2V3h12V1z" />
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden>
+              <rect x="6" y="6" width="12" height="14" rx="2" />
+              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+              <line x1="10" y1="10" x2="10" y2="16" />
+              <line x1="14" y1="10" x2="14" y2="16" />
+              <line x1="8" y1="20" x2="8" y2="21.5" />
+              <line x1="16" y1="20" x2="16" y2="21.5" />
             </svg>
-            Borradores
+            Mis viajes
           </NavLink>
         </nav>
 
-        {/* Badge publicador */}
+        {/* Clima en vivo en Córdoba */}
         <div className="flex items-center gap-2">
-          <div className="px-2.5 py-1 rounded-full bg-sky-50 text-sky-700 text-xs font-semibold flex items-center gap-1 border border-sky-100 shadow-sm">
-          <span className="material-symbols-outlined text-sm text-sky-500">partly_cloudy_day</span>
-          <span className="text-sm">18°C Córdoba</span>
+          <div
+            title={`${clima.descripcion} en Córdoba Capital`}
+            className="flex items-center gap-1 rounded-full border border-sky-100 bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 shadow-sm"
+          >
+            <span className="material-symbols-outlined text-sm text-sky-500" aria-hidden>
+              {clima.icono}
+            </span>
+            <span className="text-sm">{clima.temperatura}°C Córdoba</span>
+          </div>
         </div>
-      </div>
     </div>
     </header>
   )

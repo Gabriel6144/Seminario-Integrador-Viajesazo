@@ -12,11 +12,15 @@
  * Se declara como const para tener una sola fuente de verdad: la lista y el tipo salen de acá.
  */
 export const CATEGORIAS = [
-  'GASTRONOMIA',
-  'FAMILIA',
-  'CULTURA',
   'NATURALEZA',
+  'GASTRONOMIA',
+  'CULTURA',
+  'HISTORIA',
   'AVENTURA',
+  'VIDA_NOCTURNA',
+  'MUSICA',
+  'COMPRAS',
+  'FAMILIAR_Y_RELAX',
 ] as const
 
 export type Categoria = (typeof CATEGORIAS)[number]
@@ -57,12 +61,19 @@ export const ESTADO_PROPUESTA_LABELS: Record<EstadoPropuesta, string> = {
  * `CATEGORIAS[i]` y se muestra `CATEGORIA_LABELS[CATEGORIAS[i]]`.
  */
 export const CATEGORIA_LABELS: Record<Categoria, string> = {
-  GASTRONOMIA: 'Gastronomía',
-  FAMILIA: 'Familia',
-  CULTURA: 'Cultura',
   NATURALEZA: 'Naturaleza',
+  GASTRONOMIA: 'Gastronomía',
+  CULTURA: 'Cultura',
+  HISTORIA: 'Historia',
   AVENTURA: 'Aventura',
+  VIDA_NOCTURNA: 'Vida nocturna',
+  MUSICA: 'Música',
+  COMPRAS: 'Compras',
+  FAMILIAR_Y_RELAX: 'Familiar y relax',
 }
+
+export const TIPOS_REGISTRO = ['EVENTO', 'ACTIVIDAD'] as const
+export type TipoRegistro = (typeof TIPOS_REGISTRO)[number]
 
 /**
  * `TipoPropuesta` del backend, en mayúsculas y sin tildes porque se persiste como `STRING`.
@@ -81,6 +92,21 @@ export const TIPOS_PROPUESTA = [
 
 export type TipoPropuesta = (typeof TIPOS_PROPUESTA)[number]
 
+/** Tipos de propuesta permitidos para un `Evento` en el dominio (`Evento.tiposPermitidos()`). */
+export const TIPOS_PROPUESTA_EVENTO = [
+  'FERIA',
+  'CONGRESO',
+  'ENCUENTRO',
+  'DEPORTIVO',
+  'ESPECTACULO',
+  'JORNADA',
+  'EXPOSICION',
+  'FESTIVAL',
+] as const
+
+/** Tipos de propuesta permitidos para una `Actividad` en el dominio (`Actividad.tiposPermitidos()`). */
+export const TIPOS_PROPUESTA_ACTIVIDAD = ['VISITA_GUIADA', 'DEPORTIVO'] as const
+
 export const TIPO_PROPUESTA_LABELS: Record<TipoPropuesta, string> = {
   FERIA: 'Feria',
   CONGRESO: 'Congreso',
@@ -94,14 +120,14 @@ export const TIPO_PROPUESTA_LABELS: Record<TipoPropuesta, string> = {
 }
 
 /**
- * `Modalidad` del backend, en mayúsculas y sin tildes porque se persiste como `STRING`.
+ * `Modalidad` del backend (`Modalidad.java`).
  */
 export const MODALIDADES = [
   'PEDESTRE',
   'CICLISTA',
-  'AUTOMOVILISTICA',
+  'AUTOMOVILÍSTICA',
   'FERROVIARIA',
-  'NAUTICA',
+  'NÁUTICA',
   'ECUESTRE',
   'ACCESIBLE',
 ] as const
@@ -111,11 +137,33 @@ export type Modalidad = (typeof MODALIDADES)[number]
 export const MODALIDAD_LABELS: Record<Modalidad, string> = {
   PEDESTRE: 'Pedestre',
   CICLISTA: 'Ciclista',
-  AUTOMOVILISTICA: 'Automovilística',
+  AUTOMOVILÍSTICA: 'Automovilística',
   FERROVIARIA: 'Ferroviaria',
-  NAUTICA: 'Náutica',
+  NÁUTICA: 'Náutica',
   ECUESTRE: 'Ecuestre',
   ACCESIBLE: 'Accesible',
+}
+
+export const DIAS_SEMANA = [
+  'MONDAY',
+  'TUESDAY',
+  'WEDNESDAY',
+  'THURSDAY',
+  'FRIDAY',
+  'SATURDAY',
+  'SUNDAY',
+] as const
+
+export type DiaSemana = (typeof DIAS_SEMANA)[number]
+
+export const DIA_SEMANA_LABELS: Record<DiaSemana, string> = {
+  MONDAY: 'Lunes',
+  TUESDAY: 'Martes',
+  WEDNESDAY: 'Miércoles',
+  THURSDAY: 'Jueves',
+  FRIDAY: 'Viernes',
+  SATURDAY: 'Sábado',
+  SUNDAY: 'Domingo',
 }
 
 /** `LocalDate` de Java serializado como `yyyy-MM-dd`, por ejemplo `"2026-10-01"`. */
@@ -148,8 +196,15 @@ export interface Page<T> {
   }
 }
 
+export interface EstadoPropuestaObj {
+  id: number
+  nombre: EstadoPropuesta
+  descripcion?: string | null
+}
+
 export interface EventoResponse {
   id: number
+  tipo?: TipoRegistro
   nombre: string
   descripcion: string | null
   categoria: Categoria | null
@@ -157,7 +212,7 @@ export interface EventoResponse {
   modalidad?: Modalidad | null
   tipoAcceso: TipoAcceso | null
   /** Lo asigna el backend al registrar el evento; puede cambiar por reglas de negocio. */
-  estadoPropuesta: EstadoPropuesta | null
+  estadoPropuesta: EstadoPropuesta | EstadoPropuestaObj | null
   /** `BigDecimal` serializado como número, con dos decimales. Solo tiene sentido si es `DE_PAGO`. */
   montoEstimado: number | null
   descripcionArancel: string | null
@@ -178,6 +233,75 @@ export interface EventoResponse {
   /** Aplanados. En la entidad el origen es `publicador.id` / `publicador.nombre`. */
   publicadorId: number
   publicadorNombre: string
+}
+
+export interface DisponibilidadItem {
+  diaSemana: DiaSemana
+  horaInicio: LocalTime
+  horaFin: LocalTime
+}
+
+export interface ActividadResponse {
+  id: number
+  tipo?: 'ACTIVIDAD'
+  nombre: string
+  descripcion: string | null
+  tipoPropuesta: TipoPropuesta
+  categoria: Categoria | null
+  modalidad: Modalidad | null
+  tipoAcceso: TipoAcceso
+  estadoPropuesta: EstadoPropuesta | EstadoPropuestaObj | null
+  lugarRecinto: string | null
+  localidad: string | null
+  direccion: string | null
+  latitud: number | null
+  longitud: number | null
+  duracionMinutos: number
+  disponibilidades: DisponibilidadItem[]
+  imagenes: string[]
+  publicadorId: number
+  publicadorNombre: string
+}
+
+export interface PropuestaResumenResponse {
+  id: number
+  tipo?: TipoRegistro
+  nombre: string
+  descripcion: string | null
+  tipoPropuesta?: TipoPropuesta | null
+  categoria: Categoria | null
+  modalidad?: Modalidad | null
+  tipoAcceso: TipoAcceso | null
+  estadoPropuesta: EstadoPropuesta | EstadoPropuestaObj | null
+  lugarRecinto: string | null
+  localidad: string | null
+  direccion: string | null
+  latitud: number | null
+  longitud: number | null
+  fechaInicio: LocalDate | null
+  fechaFin: LocalDate | null
+  horarioInicio: LocalTime | null
+  horarioFin: LocalTime | null
+  duracionMinutos?: number | null
+  imagenes: string[]
+  publicadorId: number
+  publicadorNombre: string
+}
+
+export interface ActividadRequest {
+  nombre: string
+  descripcion: string | null
+  categoria: Categoria | null
+  modalidad: Modalidad | null
+  tipoPropuesta: TipoPropuesta | null
+  tipoAcceso: TipoAcceso | null
+  lugarRecinto: string
+  localidad: string
+  direccion: string
+  duracionMinutos: number
+  disponibilidades: DisponibilidadItem[]
+  imagenes: string[]
+  publicadorId: number
 }
 
 export interface PublicadorResponse {
@@ -252,9 +376,11 @@ export interface PublicadorRequest {
  */
 export interface ApiErrorResponse {
   status: number
-  error: string
-  message: string
-  timestamp: string
+  error?: string
+  message?: string
+  detail?: string
+  title?: string
+  timestamp?: string
 }
 
 export const TIPOS_RITMO = ['TRANQUILO', 'EQUILIBRADO', 'INTENSIVO'] as const

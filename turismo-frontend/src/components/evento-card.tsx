@@ -2,17 +2,47 @@ import { Link } from 'react-router-dom'
 
 import { CategoriaBadge } from '@/components/categoria-badge'
 import { formatDateRange, formatTimeRange } from '@/lib/dates'
-import type { EventoResponse } from '@/types/api'
+import {
+  ESTADO_PROPUESTA_LABELS,
+  type EstadoPropuesta,
+  type EstadoPropuestaObj,
+  type EventoResponse,
+  type PropuestaResumenResponse,
+} from '@/types/api'
+
+const ESTADO_DOT_COLORS: Record<EstadoPropuesta, string> = {
+  INICIADO: 'bg-emerald-400',
+  REPROGRAMADO: 'bg-amber-400',
+  CANCELADO: 'bg-rose-400',
+  FINALIZADO: 'bg-slate-400',
+}
+
+function resolveEstadoKey(
+  estado: EstadoPropuesta | EstadoPropuestaObj | null | undefined,
+): EstadoPropuesta {
+  if (!estado) return 'INICIADO'
+  return typeof estado === 'object' ? estado.nombre : estado
+}
 
 /**
- * Tarjeta de evento con hero image para las grillas de listado.
+ * Tarjeta de propuesta turística (Evento o Actividad) con hero image para las grillas de listado.
  *
  * Diseño según prototipo Stitch: imagen de fondo con gradiente overlay,
- * badges de estado y categoría sobre la imagen, y metadata en el body.
- * Si el evento no tiene imagen, se muestra un placeholder con gradiente.
+ * badges de tipo y categoría sobre la imagen, y metadata en el body.
+ * Si la propuesta no tiene imagen, se muestra un placeholder con gradiente.
  */
-export function EventoCard({ evento }: { evento: EventoResponse }) {
+export function EventoCard({
+  evento,
+}: {
+  evento: EventoResponse | PropuestaResumenResponse
+}) {
+  const esActividad = 'tipo' in evento && evento.tipo === 'ACTIVIDAD'
+  const detallePath = esActividad ? `/actividades/${evento.id}` : `/eventos/${evento.id}`
+  const editarPath = esActividad ? `/actividades/${evento.id}/editar` : `/eventos/${evento.id}/editar`
   const horario = formatTimeRange(evento.horarioInicio, evento.horarioFin)
+  const duracionMinutos = 'duracionMinutos' in evento ? evento.duracionMinutos : null
+  const estadoKey = resolveEstadoKey(evento.estadoPropuesta)
+  const estadoLabel = ESTADO_PROPUESTA_LABELS[estadoKey]
   const imagen = evento.imagenes[0]
 
   return (
@@ -38,30 +68,38 @@ export function EventoCard({ evento }: { evento: EventoResponse }) {
 
         {/* Badges sobre la imagen */}
         <div className="absolute left-3 right-3 top-3 flex items-center justify-between">
-          <span className="inline-flex items-center gap-1 rounded-full bg-[#df2a29] px-2.5 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-sm">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-white" />
+          <span
+            className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-sm ${
+              esActividad ? 'bg-[#00658d]' : 'bg-[#df2a29]'
+            }`}
+          >
+            {esActividad ? 'Actividad' : 'Evento'}
+          </span>
+          {evento.categoria ? (
+            <CategoriaBadge categoria={evento.categoria} />
+          ) : (
+            <span className="rounded-full bg-[#d7a73b] px-2.5 py-1 text-xs font-semibold text-white shadow-sm">
+              Sin categoría
             </span>
-            Publicado
-          </span>
-          <span className="rounded-md bg-white/90 px-2 py-0.5 text-xs font-semibold text-[#7a5900] backdrop-blur-sm">
-            {evento.categoria ? (
-              <CategoriaBadge categoria={evento.categoria} />
-            ) : (
-              'Sin categoría'
-            )}
-          </span>
+          )}
         </div>
 
         {/* Título sobre la imagen */}
         <div className="absolute bottom-3 left-3 right-3 text-white">
-          <span className="block text-xs font-medium uppercase tracking-wider text-white/80">
-            {evento.localidad ?? 'Córdoba'}
-          </span>
+          <div className="mb-0.5 flex flex-wrap items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-white/85">
+            <span>{evento.localidad ?? 'Córdoba'}</span>
+            <span aria-hidden>·</span>
+            <span className="inline-flex items-center gap-1 font-semibold text-white">
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${ESTADO_DOT_COLORS[estadoKey]}`}
+                aria-hidden
+              />
+              {estadoLabel}
+            </span>
+          </div>
           <h3 className="font-heading text-lg font-bold leading-tight drop-shadow-sm">
             <Link
-              to={`/eventos/${evento.id}`}
+              to={detallePath}
               className="outline-none after:absolute after:inset-0 hover:underline focus-visible:underline"
             >
               {evento.nombre}
@@ -73,19 +111,34 @@ export function EventoCard({ evento }: { evento: EventoResponse }) {
       {/* Body con metadata */}
       <div className="flex flex-1 flex-col justify-between p-4">
         <div className="space-y-2">
-          <div className="flex items-center gap-2 text-sm text-[#3f484e]">
-            <svg className="h-4 w-4 text-[#7a5900]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
-              <rect x="3" y="4" width="18" height="18" rx="2" />
-              <line x1="16" y1="2" x2="16" y2="6" />
-              <line x1="8" y1="2" x2="8" y2="6" />
-              <line x1="3" y1="10" x2="21" y2="10" />
-            </svg>
-            <span className="font-medium text-[#191c1e]">
-              {formatDateRange(evento.fechaInicio, evento.fechaFin)}
-            </span>
-          </div>
+          {esActividad ? (
+            <div className="flex items-center gap-2 text-sm text-[#3f484e]">
+              <svg className="h-4 w-4 text-[#00658d]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              <span className="font-medium text-[#191c1e]">
+                {duracionMinutos !== null ? `Duración: ${duracionMinutos} min` : 'Actividad permanente'}
+              </span>
+            </div>
+          ) : (
+            evento.fechaInicio !== null &&
+            evento.fechaFin !== null && (
+              <div className="flex items-center gap-2 text-sm text-[#3f484e]">
+                <svg className="h-4 w-4 text-[#7a5900]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
+                  <rect x="3" y="4" width="18" height="18" rx="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+                <span className="font-medium text-[#191c1e]">
+                  {formatDateRange(evento.fechaInicio, evento.fechaFin)}
+                </span>
+              </div>
+            )
+          )}
 
-          {horario !== null && (
+          {!esActividad && horario !== null && (
             <div className="flex items-center gap-2 text-sm text-[#3f484e]">
               <svg className="h-4 w-4 text-[#7a5900]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
                 <circle cx="12" cy="12" r="10" />
@@ -115,7 +168,7 @@ export function EventoCard({ evento }: { evento: EventoResponse }) {
         {/* Acciones */}
         <div className="mt-4 flex items-center justify-between gap-2 border-t border-[#e0e3e5] pt-3">
           <Link
-            to={`/eventos/${evento.id}`}
+            to={detallePath}
             className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-[#f2f4f6] px-2 py-2 text-sm font-medium text-[#191c1e] transition-colors hover:bg-[#e0e3e5]"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
@@ -125,7 +178,7 @@ export function EventoCard({ evento }: { evento: EventoResponse }) {
             <span className="hidden sm:inline">Detalle</span>
           </Link>
           <Link
-            to={`/eventos/${evento.id}/editar`}
+            to={editarPath}
             className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-[#f2f4f6] px-2 py-2 text-sm font-medium text-[#191c1e] transition-colors hover:bg-[#e0e3e5]"
           >
             <svg className="h-4 w-4 text-[#bb0413]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
@@ -135,7 +188,7 @@ export function EventoCard({ evento }: { evento: EventoResponse }) {
             <span>Editar</span>
           </Link>
           <Link
-            to={`/eventos/${evento.id}`}
+            to={detallePath}
             className="inline-flex items-center justify-center rounded-lg p-2 text-[#ba1a1a] transition-colors hover:bg-[#ffdad6]/40"
             title="Dar de baja"
           >

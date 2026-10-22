@@ -46,7 +46,7 @@ describe('ImagenUploader', () => {
     )
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'no se recibió ningún archivo de imagen',
+      'No se recibió ningún archivo de imagen.',
     )
     expect(onUploaded).not.toHaveBeenCalled()
   })

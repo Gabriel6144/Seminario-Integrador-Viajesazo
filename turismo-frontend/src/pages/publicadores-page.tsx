@@ -34,7 +34,7 @@ export function PublicadoresPage() {
             Publicadores
           </h2>
           <p className="text-sm text-[#3f484e]">
-            Organismos y asociaciones que cargan eventos en la plataforma.
+            Organismos y asociaciones que cargan propuestas turísticas en la plataforma.
           </p>
         </div>
 

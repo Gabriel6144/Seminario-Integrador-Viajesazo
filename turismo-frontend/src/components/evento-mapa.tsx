@@ -57,12 +57,12 @@ export function EventoMapa({ nombre, lugar, localidad, latitud, longitud }: Even
   const referencia = [lugar, localidad].filter(Boolean).join(' · ')
 
   return (
-    <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
+    <div className="relative z-0 isolate overflow-hidden rounded-xl border bg-white shadow-sm">
       <div
         ref={container}
         role="img"
         aria-label={`Mapa de la ubicación de ${nombre}`}
-        className="h-72 w-full"
+        className="relative z-0 h-72 w-full"
       />
       <p className="border-t px-3 py-2 text-xs text-[#3f484e]">{referencia}</p>
     </div>

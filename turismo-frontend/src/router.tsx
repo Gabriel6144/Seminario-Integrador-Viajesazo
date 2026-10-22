@@ -1,6 +1,8 @@
 import { createBrowserRouter } from 'react-router-dom'
 
 import { Layout } from '@/components/layout'
+import { ActividadDetailPage } from '@/pages/actividad-detail-page'
+import { ActividadEditarPage } from '@/pages/actividad-editar-page'
 import { AgendaPage } from '@/pages/agenda-page'
 import { BorradoresPage } from '@/pages/borradores-page'
 import { EventoDetailPage } from '@/pages/evento-detail-page'
@@ -37,9 +39,12 @@ export const router = createBrowserRouter([
       { path: 'agenda', Component: AgendaPage },
       { path: 'borradores', Component: BorradoresPage },
       { path: 'planificar', Component: PlanificadorPage },
+      { path: 'propuestas/nueva', Component: EventoNuevoPage },
       { path: 'eventos/nuevo', Component: EventoNuevoPage },
       { path: 'eventos/:id', Component: EventoDetailPage },
       { path: 'eventos/:id/editar', Component: EventoEditarPage },
+      { path: 'actividades/:id', Component: ActividadDetailPage },
+      { path: 'actividades/:id/editar', Component: ActividadEditarPage },
       { path: 'publicadores', Component: PublicadoresPage },
       { path: 'publicadores/nuevo', Component: PublicadorNuevoPage },
       { path: 'publicadores/:id', Component: PublicadorDetailPage },

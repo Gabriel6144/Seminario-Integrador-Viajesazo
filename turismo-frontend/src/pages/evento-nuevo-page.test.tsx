@@ -43,8 +43,8 @@ async function completarObligatorios() {
   await user().type(screen.getByLabelText('Lugar o recinto'), 'Anfiteatro Municipal')
   await user().type(screen.getByLabelText('Ciudad / Localidad'), 'Villa Carlos Paz')
   await user().type(screen.getByLabelText('Dirección exacta o referencia'), 'Av. San Martín 500')
-  await user().type(screen.getByLabelText('Fecha de inicio'), '2026-07-01')
-  await user().type(screen.getByLabelText('Fecha de finalización'), '2026-07-05')
+  await user().type(screen.getByLabelText('Fecha de inicio'), '2027-07-01')
+  await user().type(screen.getByLabelText('Fecha de finalización'), '2027-07-05')
   await elegirPublicador(TURISMO.nombre)
 }
 
@@ -136,7 +136,7 @@ describe('EventoNuevoPage', () => {
     await user().click(screen.getByRole('button', { name: 'Crear evento' }))
 
     expect(
-      await screen.findByText('el monto estimado es obligatorio para un evento arancelado'),
+      await screen.findByText('El monto estimado es obligatorio para un evento arancelado.'),
     ).toBeInTheDocument()
     expect(allEventos().some((evento) => evento.nombre === 'Festival de Invierno')).toBe(false)
   }, 15_000)
@@ -227,10 +227,10 @@ describe('EventoNuevoPage', () => {
     const totalAntes = allEventos().length
     await user().click(screen.getByRole('button', { name: 'Crear evento' }))
 
-    expect(await screen.findByText('el nombre es obligatorio')).toBeInTheDocument()
-    expect(screen.getByText('la categoría es obligatoria')).toBeInTheDocument()
-    expect(screen.getByText('el tipo de propuesta es obligatorio')).toBeInTheDocument()
-    expect(screen.getByText('la modalidad es obligatoria')).toBeInTheDocument()
+    expect(await screen.findByText('El nombre es obligatorio.')).toBeInTheDocument()
+    expect(screen.getByText('La categoría es obligatoria.')).toBeInTheDocument()
+    expect(screen.getByText('El tipo de propuesta es obligatorio.')).toBeInTheDocument()
+    expect(screen.getByText('La modalidad es obligatoria.')).toBeInTheDocument()
     expect(allEventos()).toHaveLength(totalAntes)
   })
 
