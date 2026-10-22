@@ -88,7 +88,7 @@ public class ViajeController {
         return viajeService.completeDraft(id);
     }
 
-    /** Descarta un borrador (baja física). */
+    /** Descarta un borrador (baja lógica: pasa a CANCELADO). */
     @DeleteMapping("/borradores/{id}")
     public ResponseEntity<Void> deleteDraft(@PathVariable Long id) {
         viajeService.deleteDraft(id);

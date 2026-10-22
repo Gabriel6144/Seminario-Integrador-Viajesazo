@@ -1,6 +1,7 @@
 package com.viajesazo.turismo_backend.repository;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.domain.Page;
@@ -38,5 +39,10 @@ public interface ViajeRepository extends JpaRepository<Viaje, Long> {
      * Detalle/edición de un borrador, validando a su dueño.
      */
     Optional<Viaje> findByIdAndUsuarioAndEstado(Long id, String usuario, EstadoViaje estado);
+
+    /**
+     * Viajes candidatos a transiciones automáticas por fecha.
+     */
+    List<Viaje> findByEstadoIn(Collection<EstadoViaje> estados);
 
 }

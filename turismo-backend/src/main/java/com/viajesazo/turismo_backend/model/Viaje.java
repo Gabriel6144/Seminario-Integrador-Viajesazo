@@ -1,8 +1,12 @@
 package com.viajesazo.turismo_backend.model;
 
+import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.ArrayList;
+
+import com.viajesazo.turismo_backend.exception.BusinessRuleException;
 
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -71,6 +75,97 @@ public class Viaje {
     // Usuario entiendo lo vemos en el utlimo Sprint, por ahora diría dejarlo como String
     @Column(nullable = false, length = 120)
     private String usuario;
+
+
+    private void transicionarA(EstadoViaje destino) {
+        if (estado == null || !estado.puedeTransicionarA(destino)) {
+            throw new BusinessRuleException("no se puede pasar de " + estado + " a " + destino);
+        }
+        estado = destino;
+    }
+
+    /**
+     * Completa un borrador y lo deja PLANIFICADO, validando que tenga todos los datos
+     * obligatorios. La transición BORRADOR → PLANIFICADO es la única entrada a este estado.
+     */
+    public void planificar(Clock clock) {
+        List<String> errores = new ArrayList<>();
+        if (nombre == null || nombre.isBlank()) {
+            errores.add("El nombre del viaje no puede estar vacío");
+        }
+        if (zonaInteres == null) {
+            errores.add("La ubicación de interés no puede estar vacía");
+        }
+        if (rangoInteresKm == null || rangoInteresKm <= 0) {
+            errores.add("El rango de interés debe ser mayor a cero");
+        }
+        if (ritmo == null) {
+            errores.add("El ritmo del viaje no puede estar vacío");
+        }
+        if (interesesCategoria == null || interesesCategoria.isEmpty()) {
+            errores.add("Debe seleccionar al menos un interés");
+        }
+        if (fechaInicio == null) {
+            errores.add("La fecha de inicio no puede estar vacía");
+        }
+        if (fechaFin == null) {
+            errores.add("La fecha de finalización no puede estar vacía");
+        }
+        if (fechaInicio != null && fechaFin != null) {
+            if (fechaFin.isBefore(fechaInicio)) {
+                errores.add("la fecha de finalización no puede ser anterior a la de inicio");
+            }
+            if (fechaInicio.toLocalDate().isBefore(LocalDate.now(clock))) {
+                errores.add("La fecha de inicio no puede ser anterior a hoy");
+            }
+        }
+        if (usuario == null || usuario.isBlank()) {
+            errores.add("El turista no puede estar vacío");
+        }
+        if (!errores.isEmpty()) {
+            throw new BusinessRuleException(String.join("; ", errores));
+        }
+        transicionarA(EstadoViaje.PLANIFICADO);
+    }
+
+    /** Baja lógica: solo un borrador o un viaje planificado se pueden cancelar. */
+    public void cancelar() {
+        transicionarA(EstadoViaje.CANCELADO);
+    }
+
+    /** Un viaje en curso o terminado ya no se puede modificar. */
+    public void validarEditable() {
+        if (estado == EstadoViaje.EN_CURSO || estado == EstadoViaje.FINALIZADO
+                || estado == EstadoViaje.CANCELADO) {
+            throw new BusinessRuleException(
+                    "el viaje está " + estado.name().toLowerCase().replace('_', ' ')
+                            + " y no se puede modificar");
+        }
+    }
+
+    /**
+     * Aplica las transiciones automáticas según la fecha actual. Un viaje planificado
+     * pasa a EN_CURSO el día de inicio y a FINALIZADO el día siguiente al de fin.
+     * Los borradores y los estados terminales nunca se tocan.
+     */
+    public void actualizarEstadoPorFechas(LocalDate hoy) {
+        if (estado != EstadoViaje.PLANIFICADO && estado != EstadoViaje.EN_CURSO) {
+            return;
+        }
+        if (fechaInicio == null || fechaFin == null) {
+            return;
+        }
+        LocalDate inicio = fechaInicio.toLocalDate();
+        LocalDate fin = fechaFin.toLocalDate();
+        if (hoy.isAfter(fin)) {
+            if (estado == EstadoViaje.PLANIFICADO) {
+                transicionarA(EstadoViaje.EN_CURSO);
+            }
+            transicionarA(EstadoViaje.FINALIZADO);
+        } else if (!hoy.isBefore(inicio) && estado == EstadoViaje.PLANIFICADO) {
+            transicionarA(EstadoViaje.EN_CURSO);
+        }
+    }
 
 
 }
