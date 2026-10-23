@@ -20,6 +20,12 @@ public interface ViajeRepository extends JpaRepository<Viaje, Long> {
             Collection<EstadoViaje> estados, Pageable pageable);
 
     /**
+     * Listado de viajes de un turista cuyo estado está permitido, ordenados por fecha de inicio.
+     */
+    Page<Viaje> findByUsuarioAndEstadoInOrderByFechaInicioAsc(String usuario,
+            Collection<EstadoViaje> estados, Pageable pageable);
+
+    /**
      * Detalle y modificación de un viaje no borrador y no cancelado.
      */
     Optional<Viaje> findByIdAndEstadoNotIn(Long id, Collection<EstadoViaje> estados);

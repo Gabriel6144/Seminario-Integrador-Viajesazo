@@ -27,37 +27,45 @@ class ViajeRepositoryTest {
 	private ViajeRepository viajeRepository;
 
 	@Test
-	@DisplayName("VZ-22: lista solo los viajes activos del turista")
-	void listsOnlyActiveTripsOfTourist() {
-		save("Activo propio", TURISTA, EstadoViaje.PLANIFICADO);
+	@DisplayName("VZ-22: lista los estados permitidos del turista y excluye los terminales")
+	void listsAllowedTripsOfTourist() {
+		save("Borrador propio", TURISTA, EstadoViaje.BORRADOR);
+		save("Planificado propio", TURISTA, EstadoViaje.PLANIFICADO);
+		save("En curso propio", TURISTA, EstadoViaje.EN_CURSO);
 		save("Cancelado propio", TURISTA, EstadoViaje.CANCELADO);
+		save("Finalizado propio", TURISTA, EstadoViaje.FINALIZADO);
 		save("Activo ajeno", OTRO, EstadoViaje.PLANIFICADO);
 
-		Page<Viaje> result = viajeRepository.findByUsuarioAndEstadoNotInOrderByFechaInicioAsc(
-				TURISTA, List.of(EstadoViaje.BORRADOR, EstadoViaje.CANCELADO), PageRequest.of(0, 10));
+		Page<Viaje> result = viajeRepository.findByUsuarioAndEstadoInOrderByFechaInicioAsc(
+				TURISTA, List.of(EstadoViaje.BORRADOR, EstadoViaje.PLANIFICADO, EstadoViaje.EN_CURSO),
+				PageRequest.of(0, 10));
 
-		assertThat(result.getContent()).extracting(Viaje::getNombre).containsExactly("Activo propio");
+		assertThat(result.getContent()).extracting(Viaje::getNombre)
+				.containsExactly("Borrador propio", "Planificado propio", "En curso propio");
 	}
 
 	@Test
-	@DisplayName("VZ-22: ordena los viajes activos por fecha de inicio")
-	void ordersActiveTripsByStartDate() {
+	@DisplayName("VZ-22: ordena los estados permitidos por fecha de inicio")
+	void ordersAllowedTripsByStartDate() {
 		save("Segundo", TURISTA, EstadoViaje.PLANIFICADO, LocalDateTime.parse("2026-10-22T00:00:00"));
 		save("Primero", TURISTA, EstadoViaje.PLANIFICADO, LocalDateTime.parse("2026-10-20T00:00:00"));
 
-		Page<Viaje> result = viajeRepository.findByUsuarioAndEstadoNotInOrderByFechaInicioAsc(
-				TURISTA, List.of(EstadoViaje.BORRADOR, EstadoViaje.CANCELADO), PageRequest.of(0, 10));
+		Page<Viaje> result = viajeRepository.findByUsuarioAndEstadoInOrderByFechaInicioAsc(
+				TURISTA, List.of(EstadoViaje.BORRADOR, EstadoViaje.PLANIFICADO, EstadoViaje.EN_CURSO),
+				PageRequest.of(0, 10));
 
 		assertThat(result.getContent()).extracting(Viaje::getNombre).containsExactly("Primero", "Segundo");
 	}
 
 	@Test
-	@DisplayName("VZ-22: la página vacía de un turista sin viajes activos no falla")
-	void returnsEmptyPageWhenNoActiveTrips() {
+	@DisplayName("VZ-22: la página vacía de un turista sin estados permitidos no falla")
+	void returnsEmptyPageWhenNoAllowedTrips() {
 		save("Cancelado", TURISTA, EstadoViaje.CANCELADO);
+		save("Finalizado", TURISTA, EstadoViaje.FINALIZADO);
 
-		Page<Viaje> result = viajeRepository.findByUsuarioAndEstadoNotInOrderByFechaInicioAsc(
-				TURISTA, List.of(EstadoViaje.BORRADOR, EstadoViaje.CANCELADO), PageRequest.of(0, 10));
+		Page<Viaje> result = viajeRepository.findByUsuarioAndEstadoInOrderByFechaInicioAsc(
+				TURISTA, List.of(EstadoViaje.BORRADOR, EstadoViaje.PLANIFICADO, EstadoViaje.EN_CURSO),
+				PageRequest.of(0, 10));
 
 		assertThat(result.getContent()).isEmpty();
 	}

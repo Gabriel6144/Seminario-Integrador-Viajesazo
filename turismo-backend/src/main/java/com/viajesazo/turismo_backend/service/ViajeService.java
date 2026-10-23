@@ -2,7 +2,6 @@ package com.viajesazo.turismo_backend.service;
 
 import java.time.Clock;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
@@ -19,7 +18,7 @@ import com.viajesazo.turismo_backend.mapper.ViajeMapper;
 import com.viajesazo.turismo_backend.model.EstadoViaje;
 import com.viajesazo.turismo_backend.model.Viaje;
 import com.viajesazo.turismo_backend.repository.ViajeRepository;
-
+import java.util.ArrayList;
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -157,12 +156,12 @@ public class ViajeService {
 		}
 	}
 
-	/** VZ-22: listado de viajes activos (no borradores ni cancelados) del turista, paginado. */
+	/** VZ-22: listado de viajes permitidos del turista, paginado. */
 	@Transactional(readOnly = true)
 	public Page<ViajeResponse> findAll(String usuario, Pageable pageable) {
 		return viajeRepository
-				.findByUsuarioAndEstadoNotInOrderByFechaInicioAsc(usuario,
-						List.of(EstadoViaje.BORRADOR, EstadoViaje.CANCELADO), pageable)
+				.findByUsuarioAndEstadoInOrderByFechaInicioAsc(usuario,
+						List.of(EstadoViaje.BORRADOR, EstadoViaje.PLANIFICADO, EstadoViaje.EN_CURSO), pageable)
 				.map(mapper::toResponse);
 	}
 
@@ -170,6 +169,43 @@ public class ViajeService {
 		return viajeRepository
 				.findByIdAndEstadoNotIn(id, List.of(EstadoViaje.BORRADOR, EstadoViaje.CANCELADO))
 				.orElseThrow(() -> new ResourceNotFoundException("No existe el viaje con id " + id));
+	}
+
+	// VZ-22: listado de viajes permitidos del turista filtrado por estado, paginado.
+	@Transactional(readOnly = true)
+	public Page<ViajeResponse> findByEstado(String usuario, String estado, Pageable pageable) {
+		EstadoViaje estadoEnum;
+		try {
+			estadoEnum = EstadoViaje.valueOf(estado);
+		} catch (IllegalArgumentException e) {
+			throw new BusinessRuleException("Estado inválido: " + estado);
+		}
+		return findByEstadoEnums(usuario, List.of(estadoEnum), pageable);
+	}
+
+	@Transactional(readOnly = true)
+	public Page<ViajeResponse> findByEstados(String usuario, List<String> estados, Pageable pageable) {
+		List<EstadoViaje> estadosEnum = estados.stream().map(this::parseEstado).toList();
+		return findByEstadoEnums(usuario, estadosEnum, pageable);
+	}
+
+	private Page<ViajeResponse> findByEstadoEnums(String usuario, List<EstadoViaje> estados,
+			Pageable pageable) {
+		return viajeRepository
+				.findByUsuarioAndEstadoInOrderByFechaInicioAsc(usuario, estados, pageable)
+				.map(mapper::toResponse);
+	}
+
+	private EstadoViaje parseEstado(String estado) {
+		try {
+			EstadoViaje estadoEnum = EstadoViaje.valueOf(estado);
+			if (estadoEnum == EstadoViaje.CANCELADO || estadoEnum == EstadoViaje.FINALIZADO) {
+				throw new BusinessRuleException("Estado no permitido para el listado: " + estado);
+			}
+			return estadoEnum;
+		} catch (IllegalArgumentException e) {
+			throw new BusinessRuleException("Estado inválido: " + estado);
+		}
 	}
 
 	private void validateRange(ViajeRequest request) {
