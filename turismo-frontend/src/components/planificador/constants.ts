@@ -79,6 +79,18 @@ export const ZONES: ZoneItem[] = [
   },
 ]
 
+/**
+ * Tope del radio de exploración. 250 km alcanza casi toda la provincia desde cualquier base
+ * turística, sin quedar atado a un rango corto tipo urbano.
+ */
+export const RADIO_MAX_KM = 250
+
+export const RADIO_PRESETS = [
+  { km: 10, label: 'Cerca' },
+  { km: 50, label: 'Región' },
+  { km: RADIO_MAX_KM, label: 'Provincia' },
+] as const
+
 export const INTEREST_MAP: Record<string, InteresCategoria> = {
   Naturaleza: 'NATURALEZA',
   Gastronomía: 'GASTRONOMIA',

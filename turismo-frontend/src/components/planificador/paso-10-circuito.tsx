@@ -78,7 +78,7 @@ export function Paso10Circuito({
         <div className="flex items-center justify-between rounded-xl bg-slate-800/90 px-4 py-3 text-xs sm:text-sm">
           <div className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-            <span className="font-semibold">Hospedaje</span>
+            <span className="font-semibold">Destino</span>
           </div>
           <span className="text-slate-400">━━ 12 min ━━</span>
           <div className="flex items-center gap-1.5">

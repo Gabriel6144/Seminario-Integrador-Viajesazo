@@ -37,6 +37,19 @@ export interface UbicacionInversa {
   direccion: string
 }
 
+/**
+ * Destino del planificador: una zona de interés, no un hospedaje. Se separa de `LugarEncontrado`
+ * porque la API de viajes pide `ciudad` + `localidad` (sin `direccion`) y el mapa necesita un
+ * nombre corto para el marcador.
+ */
+export interface DestinoGeocodificado {
+  nombre: string
+  ciudad: string
+  localidad: string | null
+  lat: number
+  lng: number
+}
+
 interface NominatimAddress {
   city?: string
   town?: string
@@ -62,6 +75,7 @@ interface NominatimSearchItem {
 }
 
 interface NominatimReverseItem {
+  name?: string
   display_name?: string
   address?: NominatimAddress
 }
@@ -72,13 +86,33 @@ interface NominatimReverseItem {
  */
 const CORDOBA_VIEWBOX = '-65.8,-29.5,-61.8,-35.1'
 
-function localidadDe(address?: NominatimAddress): string {
+const MAX_TEXTO = 150
+
+function recortar(texto: string): string {
+  return texto.trim().slice(0, MAX_TEXTO)
+}
+
+function ciudadDe(address?: NominatimAddress): string {
   return (
     address?.city ??
     address?.town ??
     address?.village ??
     address?.hamlet ??
     address?.municipality ??
+    address?.county ??
+    ''
+  )
+}
+
+function localidadDe(address?: NominatimAddress): string {
+  return ciudadDe(address)
+}
+
+function zonaDe(address?: NominatimAddress): string {
+  return (
+    address?.suburb ??
+    address?.neighbourhood ??
+    address?.city_district ??
     address?.county ??
     ''
   )
@@ -112,16 +146,10 @@ function direccionDe(address: NominatimAddress | undefined, fallback: string): s
   return fallback.trim()
 }
 
-/**
- * Busca lugares por texto en Córdoba. Devuelve `[]` ante cualquier fallo, incluida la cancelación.
- */
-export async function buscarLugar(
-  query: string,
+async function buscarEnNominatim(
+  texto: string,
   signal?: AbortSignal,
-): Promise<LugarEncontrado[]> {
-  const texto = query.trim()
-  if (texto.length === 0) return []
-
+): Promise<NominatimSearchItem[]> {
   try {
     const params = new URLSearchParams({
       q: texto,
@@ -137,30 +165,83 @@ export async function buscarLugar(
     const response = await fetch(`/nominatim/search?${params.toString()}`, { signal })
     if (!response.ok) return []
 
-    const data = (await response.json()) as NominatimSearchItem[]
-
-    return data.flatMap((item) => {
-      const lat = Number(item.lat)
-      const lng = Number(item.lon)
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return []
-
-      const localidad = localidadDe(item.address)
-      const nombre = nombreDelLugar(item)
-
-      return [
-        {
-          nombre,
-          lugarRecinto: nombre,
-          localidad,
-          direccion: direccionDe(item.address, localidad || nombre),
-          lat,
-          lng,
-        },
-      ]
-    })
+    return (await response.json()) as NominatimSearchItem[]
   } catch {
     return []
   }
+}
+
+function nombreDesdeDisplayName(displayName: string | undefined): string {
+  return displayName?.split(',')[0]?.trim() ?? ''
+}
+
+/**
+ * Busca lugares por texto en Córdoba. Devuelve `[]` ante cualquier fallo, incluida la cancelación.
+ */
+export async function buscarLugar(
+  query: string,
+  signal?: AbortSignal,
+): Promise<LugarEncontrado[]> {
+  const texto = query.trim()
+  if (texto.length === 0) return []
+
+  const data = await buscarEnNominatim(texto, signal)
+
+  return data.flatMap((item) => {
+    const lat = Number(item.lat)
+    const lng = Number(item.lon)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return []
+
+    const localidad = localidadDe(item.address)
+    const nombre = nombreDelLugar(item)
+
+    return [
+      {
+        nombre,
+        lugarRecinto: nombre,
+        localidad,
+        direccion: direccionDe(item.address, localidad || nombre),
+        lat,
+        lng,
+      },
+    ]
+  })
+}
+
+/**
+ * Busca zonas de destino en Córdoba para el planificador. A diferencia de `buscarLugar`, no arma
+ * una dirección de evento: devuelve la ciudad y la zona que espera `UbicacionRequest`.
+ */
+export async function buscarDestino(
+  query: string,
+  signal?: AbortSignal,
+): Promise<DestinoGeocodificado[]> {
+  const texto = query.trim()
+  if (texto.length === 0) return []
+
+  const data = await buscarEnNominatim(texto, signal)
+
+  return data.flatMap((item) => {
+    const lat = Number(item.lat)
+    const lng = Number(item.lon)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return []
+
+    const nombre = nombreDelLugar(item) || nombreDesdeDisplayName(item.display_name)
+    const ciudad = ciudadDe(item.address) || nombre
+    if (ciudad.length === 0) return []
+
+    const zona = zonaDe(item.address)
+
+    return [
+      {
+        nombre: recortar(nombre || ciudad),
+        ciudad: recortar(ciudad),
+        localidad: zona.length > 0 && zona !== ciudad ? recortar(zona) : null,
+        lat,
+        lng,
+      },
+    ]
+  })
 }
 
 /**
@@ -188,11 +269,52 @@ export async function geocodificarInverso(
     const localidad = localidadDe(data.address)
     const direccion = direccionDe(
       data.address,
-      localidad || (data.display_name?.split(',')[0]?.trim() ?? ''),
+      localidad || nombreDesdeDisplayName(data.display_name),
     )
     if (direccion.length === 0) return null
 
     return { direccion, localidad }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Geocoding inverso para el planificador: dado un punto del mapa, devuelve la zona de destino que
+ * se puede guardar como `UbicacionRequest`. Devuelve `null` ante cualquier fallo o si Nominatim no
+ * puede identificar una ciudad (sin `ciudad` la API rechaza el viaje).
+ */
+export async function geocodificarDestinoInverso(
+  lat: number,
+  lng: number,
+  signal?: AbortSignal,
+): Promise<DestinoGeocodificado | null> {
+  try {
+    const params = new URLSearchParams({
+      lat: String(lat),
+      lon: String(lng),
+      format: 'jsonv2',
+      addressdetails: '1',
+      'accept-language': 'es',
+    })
+
+    const response = await fetch(`/nominatim/reverse?${params.toString()}`, { signal })
+    if (!response.ok) return null
+
+    const data = (await response.json()) as NominatimReverseItem
+    const nombre = data.name?.trim() || nombreDesdeDisplayName(data.display_name)
+    const ciudad = ciudadDe(data.address) || nombre
+    if (ciudad.length === 0) return null
+
+    const zona = zonaDe(data.address) || localidadDe(data.address)
+
+    return {
+      nombre: recortar(nombre || ciudad),
+      ciudad: recortar(ciudad),
+      localidad: zona.length > 0 && zona !== ciudad ? recortar(zona) : null,
+      lat,
+      lng,
+    }
   } catch {
     return null
   }
