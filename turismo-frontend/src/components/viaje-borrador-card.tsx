@@ -51,8 +51,8 @@ export function ViajeBorradorCard({ borrador, onDescartar, descartando }: Props)
         )}
         {borrador.ubicacion ? (
           <p className="flex items-center gap-1">
-            <span className="material-symbols-outlined text-sm">hotel</span>
-            Hospedaje base: {borrador.ubicacion.nombre}
+            <span className="material-symbols-outlined text-sm">travel_explore</span>
+            Zona de destino: {borrador.ubicacion.nombre}
           </p>
         ) : (
           <p className="flex items-center gap-1">

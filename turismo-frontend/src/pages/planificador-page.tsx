@@ -9,13 +9,14 @@ import {
 } from '@/api/viajes'
 import {
   INTEREST_MAP,
+  RADIO_MAX_KM,
   RANDOM_NAMES,
   RHYTHM_MAP,
 } from '@/components/planificador/constants'
 import { Paso1Bienvenida } from '@/components/planificador/paso-1-bienvenida'
 import { Paso2Nombre } from '@/components/planificador/paso-2-nombre'
 import { Paso3Fechas } from '@/components/planificador/paso-3-fechas'
-import { Paso4Hospedaje } from '@/components/planificador/paso-4-hospedaje'
+import { Paso4Destino } from '@/components/planificador/paso-4-destino'
 import { Paso5Radio } from '@/components/planificador/paso-5-radio'
 import { Paso6Intereses } from '@/components/planificador/paso-6-intereses'
 import { Paso7Ritmo } from '@/components/planificador/paso-7-ritmo'
@@ -24,11 +25,10 @@ import { Paso9Generando } from '@/components/planificador/paso-9-generando'
 import { Paso10Circuito } from '@/components/planificador/paso-10-circuito'
 import { PlanificadorExitModal } from '@/components/planificador/planificador-exit-modal'
 import { PlanificadorHeader } from '@/components/planificador/planificador-header'
-import type { LoadingStep } from '@/components/planificador/types'
+import type { DestinoSeleccionado, LoadingStep } from '@/components/planificador/types'
 import type {
   InteresCategoria,
   TipoRitmo,
-  UbicacionRequest,
   ViajeBorradorRequest,
   ViajeRequest,
 } from '@/types/api'
@@ -42,14 +42,6 @@ const RHYTHM_REVERSE: Record<TipoRitmo, string> = {
 const INTEREST_REVERSE: Partial<Record<InteresCategoria, string>> = Object.fromEntries(
   Object.entries(INTEREST_MAP).map(([k, v]) => [v, k]),
 ) as Partial<Record<InteresCategoria, string>>
-
-const ZONE_UBICACION: Record<string, UbicacionRequest> = {
-  'Centro Histórico': { ciudad: 'Córdoba', localidad: 'Centro Histórico', latitud: -31.42, longitud: -64.18 },
-  'Villa Carlos Paz': { ciudad: 'Villa Carlos Paz', localidad: 'Valle de Punilla', latitud: -31.42, longitud: -64.5 },
-  'La Cumbrecita / Calamuchita': { ciudad: 'La Cumbrecita', localidad: 'Valle de Calamuchita', latitud: -31.9, longitud: -64.77 },
-  'Colonia Caroya / Sierras Chicas': { ciudad: 'Colonia Caroya', localidad: 'Sierras Chicas', latitud: -30.98, longitud: -64.08 },
-  'Mina Clavero / Traslasierra': { ciudad: 'Mina Clavero', localidad: 'Traslasierra', latitud: -31.72, longitud: -65.01 },
-}
 
 export function PlanificadorPage() {
   const navigate = useNavigate()
@@ -82,7 +74,7 @@ export function PlanificadorPage() {
   const [tripName, setTripName] = useState<string>('')
   const [dateFrom, setDateFrom] = useState<string>('')
   const [dateTo, setDateTo] = useState<string>('')
-  const [zone, setZone] = useState<string>('')
+  const [destino, setDestino] = useState<DestinoSeleccionado | null>(null)
   const [radiusKm, setRadiusKm] = useState<number>(8)
   const [interests, setInterests] = useState<string[]>([])
   const [rhythm, setRhythm] = useState<string>('')
@@ -128,8 +120,9 @@ export function PlanificadorPage() {
 
   const isStep2Valid = tripName.trim().length > 0
   const isStep3Valid = dateFrom !== '' && dateTo !== '' && dateFrom >= todayStr && dateFrom <= dateTo
-  const isStep4Valid = zone.trim().length > 0
-  const isStep5Valid = typeof radiusKm === 'number' && radiusKm > 0
+  const isStep4Valid = destino !== null
+  const isStep5Valid =
+    typeof radiusKm === 'number' && radiusKm > 0 && radiusKm <= RADIO_MAX_KM
   const isStep6Valid = interests.length > 0
   const isStep7Valid = rhythm.trim().length > 0
 
@@ -149,14 +142,24 @@ export function PlanificadorPage() {
     setTripName(d.nombre ?? 'Escapada a Córdoba')
     if (d.fechaInicio) setDateFrom(d.fechaInicio)
     if (d.fechaFin) setDateTo(d.fechaFin)
-    if (d.rangoInteresKm != null) setRadiusKm(d.rangoInteresKm)
+    if (d.rangoInteresKm != null) {
+      setRadiusKm(Math.min(Math.max(d.rangoInteresKm, 1), RADIO_MAX_KM))
+    }
     if (d.interesesCategoria.length > 0) {
       setInterests(d.interesesCategoria.map((item) => INTEREST_REVERSE[item] ?? item))
     }
     if (d.ritmo) setRhythm(RHYTHM_REVERSE[d.ritmo] ?? rhythm)
     if (d.ubicacion) {
-      const zona = Object.keys(ZONE_UBICACION).find((nombre) => ZONE_UBICACION[nombre].ciudad === d.ubicacion?.ciudad)
-      if (zona) setZone(zona)
+      const ubicacion = d.ubicacion
+      setDestino({
+        nombre:
+          [ubicacion.ciudad, ubicacion.localidad].filter(Boolean).join(' · ') ||
+          ubicacion.nombre,
+        ciudad: ubicacion.ciudad,
+        localidad: ubicacion.localidad,
+        latitud: ubicacion.latitud,
+        longitud: ubicacion.longitud,
+      })
     }
     if (d.pasoActual) setStep(d.pasoActual)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -206,7 +209,7 @@ export function PlanificadorPage() {
       }
     }
     if (step === 4 && !isStep4Valid) {
-      showToast('Por favor, seleccioná dónde te vas a hospedar')
+      showToast('Por favor, seleccioná tu zona de destino')
       return
     }
     if (step === 5 && !isStep5Valid) {
@@ -249,7 +252,15 @@ export function PlanificadorPage() {
     nombre: tripName.trim() || 'Escapada a Córdoba',
     fechaInicio: dateFrom,
     fechaFin: dateTo,
-    ubicacion: ZONE_UBICACION[zone] ?? null,
+    ubicacion:
+      destino === null
+        ? null
+        : {
+            ciudad: destino.ciudad,
+            localidad: destino.localidad,
+            latitud: destino.latitud,
+            longitud: destino.longitud,
+          },
     rangoInteresKm: Number(radiusKm),
     ritmo: RHYTHM_MAP[rhythm] ?? 'EQUILIBRADO',
     interesesCategoria: interests.map((item) => INTEREST_MAP[item] ?? 'NATURALEZA'),
@@ -348,16 +359,17 @@ export function PlanificadorPage() {
           )}
 
           {step === 4 && (
-            <Paso4Hospedaje
-              zone={zone}
+            <Paso4Destino
+              destino={destino}
               isValid={isStep4Valid}
-              onChangeZone={setZone}
+              onSelectDestino={setDestino}
               onNext={() => handleNextStep(5)}
             />
           )}
 
           {step === 5 && (
             <Paso5Radio
+              destino={destino}
               radiusKm={radiusKm}
               sliderKmId={sliderKmId}
               isValid={isStep5Valid}
@@ -390,7 +402,7 @@ export function PlanificadorPage() {
               dateFrom={dateFrom}
               dateTo={dateTo}
               daysCount={daysCount}
-              zone={zone}
+              destinoLabel={destino?.nombre ?? ''}
               radiusKm={radiusKm}
               interests={interests}
               rhythm={rhythm}
