@@ -3,7 +3,7 @@ interface Paso8ResumenProps {
   dateFrom: string
   dateTo: string
   daysCount: number
-  zone: string
+  destinoLabel: string
   radiusKm: number
   interests: string[]
   rhythm: string
@@ -16,7 +16,7 @@ export function Paso8Resumen({
   dateFrom,
   dateTo,
   daysCount,
-  zone,
+  destinoLabel,
   radiusKm,
   interests,
   rhythm,
@@ -75,13 +75,13 @@ export function Paso8Resumen({
           </button>
         </div>
 
-        {/* Row 3: Hospedaje */}
+        {/* Row 3: Zona de destino */}
         <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/60 p-3">
           <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-xl text-sky-600">location_on</span>
+            <span className="material-symbols-outlined text-xl text-sky-600">travel_explore</span>
             <div>
-              <span className="block text-[10px] font-semibold uppercase text-slate-400">Hospedaje</span>
-              <span className="text-sm font-bold text-slate-800">{zone}</span>
+              <span className="block text-[10px] font-semibold uppercase text-slate-400">Zona de destino</span>
+              <span className="text-sm font-bold text-slate-800">{destinoLabel}</span>
             </div>
           </div>
           <button
