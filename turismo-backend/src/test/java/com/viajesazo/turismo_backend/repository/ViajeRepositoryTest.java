@@ -2,7 +2,7 @@ package com.viajesazo.turismo_backend.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
@@ -47,8 +47,8 @@ class ViajeRepositoryTest {
 	@Test
 	@DisplayName("VZ-22: ordena los estados permitidos por fecha de inicio")
 	void ordersAllowedTripsByStartDate() {
-		save("Segundo", TURISTA, EstadoViaje.PLANIFICADO, LocalDateTime.parse("2026-10-22T00:00:00"));
-		save("Primero", TURISTA, EstadoViaje.PLANIFICADO, LocalDateTime.parse("2026-10-20T00:00:00"));
+		save("Segundo", TURISTA, EstadoViaje.PLANIFICADO, LocalDate.parse("2026-10-22"));
+		save("Primero", TURISTA, EstadoViaje.PLANIFICADO, LocalDate.parse("2026-10-20"));
 
 		Page<Viaje> result = viajeRepository.findByUsuarioAndEstadoInOrderByFechaInicioAsc(
 				TURISTA, List.of(EstadoViaje.BORRADOR, EstadoViaje.PLANIFICADO, EstadoViaje.EN_CURSO),
@@ -83,10 +83,10 @@ class ViajeRepositoryTest {
 	}
 
 	private Viaje save(String nombre, String usuario, EstadoViaje estado) {
-		return save(nombre, usuario, estado, LocalDateTime.parse("2026-10-20T00:00:00"));
+		return save(nombre, usuario, estado, LocalDate.parse("2026-10-20"));
 	}
 
-	private Viaje save(String nombre, String usuario, EstadoViaje estado, LocalDateTime inicio) {
+	private Viaje save(String nombre, String usuario, EstadoViaje estado, LocalDate inicio) {
 		return viajeRepository.save(Viaje.builder()
 				.nombre(nombre)
 				.zonaInteres(Ubicacion.builder()

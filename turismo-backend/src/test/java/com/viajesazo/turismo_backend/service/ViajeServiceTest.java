@@ -186,13 +186,13 @@ class ViajeServiceTest {
 	void appliesAutomaticTransitions() {
 		Viaje enCurso = persistedTrip();
 		enCurso.setEstado(EstadoViaje.PLANIFICADO);
-		enCurso.setFechaInicio(LocalDateTime.parse("2026-10-14T00:00:00"));
-		enCurso.setFechaFin(LocalDateTime.parse("2026-10-16T00:00:00"));
+		enCurso.setFechaInicio(LocalDate.parse("2026-10-14"));
+		enCurso.setFechaFin(LocalDate.parse("2026-10-16"));
 
 		Viaje vencido = persistedTrip();
 		vencido.setEstado(EstadoViaje.PLANIFICADO);
-		vencido.setFechaInicio(LocalDateTime.parse("2026-10-10T00:00:00"));
-		vencido.setFechaFin(LocalDateTime.parse("2026-10-12T00:00:00"));
+		vencido.setFechaInicio(LocalDate.parse("2026-10-10"));
+		vencido.setFechaFin(LocalDate.parse("2026-10-12"));
 
 		when(viajeRepository.findByEstadoIn(any())).thenReturn(List.of(enCurso, vencido));
 
@@ -251,8 +251,8 @@ class ViajeServiceTest {
 						.longitud(new java.math.BigDecimal("-64.55"))
 						.build())
 				.rangoInteresKm(35.0)
-				.fechaInicio(java.time.LocalDateTime.parse("2026-10-20T00:00:00"))
-				.fechaFin(java.time.LocalDateTime.parse("2026-10-22T00:00:00"))
+				.fechaInicio(java.time.LocalDate.parse("2026-10-20"))
+				.fechaFin(java.time.LocalDate.parse("2026-10-22"))
 				.ritmo(TipoRitmo.EQUILIBRADO)
 				.interesesCategoria(new java.util.ArrayList<>(List.of(InteresCategoria.CULTURA)))
 				.estado(EstadoViaje.PLANIFICADO)
