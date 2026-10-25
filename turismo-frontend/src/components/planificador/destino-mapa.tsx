@@ -154,13 +154,18 @@ function actualizarRadio(
   )
 }
 
-/** Reencuadra la cámara para que el anillo entre completo, respetando el modo 2D/3D. */
+/**
+ * Reencuadra la cámara para que el anillo entre completo, respetando el modo 2D/3D.
+ *
+ * `duracion` se omite para que MapLibre calcule la animación según la distancia del salto;
+ * con `0` el movimiento es instantáneo (solo para la carga inicial).
+ */
 function encuadrarRadio(
   map: maplibregl.Map,
   destino: DestinoSeleccionado,
   radioKm: number,
   es3D: boolean,
-  duracion: number,
+  duracion?: number,
 ): void {
   const centro: [number, number] = [destino.longitud, destino.latitud]
 
@@ -374,8 +379,10 @@ export function DestinoMapa({ destino, radiusKm = 0, onSelectDestino }: DestinoM
       markerRef.current.setLngLat([destino.longitud, destino.latitud])
     }
 
-    if (loadedRef.current) {
-      encuadrarRadio(map, destino, radioRef.current, is3DRef.current, 0)
+    // Con radio, el efecto de `[destino, radiusKm]` ya reencuadra el anillo: acá solo se
+    // resuelve el paso 4, donde no hay círculo que encuadrar y la cámara debe volar al punto.
+    if (loadedRef.current && radioRef.current === 0) {
+      encuadrarRadio(map, destino, 0, is3DRef.current)
     }
   }, [destino])
 

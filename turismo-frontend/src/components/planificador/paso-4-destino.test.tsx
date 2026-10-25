@@ -247,12 +247,35 @@ const CORDOBA: DestinoSeleccionado = {
   longitud: -64.19,
 }
 
+const VILLA_CARLOS_PAZ: DestinoSeleccionado = {
+  nombre: 'Villa Carlos Paz (Valle de Punilla)',
+  ciudad: 'Villa Carlos Paz',
+  localidad: 'Valle de Punilla',
+  latitud: -31.4241,
+  longitud: -64.4978,
+}
+
 describe('DestinoMapa con radio', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     maplibre.layers.clear()
     for (const key of Object.keys(maplibre.sources)) delete maplibre.sources[key]
     for (const key of Object.keys(maplibre.handlers)) delete maplibre.handlers[key]
+  })
+
+  it('vuela animado al cambiar de destino y deja que MapLibre calcule la duración', async () => {
+    const { rerender } = render(<DestinoMapa destino={CORDOBA} onSelectDestino={vi.fn()} />)
+
+    await waitFor(() => expect(maplibre.handlers['style.load']).toBeTypeOf('function'))
+    act(() => maplibre.handlers['style.load']?.())
+
+    rerender(<DestinoMapa destino={VILLA_CARLOS_PAZ} onSelectDestino={vi.fn()} />)
+
+    await waitFor(() => expect(maplibre.map.flyTo).toHaveBeenCalled())
+    expect(maplibre.map.flyTo).toHaveBeenCalledWith(
+      expect.objectContaining({ center: [-64.4978, -31.4241], zoom: 15 }),
+    )
+    expect(maplibre.map.flyTo.mock.calls.at(-1)?.[0].duration).toBeUndefined()
   })
 
   it('dibuja el círculo del radio y reencuadra el mapa en vez de saltar al zoom 15', async () => {
