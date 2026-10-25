@@ -18,6 +18,7 @@ public record PropuestaFiltro(
 		NombreEstado estado,
 		Long publicadorId,
 		String localidad,
+		String ubicacion,
 		String q,
 		LocalDate fechaDesde,
 		LocalDate fechaHasta

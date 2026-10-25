@@ -44,12 +44,13 @@ public class PropuestaController {
 			@RequestParam(required = false) NombreEstado estado,
 			@RequestParam(required = false) Long publicadorId,
 			@RequestParam(required = false) String localidad,
+			@RequestParam(required = false) String ubicacion,
 			@RequestParam(required = false) String q,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaDesde,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaHasta,
 			@PageableDefault(size = 20) Pageable pageable) {
 		PropuestaFiltro filtro = new PropuestaFiltro(tipo, tipoPropuesta, categoria, modalidad, tipoAcceso,
-				estado, publicadorId, localidad, q, fechaDesde, fechaHasta);
+				estado, publicadorId, localidad, ubicacion, q, fechaDesde, fechaHasta);
 		return new PagedModel<>(propuestaQueryService.search(filtro, pageable));
 	}
 }
