@@ -466,7 +466,8 @@ Devuelve eventos y actividades en una sola página de `PropuestaResumenResponse`
 | `tipoAcceso` | `TipoAcceso` | Filtro exacto. |
 | `estado` | `NombreEstado` | Filtro exacto. |
 | `publicadorId` | number | Filtro exacto. |
-| `localidad` | string | Comparación exacta, sin distinguir mayúsculas. |
+| `localidad` | string | Comparación exacta, sin distinguir mayúsculas ni tildes. |
+| `ubicacion` | string | Texto libre sobre `localidad`, `lugarRecinto` y `direccion`, sin distinguir mayúsculas ni tildes. |
 | `q` | string | Busca en `nombre` y `descripcion`, sin distinguir mayúsculas. |
 | `fechaDesde` | date | Solo con `tipo=EVENTO`. Eventos que terminan en esa fecha o después. |
 | `fechaHasta` | date | Solo con `tipo=EVENTO`. Eventos que empiezan en esa fecha o antes. |
@@ -553,7 +554,76 @@ GET /api/propuestas?tipo=EVENTO&fechaDesde=2026-10-01&fechaHasta=2026-10-31&sort
 }
 ```
 
-## 7. Agenda semanal — `GET /api/agenda/semanal`
+## 7. Agenda
+
+### 7.1 Agenda turística — `GET /api/agenda` (VZ-18)
+
+Devuelve solo **eventos** no cancelados, ordenados por `fechaInicio` y luego `horarioInicio`
+ascendente (los más próximos primero). El orden es fijo: el parámetro `sort` se ignora.
+
+```http
+GET /api/agenda?fechaDesde=2026-10-01&fechaHasta=2026-10-31&tipoPropuesta=FESTIVAL&categoria=CULTURA&ubicacion=cosquin&tipoAcceso=GRATUITO&page=0&size=20
+```
+
+#### Parámetros
+
+| Parámetro | Tipo | Observaciones |
+| --- | --- | --- |
+| `fechaDesde` | date | Si no se envía, el backend usa **hoy**. Incluye eventos que terminan ese día o después (solapamiento). |
+| `fechaHasta` | date | Incluye eventos que empiezan ese día o antes (solapamiento). |
+| `tipoPropuesta` | `TipoPropuesta` | Filtro exacto. |
+| `categoria` | `InteresCategoria` | Filtro exacto. |
+| `ubicacion` | string | Busca en `localidad`, `lugarRecinto` y `direccion`, sin distinguir mayúsculas ni tildes. |
+| `tipoAcceso` | `TipoAcceso` | Filtro exacto (`GRATUITO` / `DE_PAGO`). |
+| `page` | number | Desde 0. |
+| `size` | number | Máximo 100, por defecto 20. |
+
+#### Comportamiento
+
+- `200` con página de `PropuestaResumenResponse` (ver 3.4), siempre con `tipo = "EVENTO"`.
+- **Excluye `CANCELADO`.** Por defecto, con `fechaDesde = hoy`, también quedan fuera los eventos ya
+  terminados.
+- Las actividades nunca aparecen; se consultan por `/api/actividades` o
+  `/api/propuestas?tipo=ACTIVIDAD`.
+- Un `tipoPropuesta` o `categoria` inexistente responde **400**.
+- Una fecha con formato inválido responde **400**.
+- El detalle de cada evento se consulta en `GET /api/eventos/{id}` (CA3).
+
+#### Ejemplo de respuesta
+
+```json
+{
+  "content": [
+    {
+      "id": 1,
+      "tipo": "EVENTO",
+      "nombre": "Festival Nacional de Folklore de Cosquín",
+      "descripcion": "Tradicional festival folklórico...",
+      "tipoPropuesta": "FESTIVAL",
+      "categoria": "CULTURA",
+      "modalidad": "PEDESTRE",
+      "tipoAcceso": "DE_PAGO",
+      "estadoPropuesta": { "id": 1, "nombre": "INICIADO", "descripcion": null },
+      "lugarRecinto": "Plaza Próspero Molina",
+      "localidad": "Cosquín",
+      "direccion": "Av. San Martín 800, Cosquín",
+      "latitud": -31.4135,
+      "longitud": -64.4947,
+      "fechaInicio": "2026-10-01",
+      "fechaFin": "2026-10-03",
+      "horarioInicio": "20:00:00",
+      "horarioFin": "23:30:00",
+      "duracionMinutos": null,
+      "imagenes": [],
+      "publicadorId": 2,
+      "publicadorNombre": "Municipalidad de Cosquín"
+    }
+  ],
+  "page": { "size": 20, "number": 0, "totalElements": 1, "totalPages": 1 }
+}
+```
+
+### 7.2 Agenda semanal — `GET /api/agenda/semanal` (US6)
 
 Devuelve solo **eventos** de la semana ISO en curso (lunes a domingo), con la misma paginación.
 
@@ -564,6 +634,8 @@ GET /api/agenda/semanal?page=0&size=20
 - `200` con página de `EventoResponse`.
 - No incluye actividades.
 - El límite inferior es hoy, no el lunes: un evento que ya terminó esta semana no aparece.
+- No acepta filtros: para filtrar por fecha, tipo, categoría, ubicación o acceso usar
+  `/api/agenda`.
 
 ## 8. Eventos por publicador — `GET /api/publicadores/{id}/eventos`
 
@@ -825,5 +897,7 @@ export interface ActividadRequest {
 6. **`imagenes: null` no borra**: en actualización conserva las existentes. Para borrar, enviar `[]`.
 7. **`disponibilidades: null` no borra**: en actualización conserva las franjas. Para borrar, enviar `[]`.
 8. **El listado unificado no reemplaza los listados por tipo**: `/api/eventos` y `/api/actividades` siguen existiendo con sus propios DTOs.
-9. **La agenda semanal es solo de eventos**; las actividades se consultan por `/api/actividades` o `/api/propuestas?tipo=ACTIVIDAD`.
+9. **Las agendas son solo de eventos**: `/api/agenda` (turística, con filtros y orden fijo) y
+   `/api/agenda/semanal` (US6, semana en curso). Las actividades se consultan por
+   `/api/actividades` o `/api/propuestas?tipo=ACTIVIDAD`.
 10. **Un `sort` inválido devuelve 400**, no 500. Si se ordena por un campo de evento sin `tipo=EVENTO`, también devuelve 400.

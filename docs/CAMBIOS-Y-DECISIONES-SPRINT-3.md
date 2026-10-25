@@ -204,6 +204,20 @@ El orden también se aplica dentro de la especificación:
 - Los campos de actividad requieren `tipo=ACTIVIDAD`.
 - Se omite en la consulta de conteo (`query.getResultType() == Long.class`), porque ordenar un `count` no tiene sentido.
 
+### 4.5 Agenda turística (VZ-18)
+
+`GET /api/agenda` es un endpoint nuevo, separado de `/api/agenda/semanal` (US6) para no cambiar el
+contrato existente:
+
+- Acepta `fechaDesde`, `fechaHasta`, `tipoPropuesta`, `categoria`, `ubicacion`, `tipoAcceso`,
+  `page` y `size`.
+- Fuerza `tipo=EVENTO` y excluye `CANCELADO`; las actividades no aparecen.
+- Si no viene `fechaDesde`, usa hoy: así no se muestran eventos terminados. Las fechas se comparan
+  por solapamiento (`fechaFin >= fechaDesde`, `fechaInicio <= fechaHasta`).
+- El orden es fijo (`fechaInicio`, `horarioInicio`) y se descarta el `sort` del cliente.
+- `ubicacion` busca en localidad, recinto y dirección, sin distinguir mayúsculas ni tildes.
+- Devuelve `PropuestaResumenResponse`; el detalle sigue siendo `GET /api/eventos/{id}`.
+
 ## 5. Cambios por archivo
 
 ### 5.1 Nuevos
@@ -267,6 +281,8 @@ El orden también se aplica dentro de la especificación:
 - `mapper/ViajeMapper.java`: ignora `direccion` al mapear `UbicacionRequest`.
 - `exception/GlobalExceptionHandler.java`: 422 y 409 con `ProblemDetail`.
 - `controller/EventoController.java`, `AgendaController.java`, `PublicadorController.java`: usan `PropuestaService`.
+- `controller/AgendaController.java`, `controller/PropuestaController.java`, `service/PropuestaQueryService.java`, `repository/PropuestaSpecifications.java`, `dto/request/PropuestaFiltro.java`: nuevo `GET /api/agenda` (VZ-18) y filtro `ubicacion`.
+- Tests: `AgendaControllerTest`, `PropuestaRepositoryTest` y `PropuestaControllerTest` cubren orden fijo, solapamiento, cancelados y filtros de la agenda.
 - `data.sql`: reescrito para JOINED, fechas relativas y actividades.
 - Tests de controller, repositorio y agenda actualizados por el nuevo modelo.
 
@@ -296,6 +312,7 @@ Resumen de endpoints:
 | `PUT` | `/api/actividades/{id}` | Actualiza actividad. |
 | `DELETE` | `/api/actividades/{id}` | Elimina actividad. |
 | `GET` | `/api/agenda/semanal` | Eventos de la semana ISO en curso. |
+| `GET` | `/api/agenda` | VZ-18 — agenda filtrable de eventos, ordenada por fecha. |
 | `GET` | `/api/publicadores/{id}/eventos` | Eventos de un publicador. |
 
 ## 7. Datos de demo
@@ -344,22 +361,25 @@ cd turismo-backend
 
 > Usar siempre `clean test`. Un `application.properties` viejo en `target/test-classes` puede opacar el de `main`.
 
-Resultado: **177 tests, 0 failures, 0 errors**.
+Resultado: **207 tests, 202 en verde y 5 fallos preexistentes** (`PropuestaTuristicaTest` ×4 y
+`ActividadServiceTest` ×1, por `tiposPermitidos`).
 
 | Suite | Tests |
 | --- | ---: |
 | `ActividadControllerTest` | 8 |
-| `AgendaControllerTest` | 4 |
+| `AgendaControllerTest` | 7 |
 | `EventoControllerTest` | 15 |
 | `ImagenControllerTest` | 4 |
 | `ImagenServingTest` | 2 |
 | `PropuestaControllerTest` | 3 |
 | `PublicadorControllerTest` | 10 |
-| `ViajeControllerTest` | 14 |
+| `ViajeControllerTest` | 17 |
 | `ViajeMapperTest` | 4 |
+| `EstadoViajeTest` | 3 |
 | `PropuestaTuristicaTest` | 11 |
+| `ViajeTest` | 11 |
 | `EventoRepositoryTest` | 16 |
-| `PropuestaRepositoryTest` | 12 |
+| `PropuestaRepositoryTest` | 18 |
 | `PublicadorRepositoryTest` | 5 |
 | `ViajeRepositoryTest` | 4 |
 | `ActividadServiceTest` | 9 |
@@ -368,13 +388,13 @@ Resultado: **177 tests, 0 failures, 0 errors**.
 | `ImagenServiceTest` | 6 |
 | `PropuestaServiceTest` | 23 |
 | `PublicadorServiceTest` | 7 |
-| `ViajeServiceTest` | 7 |
+| `ViajeServiceTest` | 11 |
 | `TurismoBackendApplicationTests` | 1 |
 
 Cobertura conceptual:
 
 - Dominio: invariantes, tipos permitidos, transiciones y estados terminales.
-- Repositorios: agenda semanal, filtros y orden del listado unificado.
+- Repositorios: agenda semanal, agenda turística VZ-18, filtros y orden del listado unificado.
 - Servicios: creación, actualización, borrado, geocodificación mockeada, errores.
 - Controllers: validación, 404, 422, 409, paginación y contrato JSON.
 
