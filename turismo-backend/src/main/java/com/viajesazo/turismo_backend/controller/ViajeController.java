@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 import com.viajesazo.turismo_backend.dto.request.ViajeBorradorRequest;
 import com.viajesazo.turismo_backend.dto.request.ViajeRequest;
 import com.viajesazo.turismo_backend.dto.response.ViajeResponse;
@@ -96,13 +98,25 @@ public class ViajeController {
     }
 
     /**
-     * VZ-22: listado de viajes activos del turista, paginado con {@code ?usuario=&page=&size=}.
+     * VZ-22: listado de viajes permitidos del turista, paginado con {@code ?usuario=&page=&size=}.
      * Sin viajes devuelve una página vacía con 200.
      */
     @GetMapping
     public PagedModel<ViajeResponse> findAll(@RequestParam String usuario,
             @PageableDefault(size = 20) Pageable pageable) {
         return new PagedModel<>(viajeService.findAll(usuario, pageable));
+    }
+
+    /**
+     * VZ-22: listado de viajes permitidos filtrado por uno o más estados, paginado con {@code ?usuario=&estado=&page=&size=}.
+     * Sin viajes devuelve una página vacía con 200.
+     * Solo acepta BORRADOR, PLANIFICADO y EN_CURSO.
+     */
+    @GetMapping("/estado")
+    public PagedModel<ViajeResponse> findByEstado(@RequestParam String usuario,
+            @RequestParam List<String> estado,
+            @PageableDefault(size = 20) Pageable pageable) {
+        return new PagedModel<>(viajeService.findByEstados(usuario, estado, pageable));
     }
 
 }

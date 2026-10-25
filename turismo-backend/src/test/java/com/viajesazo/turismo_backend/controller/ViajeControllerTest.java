@@ -214,8 +214,8 @@ class ViajeControllerTest {
 	}
 
 	@Test
-	@DisplayName("VZ-22: lista los viajes activos del turista, paginados")
-	void listsActiveTrips() throws Exception {
+	@DisplayName("VZ-22: lista los viajes permitidos del turista, paginados")
+	void listsAllowedTrips() throws Exception {
 		when(viajeService.findAll(eq(USUARIO), any(Pageable.class)))
 				.thenReturn(new PageImpl<>(List.of(response()), PageRequest.of(0, 20), 1));
 
@@ -224,6 +224,33 @@ class ViajeControllerTest {
 				.andExpect(jsonPath("$.content.length()").value(1))
 				.andExpect(jsonPath("$.content[0].nombre").value("Escapada serrana"))
 				.andExpect(jsonPath("$.page.totalElements").value(1));
+	}
+
+	@Test
+	@DisplayName("VZ-22: filtra por un estado solicitado")
+	void filtersTripsBySingleState() throws Exception {
+		when(viajeService.findByEstados(eq(USUARIO), eq(List.of("BORRADOR")), any(Pageable.class)))
+				.thenReturn(new PageImpl<>(List.of(responseWithState(EstadoViaje.BORRADOR)),
+						PageRequest.of(0, 20), 1));
+
+		mockMvc.perform(get("/api/viajes/estado").param("usuario", USUARIO).param("estado", "BORRADOR"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.content[0].estado").value("BORRADOR"));
+	}
+
+	@Test
+	@DisplayName("VZ-22: filtra por varios estados permitidos")
+	void filtersTripsByMultipleStates() throws Exception {
+		when(viajeService.findByEstados(eq(USUARIO), eq(List.of("BORRADOR", "PLANIFICADO", "EN_CURSO")),
+				any(Pageable.class)))
+				.thenReturn(new PageImpl<>(List.of(responseWithState(EstadoViaje.BORRADOR), response(),
+						responseWithState(EstadoViaje.EN_CURSO)), PageRequest.of(0, 20), 3));
+
+		mockMvc.perform(get("/api/viajes/estado").param("usuario", USUARIO)
+				.param("estado", "BORRADOR", "PLANIFICADO", "EN_CURSO"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.content.length()").value(3))
+				.andExpect(jsonPath("$.page.totalElements").value(3));
 	}
 
 	@Test
@@ -241,9 +268,13 @@ class ViajeControllerTest {
 	}
 
 	private ViajeResponse response() {
+		return responseWithState(EstadoViaje.PLANIFICADO);
+	}
+
+	private ViajeResponse responseWithState(EstadoViaje estado) {
 		return new ViajeResponse(7L, "Escapada serrana",
 				new UbicacionResponse("Villa General Belgrano", "Córdoba", "Villa General Belgrano", -31.95, -64.55),
 				35.0, LocalDate.parse("2026-10-20"), LocalDate.parse("2026-10-22"),
-				TipoRitmo.EQUILIBRADO, List.of(InteresCategoria.CULTURA), EstadoViaje.PLANIFICADO, 8, USUARIO);
+				TipoRitmo.EQUILIBRADO, List.of(InteresCategoria.CULTURA), estado, 8, USUARIO);
 	}
 }

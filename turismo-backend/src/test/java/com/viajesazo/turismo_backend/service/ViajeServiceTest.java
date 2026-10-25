@@ -203,16 +203,29 @@ class ViajeServiceTest {
 	}
 
 	@Test
-	@DisplayName("VZ-22: lista los viajes activos del turista, paginados")
-	void listsActiveTripsOfTourist() {
-		when(viajeRepository.findByUsuarioAndEstadoNotInOrderByFechaInicioAsc(
-				eq("turista@test.com"), eq(List.of(EstadoViaje.BORRADOR, EstadoViaje.CANCELADO)), any(Pageable.class)))
-				.thenReturn(new PageImpl<>(List.of(persistedTrip()), PageRequest.of(0, 10), 1));
+	@DisplayName("VZ-22: lista BORRADOR, PLANIFICADO y EN_CURSO, excluyendo estados terminales")
+	void listsAllowedTripsOfTourist() {
+		Viaje draft = persistedTrip();
+		draft.setNombre("Borrador");
+		draft.setEstado(EstadoViaje.BORRADOR);
+		Viaje planned = persistedTrip();
+		planned.setNombre("Planificado");
+		Viaje ongoing = persistedTrip();
+		ongoing.setNombre("En curso");
+		ongoing.setEstado(EstadoViaje.EN_CURSO);
+		when(viajeRepository.findByUsuarioAndEstadoInOrderByFechaInicioAsc(
+				eq("turista@test.com"),
+				eq(List.of(EstadoViaje.BORRADOR, EstadoViaje.PLANIFICADO, EstadoViaje.EN_CURSO)),
+				any(Pageable.class)))
+				.thenReturn(new PageImpl<>(List.of(draft, planned, ongoing), PageRequest.of(0, 10), 3));
 
 		Page<ViajeResponse> result = service.findAll("turista@test.com", PageRequest.of(0, 10));
 
-		assertThat(result.getContent()).extracting(ViajeResponse::nombre).containsExactly("Escapada serrana");
-		assertThat(result.getTotalElements()).isEqualTo(1);
+		assertThat(result.getContent()).extracting(ViajeResponse::nombre)
+				.containsExactly("Borrador", "Planificado", "En curso");
+		assertThat(result.getContent()).extracting(ViajeResponse::estado)
+				.containsExactly(EstadoViaje.BORRADOR, EstadoViaje.PLANIFICADO, EstadoViaje.EN_CURSO);
+		assertThat(result.getTotalElements()).isEqualTo(3);
 	}
 
 	private ViajeRequest request() {

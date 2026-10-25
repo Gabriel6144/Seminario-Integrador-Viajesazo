@@ -366,3 +366,13 @@ El 502 Bad Gateway del frontend era una consecuencia del cierre del backend:
 Al corregir los artefactos inválidos y eliminar @SuperBuilder, Hibernate ya puede cargar Actividad.
 
 Si VS Code continúa intentando iniciar con JDK 25, puede volver a aparecer el problema aunque el código fuente esté corregido. En ese caso, hay que configurar VS Code para utilizar el JDK 21 mediante java.jdt.ls.java.home o ejecutar Maven desde una terminal con JAVA_HOME apuntando a JDK 21.
+
+# Ajuste de endpoint respecto al criterio de consulta
+Antes se devolvía cualquier estado excepto BORRADOR y CANCELADO. En la práctica incluía :
+                  PLANIFICADO 
+                  EN_CURSO
+                  FINALIZADO
+Ahora se incluyen únicamente los estados permitidos por el listado y se excluyen explícitamente: 
+                  CANCELADO
+                  FINALIZADO
+La lógica está implementada en ViajeService.java y se expone mediante ViajeController.java.
