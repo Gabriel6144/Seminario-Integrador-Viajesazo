@@ -1,7 +1,9 @@
 package com.viajesazo.turismo_backend.repository;
 
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 import org.springframework.data.domain.Sort;
@@ -11,6 +13,7 @@ import com.viajesazo.turismo_backend.dto.request.PropuestaFiltro;
 import com.viajesazo.turismo_backend.exception.BusinessRuleException;
 import com.viajesazo.turismo_backend.model.Actividad;
 import com.viajesazo.turismo_backend.model.Evento;
+import com.viajesazo.turismo_backend.model.NombreEstado;
 import com.viajesazo.turismo_backend.model.PropuestaTuristica;
 import com.viajesazo.turismo_backend.model.TipoRegistro;
 
@@ -34,6 +37,9 @@ public final class PropuestaSpecifications {
 			"fechaInicio", "fechaFin", "horarioInicio", "horarioFin", "montoEstimado");
 
 	private static final Set<String> ACTIVITY_SORT = Set.of("duracionMinutos");
+
+	private static final String ACCENTED = "áéíóúüñ";
+	private static final String UNACCENTED = "aeiouun";
 
 	private PropuestaSpecifications() {
 	}
@@ -78,8 +84,15 @@ public final class PropuestaSpecifications {
 				predicates.add(cb.equal(root.get("publicador").get("id"), filtro.publicadorId()));
 			}
 			if (hasText(filtro.localidad())) {
-				predicates.add(cb.equal(cb.lower(root.get("ubicacion").get("localidad")),
-						filtro.localidad().trim().toLowerCase()));
+				predicates.add(cb.equal(normalizedLower(cb, root.get("ubicacion").get("localidad")),
+						normalize(filtro.localidad())));
+			}
+			if (hasText(filtro.ubicacion())) {
+				String like = "%" + normalize(filtro.ubicacion()) + "%";
+				predicates.add(cb.or(
+						cb.like(normalizedLower(cb, root.get("ubicacion").get("localidad")), like),
+						cb.like(normalizedLower(cb, root.get("lugarRecinto")), like),
+						cb.like(normalizedLower(cb, root.get("ubicacion").get("direccion")), like)));
 			}
 			if (hasText(filtro.q())) {
 				String like = "%" + filtro.q().trim().toLowerCase() + "%";
@@ -103,6 +116,15 @@ public final class PropuestaSpecifications {
 
 			return predicates.isEmpty() ? cb.conjunction() : cb.and(predicates.toArray(Predicate[]::new));
 		};
+	}
+
+	/**
+	 * La agenda solo muestra propuestas disponibles: una propuesta cancelada no debe aparecer,
+	 * aunque sus fechas sigan siendo futuras.
+	 */
+	public static Specification<PropuestaTuristica> notCancelled() {
+		return (root, query, cb) -> cb.notEqual(root.get("estadoPropuesta").get("nombre"),
+				NombreEstado.CANCELADO.name());
 	}
 
 	/**
@@ -148,6 +170,18 @@ public final class PropuestaSpecifications {
 	private static boolean isCountQuery(CriteriaQuery<?> query) {
 		Class<?> resultType = query.getResultType();
 		return resultType == Long.class || resultType == long.class;
+	}
+
+	private static Expression<String> normalizedLower(CriteriaBuilder cb, Expression<String> path) {
+		return cb.function("translate", String.class, cb.lower(path),
+				cb.literal(ACCENTED), cb.literal(UNACCENTED));
+	}
+
+	private static String normalize(String value) {
+		return Normalizer.normalize(value, Normalizer.Form.NFD)
+				.replaceAll("\\p{M}", "")
+				.toLowerCase(Locale.ROOT)
+				.trim();
 	}
 
 	private static boolean hasText(String value) {

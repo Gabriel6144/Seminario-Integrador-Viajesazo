@@ -196,8 +196,44 @@ export const handlers = [
     return new HttpResponse(null, { status: 204 })
   }),
 
-  http.get('/api/agenda/semanal', ({ request }) => {
-    const { content, meta } = paginate(allEventos(), request.url)
+  http.get('/api/agenda', ({ request }) => {
+    const params = new URL(request.url).searchParams
+    const tipoPropuesta = params.get('tipoPropuesta')
+    const categoria = params.get('categoria')
+    const tipoAcceso = params.get('tipoAcceso')
+    const ubicacion = normalizeText(params.get('ubicacion') ?? '')
+    const fechaDesde = params.get('fechaDesde')
+    const fechaHasta = params.get('fechaHasta')
+
+    const eventos = allEventos()
+      .filter((evento) => {
+        // La agenda solo muestra eventos vigentes: ni cancelados ni terminados antes del rango.
+        const estado =
+          typeof evento.estadoPropuesta === 'object'
+            ? evento.estadoPropuesta?.nombre
+            : evento.estadoPropuesta
+        if (estado === 'CANCELADO') return false
+        if (fechaDesde !== null && evento.fechaFin < fechaDesde) return false
+        if (fechaHasta !== null && evento.fechaInicio > fechaHasta) return false
+        if (tipoPropuesta !== null && evento.tipoPropuesta !== tipoPropuesta) return false
+        if (categoria !== null && evento.categoria !== categoria) return false
+        if (tipoAcceso !== null && evento.tipoAcceso !== tipoAcceso) return false
+        if (ubicacion !== '') {
+          const camposUbicacion = normalizeText(
+            [evento.localidad ?? '', evento.lugarRecinto ?? '', evento.direccion ?? ''].join(' '),
+          )
+          if (!camposUbicacion.includes(ubicacion)) return false
+        }
+        return true
+      })
+      .map((evento) => ({ ...evento, tipo: 'EVENTO' as const, duracionMinutos: null }))
+      .sort((a, b) => {
+        const cmpFecha = a.fechaInicio.localeCompare(b.fechaInicio)
+        if (cmpFecha !== 0) return cmpFecha
+        return (a.horarioInicio ?? '99:99:99').localeCompare(b.horarioInicio ?? '99:99:99')
+      })
+
+    const { content, meta } = paginate(eventos, request.url)
     return HttpResponse.json(page(content, meta))
   }),
 
@@ -299,6 +335,14 @@ function validateEvento(body: Partial<EventoRequest>): string | null {
 }
 
 const DEFAULT_SIZE = 12
+
+function normalizeText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
 
 function paginate<T>(items: T[], url: string) {
   const params = new URL(url).searchParams

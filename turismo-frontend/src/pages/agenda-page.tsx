@@ -14,8 +14,7 @@ import {
 
 import {
   AGENDA_FILTERS_DEFAULT,
-  filterAndSortAgendaEventos,
-  useAgendaSemanal,
+  useAgenda,
   type AgendaFilters,
 } from '@/api/agenda'
 import { DayHeading } from '@/components/day-heading'
@@ -38,19 +37,21 @@ import {
 } from '@/types/api'
 
 /**
- * Agenda de eventos — `GET /api/agenda/semanal`.
+ * Agenda de eventos — `GET /api/agenda`.
  *
  * Cumple los criterios de aceptación de la historia de usuario:
  * - CA1: Eventos ordenados cronológicamente por fecha (los más próximos primero) y agrupados por día.
  * - CA2: Filtrado opcional en un panel lateral deslizable (Drawer / Sheet) por fecha, tipo de propuesta, categoría, ubicación y acceso (gratuito/arancelado).
  * - CA3: Selección de cualquier evento para consultar su información en detalle (`/eventos/:id`).
+ *
+ * El orden y los filtros los resuelve el backend: la página solo refleja la página recibida.
  */
 export function AgendaPage() {
   const [page, setPage] = usePageParam()
   const [filters, setFilters] = useState<AgendaFilters>(AGENDA_FILTERS_DEFAULT)
   const [drawerAbierto, setDrawerAbierto] = useState(false)
 
-  const query = useAgendaSemanal(page, filters)
+  const query = useAgenda(page, filters)
 
   // Cerrar el drawer con Escape para accesibilidad
   useEffect(() => {
@@ -74,11 +75,6 @@ export function AgendaPage() {
   }, [filters])
 
   const hayFiltrosActivos = cantidadFiltrosActivos > 0
-
-  const eventosFiltrados = useMemo(
-    () => (query.data ? filterAndSortAgendaEventos(query.data.content, filters) : []),
-    [query.data, filters],
-  )
 
   // Sugerencias rápidas de localidades presentes en los eventos cargados
   const localidadesDisponibles = useMemo(() => {
@@ -453,7 +449,7 @@ export function AgendaPage() {
                 onClick={() => setDrawerAbierto(false)}
                 className="h-11 rounded-xl bg-[#00658d] px-6 font-semibold text-white shadow-md hover:bg-[#005273]"
               >
-                Ver eventos ({eventosFiltrados.length})
+                Ver eventos ({query.data?.page.totalElements ?? 0})
               </Button>
             </div>
           </aside>
@@ -466,21 +462,18 @@ export function AgendaPage() {
 
       {query.isSuccess && query.data.content.length === 0 ? (
         <EmptyState
-          title="No hay eventos esta semana"
-          description="Ningún evento cargado se solapa con la ventana de hoy al domingo."
+          title={hayFiltrosActivos ? 'No se encontraron eventos con esos filtros' : 'No hay eventos próximos'}
+          description={
+            hayFiltrosActivos
+              ? 'Probá ajustando o limpiando los filtros seleccionados.'
+              : 'Todavía no hay eventos cargados para la agenda.'
+          }
         />
       ) : null}
 
-      {query.isSuccess && query.data.content.length > 0 && eventosFiltrados.length === 0 ? (
-        <EmptyState
-          title="No se encontraron eventos con esos filtros"
-          description="Probá ajustando o limpiando los filtros seleccionados."
-        />
-      ) : null}
-
-      {query.isSuccess && eventosFiltrados.length > 0 ? (
+      {query.isSuccess && query.data.content.length > 0 ? (
         <div className="flex flex-col gap-6">
-          {groupByDay(eventosFiltrados).map(([date, eventos]) => (
+          {groupByDay(query.data.content).map(([date, eventos]) => (
             <section key={date} className="flex flex-col gap-3">
               <DayHeading date={date} />
               <Separator />

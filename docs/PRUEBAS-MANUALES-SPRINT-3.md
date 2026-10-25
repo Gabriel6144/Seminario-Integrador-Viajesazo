@@ -106,6 +106,7 @@ curl.exe -s -i "http://localhost:8080/api/eventos?size=100"
 curl.exe -s -i "http://localhost:8080/api/actividades?size=100"
 curl.exe -s -i "http://localhost:8080/api/publicadores?size=10"
 curl.exe -s -i "http://localhost:8080/api/viajes?usuario=turista.demo@viajesazo.com"
+curl.exe -s -i "http://localhost:8080/api/agenda?fechaDesde=2020-01-01&size=100"
 curl.exe -s -i "http://localhost:8080/api/agenda/semanal"
 curl.exe -s -i "http://localhost:8080/api/eventos/1"
 ```
@@ -119,6 +120,7 @@ Resultados esperados:
 | `GET /api/actividades?size=100` | `200`; `page.totalElements = 2` |
 | `GET /api/publicadores?size=10` | `200`; 3 publicadores |
 | `GET /api/viajes?usuario=turista.demo@viajesazo.com` | `200`; 2 viajes |
+| `GET /api/agenda?fechaDesde=2020-01-01&size=100` | `200`; solo eventos, ordenados por fecha; sin `CANCELADO` |
 | `GET /api/agenda/semanal` | `200`; contenido coherente con la semana actual |
 | `GET /api/eventos/1` | `200`; `tipo = "EVENTO"` y nombre `Cosquín Rock` |
 
@@ -201,6 +203,32 @@ Los tres deben devolver `400`:
 - `sort=inventado`: campo fuera de la lista permitida.
 - `fechaDesde` sin `tipo=EVENTO`: el filtro de fechas solo aplica a eventos.
 - `sort=fechaInicio` sin `tipo=EVENTO`: el orden por fecha solo aplica a eventos.
+
+### 6.9 Agenda turística VZ-18
+
+Usar un `fechaDesde` viejo para no depender del día en que se corre la prueba (el default es hoy):
+
+```powershell
+curl.exe -s -i "http://localhost:8080/api/agenda?fechaDesde=2020-01-01&size=100"
+curl.exe -s -i "http://localhost:8080/api/agenda?fechaDesde=2020-01-01&tipoPropuesta=FESTIVAL"
+curl.exe -s -i "http://localhost:8080/api/agenda?fechaDesde=2020-01-01&categoria=CULTURA&tipoAcceso=DE_PAGO"
+curl.exe -s -i "http://localhost:8080/api/agenda?fechaDesde=2020-01-01&ubicacion=cosquin"
+curl.exe -s -i "http://localhost:8080/api/agenda?fechaDesde=2020-01-01&fechaHasta=2020-12-31"
+curl.exe -s -i "http://localhost:8080/api/agenda?categoria=NO_EXISTE"
+```
+
+Esperado:
+
+- `200` con `content` de `PropuestaResumenResponse`, **solo** ítems con `tipo = "EVENTO"`.
+- Ordenados por `fechaInicio` y luego `horarioInicio` ascendente, aunque se mande `sort=nombre,asc`
+  (el orden es fijo y ese parámetro se ignora).
+- Ningún ítem con `estadoPropuesta.nombre = "CANCELADO"`.
+- `ubicacion=cosquin` encuentra eventos de `Cosquín` sin importar mayúsculas ni tildes; también
+  busca en `lugarRecinto` y `direccion`.
+- `fechaHasta=2020-12-31` devuelve `content: []` y `200` (no es un error).
+- `categoria=NO_EXISTE` devuelve `400`.
+
+El detalle de cualquier ítem se consulta con `GET /api/eventos/{id}` (CA3).
 
 ## 7. Consultar un detalle
 
@@ -418,6 +446,9 @@ usan el formato de error legacy del proyecto.
 - [ ] `/api/publicadores` devuelve 3.
 - [ ] `/api/viajes?usuario=...` devuelve 2.
 - [ ] `/api/agenda/semanal` devuelve `200`.
+- [ ] `/api/agenda?fechaDesde=2020-01-01` devuelve solo eventos, ordenados y sin `CANCELADO`.
+- [ ] `ubicacion=cosquin` encuentra eventos de `Cosquín` sin importar tildes.
+- [ ] El detalle de un ítem de la agenda se obtiene con `/api/eventos/{id}`.
 - [ ] Los filtros por tipo, texto y localidad funcionan.
 - [ ] El orden por fecha funciona con `tipo=EVENTO`.
 - [ ] El orden por duración funciona con `tipo=ACTIVIDAD`.

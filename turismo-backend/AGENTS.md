@@ -11,11 +11,13 @@ Tesis de facultad: API REST que centraliza la información turística de la prov
   son subcarpetas del mismo repo git, no repos separados. Se puede tocar el backend y el frontend
   en el mismo commit, y es lo normal: la API y el cliente se cambian juntos. El `.gitignore` de la
   raíz es el que manda.
-- Estado actual: Sprint 1 (gestión de eventos) y Sprint 2 (gestión de viajes) completos, con
-  **134 tests en verde**. Incluye paginación, CRUD de eventos, alta de publicadores, CRUD de
-  viajes con baja lógica, seed de datos, mapeo con MapStruct, **geocodificación de la ubicación
-  del evento con OpenStreetMap (Nominatim)** y **subida de imágenes a disco con servido estático**.
-  Pendientes: `Actividad`, `Itinerario`, `Usuario`, `Preferencia` y rutas/traslados.
+- Estado actual: Sprints 1–3 completos (eventos, viajes y agenda turística VZ-18), con
+  **207 tests: 202 en verde y 5 fallos preexistentes de `tiposPermitidos`**. Incluye paginación,
+  CRUD de eventos, alta de publicadores, CRUD de viajes con baja lógica, listado unificado de
+  propuestas (eventos + actividades), **agenda filtrable por fecha/tipo/categoría/ubicación/acceso**,
+  seed de datos, mapeo con MapStruct, **geocodificación de la ubicación del evento con
+  OpenStreetMap (Nominatim)** y **subida de imágenes a disco con servido estático**.
+  Pendientes: `Itinerario`, `Usuario`, `Preferencia` y rutas/traslados.
 - Para probar los endpoints a mano ver **`PRUEBAS-MANUALES.md`**: levantar, curl de cada ruta,
   casos de error, el detalle de los acentos y los bordes conocidos sin cubrir.
 
@@ -241,11 +243,14 @@ Decisiones que no son obvias y conviene no deshacer sin motivo:
   lunes al martes entraría igual y la agenda mostraría algo que ya pasó. Ambos comportamientos
   están cubiertos por `EventoRepositoryTest`.
 - **`GET /api/eventos` no filtra por fecha.** Es el listado completo, así que trae también lo ya
-  terminado y lo que todavía no empieza; la única vista con ventana temporal es la agenda semanal.
+  terminado y lo que todavía no empieza; las vistas con ventana temporal son `/api/agenda`
+  (filtrable) y `/api/agenda/semanal` (semana en curso).
 - **El orden va en el nombre del método del repository**, no en el `Pageable`: `findAllBy...`,
   `findByPublicadorIdOrderByFechaInicioAsc` y el `@Query` de la agenda. El orden es parte del
   contrato de la API, no una preferencia del cliente. Los dos listados completos ordenan por
   fecha de inicio (y hora de inicio como desempate) y por nombre de publicador, respectivamente.
+  **Excepción:** `/api/agenda` (VZ-18) arma su orden fijo en `PropuestaQueryService.AGENDA_SORT`
+  y descarta el `Sort` del cliente.
 - **La baja es física**, como se decidió. Cuando exista `Itinerario`, un itinerario que
   referencie un evento dado de baja va a quedar con referencia colgante: hay que decidir si
   el `DELETE` valida itinerarios asociados. Pendiente para el sprint de `Itinerario`.
@@ -266,7 +271,7 @@ Decisiones que no son obvias y conviene no deshacer sin motivo:
 
 ### Paginación
 
-Los cuatro listados (`/api/eventos`, `/api/publicadores`, `/api/agenda/semanal` y
+Los cinco listados (`/api/eventos`, `/api/publicadores`, `/api/agenda`, `/api/agenda/semanal` y
 `/api/publicadores/{id}/eventos`) devuelven `PagedModel` con `?page` y `?size`. El JSON tiene
 esta forma:
 
@@ -318,6 +323,33 @@ Decisiones que no son obvias y conviene no deshacer sin motivo:
 Deuda conocida: `usuario` es un `String` sin FK, igual que el `email` de `Publicador`. Cuando
 exista `Usuario`/autenticación hay que migrar a una relación real.
 
+## API del Sprint 3 — Agenda turística (VZ-18)
+
+| Método | Ruta | Caso de uso |
+| --- | --- | --- |
+| GET | `/api/agenda?fechaDesde=&fechaHasta=&tipoPropuesta=&categoria=&ubicacion=&tipoAcceso=&page=&size=` | VZ-18 — agenda filtrable, ordenada por fecha y con detalle en `/api/eventos/{id}` |
+
+Decisiones que no son obvias:
+
+- **`/api/agenda` es distinta de `/api/agenda/semanal`.** La semanal (US6) conserva su contrato:
+  ventana de hoy al domingo, sin filtros y con `EventoResponse`. La nueva agenda acepta filtros y
+  devuelve `PropuestaResumenResponse`, pero **siempre solo eventos** (`tipo = EVENTO`).
+- **El orden es fijo y lo pone el backend**: `fechaInicio ASC, horarioInicio ASC`. El `Pageable` del
+  cliente se ignora a propósito; no es una preferencia del usuario. El orden vive en
+  `PropuestaQueryService.AGENDA_SORT`, no en el nombre del método del repository.
+- **Sin `fechaDesde` la ventana arranca hoy** (`LocalDate.now(clock)`), así los eventos terminados
+  no aparecen. La comparación es por **solapamiento**: `fechaFin >= fechaDesde` y
+  `fechaInicio <= fechaHasta`, igual que la agenda semanal.
+- **Se excluyen los `CANCELADO`** con `PropuestaSpecifications.notCancelled()`. No se excluyen los
+  `FINALIZADO` por nombre de estado: los saca la ventana de fechas.
+- **`ubicacion` es texto libre** sobre `localidad`, `lugarRecinto` y `direccion`, sin distinguir
+  mayúsculas ni tildes. La normalización se hace en Java (`Normalizer`) y en SQL/H2 con
+  `translate(...)`; `localidad` exacta usa la misma normalización. Agregar tildes nuevas obliga a
+  extender `ACCENTED`/`UNACCENTED` en `PropuestaSpecifications`.
+- **El detalle reutiliza `GET /api/eventos/{id}`**; no hay endpoint de detalle de agenda.
+- **`/api/propuestas` también acepta `ubicacion`** (mismo criterio), además de los filtros que ya
+  tenía.
+
 ## Servicios
 
 `EventoService` y `PublicadorService` usan Lombok `@RequiredArgsConstructor` (todos los collaborators
@@ -325,7 +357,7 @@ son `final`), y `@Transactional` **granular**:
 
 - `@Transactional` en las escrituras (`create`, `update`, `delete`).
 - `@Transactional(readOnly = true)` en las lecturas (`findById`, `findByPublicadorId`,
-  `findWeeklyAgenda`).
+  `findWeeklyAgenda`, `searchAgenda`).
 
 No poner `@Transactional` a nivel de clase: se mixte con la granularidad de solo lectura. Y como
 `open-in-view=false`, el service mapea entidad → DTO **dentro** de la transacción, antes de
@@ -464,26 +496,33 @@ Las anotaciones de test **cambiaron de package**. Importar desde el package viej
 `@MockBean` ya no existe. Para tests unitarios con Mockito alcanza con
 `@ExtendWith(MockitoExtension.class)` + `@Mock`, sin contexto de Spring.
 
-Reparto actual (134 tests):
+Reparto actual (207 tests; 5 fallos preexistentes en `PropuestaTuristicaTest` y `ActividadServiceTest` por `tiposPermitidos`):
 
 | Archivo | Tests | Cubre |
 | --- | --- | --- |
-| `EventoServiceTest` | 23 | US1–US5, US7, reglas de negocio, arancel, estado, geocoding |
+| `PropuestaServiceTest` | 23 | US1–US5, US7, reglas de negocio, arancel, estado, geocoding |
+| `PropuestaRepositoryTest` | 18 | listado unificado, filtros, orden, **agenda VZ-18 (orden, solapamiento, cancelados, ubicación sin tildes)** |
+| `ViajeControllerTest` | 17 | VZ-19/VZ-21/VZ-22/VZ-23, 400/404, `?usuario` obligatorio |
 | `EventoRepositoryTest` | 16 | solapamiento, bordes, orden, paginación, filtro por publicador, listado completo |
 | `EventoControllerTest` | 15 | US1–US4, US7, errores 400/404, cuerpo inválido |
-| `ViajeControllerTest` | 14 | VZ-19/VZ-21/VZ-22/VZ-23, 400/404, `?usuario` obligatorio |
+| `PropuestaTuristicaTest` | 11 | invariantes del modelo base (**4 fallos preexistentes por `tiposPermitidos`**) |
+| `ViajeTest` | 11 | modelo de viaje, transiciones y validaciones |
+| `ViajeServiceTest` | 11 | VZ-19–VZ-23, baja lógica, fecha invertida, 404 |
 | `PublicadorControllerTest` | 10 | validación, ruta anidada, página vacía, US7, **email duplicado → 400** |
+| `ActividadServiceTest` | 9 | reglas de actividad (**1 fallo preexistente por `tiposPermitidos`**) |
+| `ActividadControllerTest` | 8 | CRUD de `/api/actividades`, validación, 400/404 |
+| `AgendaControllerTest` | 7 | `/api/agenda` (filtros, orden fijo, 400) y `/api/agenda/semanal` (paginación, tope de `size`) |
 | `AgendaSemanalTest` | 7 | límites de la semana ISO, paginación |
 | `PublicadorServiceTest` | 7 | alta, consulta, 404, US7, **pre-chequeo de email** |
-| `ViajeServiceTest` | 7 | VZ-19–VZ-23, baja lógica, fecha invertida, 404 |
 | `ImagenServiceTest` | 6 | **guardar/borrar, magic bytes, tope 5 MB, anti path traversal (`@TempDir`)** |
 | `GeocodingServiceTest` | 5 | **dedup de la query de Nominatim, campos vacíos, provincia** |
+| `PublicadorRepositoryTest` | 5 | orden alfabético, paginación, página vacía, **derived query + constraint de unicidad** |
 | `ViajeMapperTest` | 4 | mapeo entidad↔DTO, fechas `LocalDate`↔`LocalDateTime` |
 | `ViajeRepositoryTest` | 4 | activos por usuario, exclusión de cancelados, orden |
 | `ImagenControllerTest` | 4 | **POST/DELETE de `/api/imagenes`, parte faltante y archivo vacío → 400** |
-| `AgendaControllerTest` | 4 | forma del JSON paginado, `?page`/`?size`, tope de `size` |
+| `PropuestaControllerTest` | 3 | listado unificado, filtros (incluida `ubicacion`), 400 |
+| `EstadoViajeTest` | 3 | transiciones válidas e inválidas |
 | `ImagenServingTest` | 2 | **sirve la imagen subida bajo `/api/archivos`; inexistente → 404** |
-| `PublicadorRepositoryTest` | 5 | orden alfabético, paginación, página vacía, **derived query + constraint de unicidad** |
 | `TurismoBackendApplicationTests` | 1 | `contextLoads` |
 
 Convenciones de los tests: los **identificadores** van en inglés (métodos, constantes, locales,

@@ -55,6 +55,7 @@ class PropuestaControllerTest {
 						.param("tipoPropuesta", "FESTIVAL")
 						.param("categoria", "CULTURA")
 						.param("localidad", "Cosquín")
+						.param("ubicacion", "Plaza Próspero Molina")
 						.param("q", "folklore")
 						.param("fechaDesde", "2026-10-01")
 						.param("fechaHasta", "2026-10-31")
@@ -73,6 +74,7 @@ class PropuestaControllerTest {
 		org.assertj.core.api.Assertions.assertThat(filtro.tipoPropuesta()).isEqualTo(TipoPropuesta.FESTIVAL);
 		org.assertj.core.api.Assertions.assertThat(filtro.categoria()).isEqualTo(InteresCategoria.CULTURA);
 		org.assertj.core.api.Assertions.assertThat(filtro.localidad()).isEqualTo("Cosquín");
+		org.assertj.core.api.Assertions.assertThat(filtro.ubicacion()).isEqualTo("Plaza Próspero Molina");
 		org.assertj.core.api.Assertions.assertThat(filtro.q()).isEqualTo("folklore");
 		org.assertj.core.api.Assertions.assertThat(filtro.fechaDesde()).isEqualTo(LocalDate.parse("2026-10-01"));
 		org.assertj.core.api.Assertions.assertThat(filtro.fechaHasta()).isEqualTo(LocalDate.parse("2026-10-31"));

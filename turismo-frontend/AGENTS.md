@@ -3,19 +3,20 @@
 ## Contexto
 
 Tesis de facultad: **este proyecto es solo el frontend**. La API REST de Spring Boot vive en
-`../turismo-backend` y expone eventos, publicadores y agenda semanal. Acá no va código de
+`../turismo-backend` y expone eventos, publicadores, propuestas y agenda. Acá no va código de
 servidor ni lógica de negocio: la UI **consume** la API.
 
 Los dos proyectos viven en el **mismo repositorio git**, como subcarpetas. Eso no los hace
 acoplados de build: cada uno tiene su `package.json` / `pom.xml` y sus propios comandos.
 
-- Estado actual: Sprint 1 completo. Listados paginados de eventos y publicadores, detalle de
-  ambos, agenda semanal, **CRUD de eventos y alta de publicadores**, y ruta 404. El alta/edición
+- Estado actual: Sprint 1 completo y **agenda turística VZ-18** (Sprint 3). Listados paginados de
+  eventos y publicadores, detalle de ambos, agenda, **CRUD de eventos y alta de publicadores**, y
+  ruta 404. La agenda (VZ-18) filtra y pagina en el servidor. El alta/edición
   de eventos ya soporta **tipo de acceso y arancel** (`GRATUITO` / `DE_PAGO` con monto y link al
   sitio oficial) y **ubicación con mapa** (Leaflet + OpenStreetMap), incluido un **selector de
-  ubicación** con buscador y pin arrastrable. **151 tests en total (149 en verde).** Los 2 que
-  fallan son de `planificador-page.test.tsx` (`Viajesazo` y `/cerrar/i`), de otro sprint; son
-  deuda aparte, no los rompió el selector.
+  ubicación** con buscador y pin arrastrable. **177 tests en 19 archivos (168 en verde).** Los 9
+  que fallan son preexistentes y ajenos: 8 de `eventos-page.test.tsx` (mockea `/api/eventos` y la
+  página usa `/api/propuestas`) y 1 de `evento-editar-page.test.tsx` (validación de fecha).
 - Sigue sin autenticación: cualquiera que abra la app puede crear, editar y borrar eventos. Es
   una limitación conocida del alcance de la tesis, no una decisión de diseño closed.
 - Para la API ver el `AGENTS.md` y el `PRUEBAS-MANUALES.md` de `../turismo-backend`.
@@ -56,9 +57,13 @@ Cosas que se olvidan fácil y ya están resueltas en el código, para no volver 
   pedir y la vista muestra un mensaje honesto.
 - **`content: []` con 200 es una respuesta válida**, no un error: publicador sin eventos, base
   recién arrancada. Es estado vacío, se maneja distinto al error.
-- **La agenda usa el reloj del servidor**: la ventana va de hoy al domingo, así que la cantidad
-  de eventos cambia según el día de la semana en que se levanta la app. No se puede fijar un
-  total esperado ni en la UI ni en los tests.
+- **La agenda filtra en el servidor**: `useAgenda` manda `fechaDesde`/`fechaHasta`,
+  `tipoPropuesta`, `categoria`, `ubicacion`, `tipoAcceso`, `page` y `size` a `GET /api/agenda`.
+  El cliente no vuelve a filtrar ni a ordenar: el backend ya devuelve solo eventos no cancelados,
+  ordenados por fecha/hora, y pagina. `keepPreviousData` evita el parpadeo al cambiar de página.
+- **`/api/agenda` no es la agenda semanal**: la semanal (`/api/agenda/semanal`, US6) va de hoy al
+  domingo y no acepta filtros; su cantidad de eventos depende del día en que se corre la app. La
+  agenda turística (VZ-18) usa una ventana abierta y filtros explícitos.
 - **El cuerpo de error va en inglés** (`status`, `error`, `message`, `timestamp`) pero el
   **valor** de `message` está en español. El catch-all de 500 filtra el detalle a propósito, así
   que para 500 solo hay un texto genérico: ver `toUserMessage`.
@@ -231,8 +236,8 @@ Cuidado con los bordes de la paginación: `pointer-events-none` depende del CSS 
 
 ## Tests
 
-Vitest + Testing Library + MSW. 151 tests en 15 archivos (2 del `planificador-page` en rojo, de
-otro sprint).
+Vitest + Testing Library + MSW. 177 tests en 19 archivos (9 en rojo, preexistentes y ajenos a la
+agenda: 8 de `eventos-page` y 1 de `evento-editar-page`).
 
 - **Nominatim se mockea con handlers MSW** (`/nominatim/search` y `/nominatim/reverse`), igual que
   la API: `onUnhandledRequest: 'error'` no perdona una request real. El test del selector mockea

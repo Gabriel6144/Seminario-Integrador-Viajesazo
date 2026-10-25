@@ -4,8 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -38,6 +41,9 @@ import com.viajesazo.turismo_backend.service.PropuestaQueryService;
 @DataJpaTest
 class PropuestaRepositoryTest {
 
+	private static final Clock FIXED_CLOCK = Clock.fixed(
+			Instant.parse("2026-10-15T00:00:00Z"), ZoneOffset.UTC);
+
 	@Autowired
 	private PropuestaRepository propuestaRepository;
 
@@ -61,7 +67,7 @@ class PropuestaRepositoryTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new PropuestaQueryService(propuestaRepository, new PropuestaResumenMapper());
+		service = new PropuestaQueryService(propuestaRepository, new PropuestaResumenMapper(), FIXED_CLOCK);
 		publisher = publicadorRepository.save(Publicador.builder()
 				.nombre("Turismo Córdoba")
 				.email("info@cordoba.gob.ar")
@@ -154,7 +160,7 @@ class PropuestaRepositoryTest {
 	void filtersByPublisherAndState() {
 		Page<PropuestaResumenResponse> page = search(
 				new PropuestaFiltro(null, null, null, null, null, NombreEstado.INICIADO, publisher.getId(),
-						null, null, null, null),
+						null, null, null, null, null),
 				Sort.unsorted());
 
 		assertThat(page.getTotalElements()).isEqualTo(4);
@@ -222,15 +228,127 @@ class PropuestaRepositoryTest {
 				.hasMessageContaining("precio");
 	}
 
+	@Test
+	@DisplayName("VZ-18 CA1: la agenda solo trae eventos y los ordena por fecha aunque pidan otro orden")
+	void agendaReturnsOnlyEventsOrderedByDate() {
+		Page<PropuestaResumenResponse> page = agenda(
+				agendaFiltro(null, null, null, null, LocalDate.parse("2026-10-01"), null),
+				Sort.by(Sort.Direction.DESC, "nombre"));
+
+		assertThat(page.getContent()).extracting(PropuestaResumenResponse::nombre)
+				.containsExactly("Festival de Folklore", "Maratón de las Sierras");
+		assertThat(page.getContent()).extracting(PropuestaResumenResponse::tipo)
+				.containsOnly(TipoRegistro.EVENTO);
+	}
+
+	@Test
+	@DisplayName("VZ-18 CA1: por defecto la agenda excluye los eventos ya terminados")
+	void agendaExcludesPastEventsByDefault() {
+		Page<PropuestaResumenResponse> page = agenda(agendaFiltro(null, null, null, null, null, null),
+				Sort.unsorted());
+
+		assertThat(page.getContent()).extracting(PropuestaResumenResponse::nombre)
+				.containsExactly("Maratón de las Sierras");
+	}
+
+	@Test
+	@DisplayName("VZ-18 CA2: la agenda incluye eventos en curso dentro del rango de fechas")
+	void agendaIncludesOngoingEventsInDateRange() {
+		propuestaRepository.save(evento("Evento en curso", "Sigue vigente", TipoPropuesta.FERIA,
+				InteresCategoria.CULTURA, LocalDate.parse("2026-10-10"), LocalDate.parse("2026-10-20")));
+
+		Page<PropuestaResumenResponse> page = agenda(
+				agendaFiltro(null, null, null, null, LocalDate.parse("2026-10-15"), LocalDate.parse("2026-10-16")),
+				Sort.unsorted());
+
+		assertThat(page.getContent()).extracting(PropuestaResumenResponse::nombre)
+				.containsExactly("Evento en curso");
+	}
+
+	@Test
+	@DisplayName("VZ-18 CA2: la ubicación busca en localidad, recinto y dirección sin tildes")
+	void agendaFiltersByUbicacionText() {
+		Ubicacion jesusMaria = ubicacionRepository.save(Ubicacion.builder()
+				.ciudad("Jesús María")
+				.localidad("Jesús María")
+				.direccion("Av. San Martín 100")
+				.latitud(new BigDecimal("-30.98000000"))
+				.longitud(new BigDecimal("-64.09000000"))
+				.build());
+		Evento pena = evento("Peña de Jesús María", "Música en vivo", TipoPropuesta.FESTIVAL,
+				InteresCategoria.MUSICA, LocalDate.parse("2026-10-20"), LocalDate.parse("2026-10-21"));
+		pena.setUbicacion(jesusMaria);
+		pena.setLugarRecinto("Plaza San Martín");
+		propuestaRepository.save(pena);
+
+		assertThat(agenda(agendaFiltro(null, null, null, "jesus maria", null, null), Sort.unsorted())
+				.getContent()).extracting(PropuestaResumenResponse::nombre)
+						.containsExactly("Peña de Jesús María");
+		assertThat(agenda(agendaFiltro(null, null, null, "plaza san martin", null, null), Sort.unsorted())
+				.getContent()).extracting(PropuestaResumenResponse::nombre)
+						.containsExactly("Peña de Jesús María");
+		assertThat(agenda(agendaFiltro(null, null, null, "san martin 100", null, null), Sort.unsorted())
+				.getContent()).extracting(PropuestaResumenResponse::nombre)
+						.containsExactly("Peña de Jesús María");
+	}
+
+	@Test
+	@DisplayName("VZ-18 CA2: combina tipo de propuesta, categoría y tipo de acceso")
+	void agendaFiltersByTypeCategoryAndAccess() {
+		Evento jazz = evento("Festival de Jazz", "Música", TipoPropuesta.FESTIVAL,
+				InteresCategoria.MUSICA, LocalDate.parse("2026-10-20"), LocalDate.parse("2026-10-21"));
+		jazz.setTipoAcceso(TipoAcceso.DE_PAGO);
+		jazz.setMontoEstimado(new BigDecimal("15000"));
+		jazz.setSitioOficial("https://jazz.example.com");
+		propuestaRepository.save(jazz);
+
+		Page<PropuestaResumenResponse> page = agenda(
+				agendaFiltro(TipoPropuesta.FESTIVAL, InteresCategoria.MUSICA, TipoAcceso.DE_PAGO, null, null, null),
+				Sort.unsorted());
+
+		assertThat(page.getContent()).extracting(PropuestaResumenResponse::nombre)
+				.containsExactly("Festival de Jazz");
+	}
+
+	@Test
+	@DisplayName("VZ-18 CA2: la agenda excluye las propuestas canceladas")
+	void agendaExcludesCancelledEvents() {
+		EstadoPropuesta cancelado = estadoPropuestaRepository.save(EstadoPropuesta.builder()
+				.nombre("CANCELADO")
+				.descripcion("Propuesta cancelada")
+				.build());
+		Evento canceladoEvent = evento("Evento cancelado", "No debe aparecer", TipoPropuesta.FERIA,
+				InteresCategoria.CULTURA, LocalDate.parse("2026-10-20"), LocalDate.parse("2026-10-21"));
+		canceladoEvent.setEstadoPropuesta(cancelado);
+		propuestaRepository.save(canceladoEvent);
+
+		Page<PropuestaResumenResponse> page = agenda(agendaFiltro(null, null, null, null, null, null),
+				Sort.unsorted());
+
+		assertThat(page.getContent()).extracting(PropuestaResumenResponse::nombre)
+				.containsExactly("Maratón de las Sierras");
+	}
+
 	private Page<PropuestaResumenResponse> search(PropuestaFiltro filtro, Sort sort) {
 		Pageable pageable = PageRequest.of(0, 20, sort);
 		return service.search(filtro, pageable);
 	}
 
+	private Page<PropuestaResumenResponse> agenda(PropuestaFiltro filtro, Sort sort) {
+		Pageable pageable = PageRequest.of(0, 20, sort);
+		return service.searchAgenda(filtro, pageable);
+	}
+
 	private PropuestaFiltro filtro(TipoRegistro tipo, TipoPropuesta tipoPropuesta, InteresCategoria categoria,
 			String q, String localidad, LocalDate fechaDesde, LocalDate fechaHasta) {
-		return new PropuestaFiltro(tipo, tipoPropuesta, categoria, null, null, null, null, localidad, q,
+		return new PropuestaFiltro(tipo, tipoPropuesta, categoria, null, null, null, null, localidad, null, q,
 				fechaDesde, fechaHasta);
+	}
+
+	private PropuestaFiltro agendaFiltro(TipoPropuesta tipoPropuesta, InteresCategoria categoria,
+			TipoAcceso tipoAcceso, String ubicacion, LocalDate fechaDesde, LocalDate fechaHasta) {
+		return new PropuestaFiltro(TipoRegistro.EVENTO, tipoPropuesta, categoria, null, tipoAcceso, null, null,
+				null, ubicacion, null, fechaDesde, fechaHasta);
 	}
 
 	private Evento evento(String nombre, String descripcion, TipoPropuesta tipoPropuesta,
