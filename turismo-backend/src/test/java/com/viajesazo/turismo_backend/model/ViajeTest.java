@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 
@@ -46,7 +45,6 @@ class ViajeTest {
 	@DisplayName("no se puede planificar un viaje con fecha de inicio pasada")
 	void rejectsPastStartDate() {
 		Viaje viaje = viaje(EstadoViaje.BORRADOR);
-		viaje.setFechaInicio(LocalDateTime.parse("2026-10-14T00:00:00"));
 
 		assertThatThrownBy(() -> viaje.planificar(CLOCK))
 				.isInstanceOf(BusinessRuleException.class)
@@ -144,8 +142,8 @@ class ViajeTest {
 						.localidad("Córdoba")
 						.build())
 				.rangoInteresKm(35.0)
-				.fechaInicio(LocalDateTime.parse("2026-10-20T00:00:00"))
-				.fechaFin(LocalDateTime.parse("2026-10-22T00:00:00"))
+				.fechaInicio(LocalDate.parse("2026-10-20"))
+				.fechaFin(LocalDate.parse("2026-10-22"))
 				.ritmo(TipoRitmo.EQUILIBRADO)
 				.interesesCategoria(List.of(InteresCategoria.CULTURA))
 				.estado(estado)

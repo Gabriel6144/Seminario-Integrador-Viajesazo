@@ -3,6 +3,7 @@ package com.viajesazo.turismo_backend.mapper;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
@@ -34,7 +35,7 @@ public interface ViajeMapper {
     @Mapping(target = "estado", ignore = true)
     @Mapping(target = "pasoActual", ignore = true)
     @Mapping(target = "zonaInteres", source = "ubicacion")
-    @Mapping(target = "interesesCategoria", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    @Mapping(target = "interesesCategoria", source = "intereses")
     Viaje toEntity(ViajeRequest request);
 
     /**
@@ -47,27 +48,25 @@ public interface ViajeMapper {
     @Mapping(target = "estado", ignore = true)
     @Mapping(target = "pasoActual", ignore = true)
     @Mapping(target = "zonaInteres", ignore = true)
-    @Mapping(target = "interesesCategoria", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    @Mapping(target = "interesesCategoria", source = "intereses")
     void updateEntity(ViajeRequest request, @MappingTarget Viaje viaje);
 
+    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "estado", ignore = true)
+    @Mapping(target = "pasoActual", ignore = true)
     @Mapping(target = "zonaInteres", source = "ubicacion")
-    @Mapping(target = "interesesCategoria", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    @Mapping(target = "interesesCategoria", source = "interesesCategoria")
     Viaje toEntity(ViajeBorradorRequest request);
 
+    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "estado", ignore = true)
+    @Mapping(target = "pasoActual", ignore = true)
     @Mapping(target = "zonaInteres", ignore = true)
-    @Mapping(target = "interesesCategoria", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    @Mapping(target = "pasoActual", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    @Mapping(target = "nombre", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    @Mapping(target = "rangoInteresKm", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    @Mapping(target = "fechaInicio", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    @Mapping(target = "fechaFin", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    @Mapping(target = "ritmo", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+    @Mapping(target = "interesesCategoria", source = "interesesCategoria") 
     void updateEntity(ViajeBorradorRequest request, @MappingTarget Viaje viaje);
-
+ 
     @Mapping(target = "ubicacion", source = "zonaInteres")
     ViajeResponse toResponse(Viaje viaje);
 
