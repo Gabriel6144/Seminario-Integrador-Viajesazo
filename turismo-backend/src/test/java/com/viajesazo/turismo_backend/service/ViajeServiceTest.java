@@ -48,11 +48,14 @@ class ViajeServiceTest {
 	@Mock
 	private ViajeRepository viajeRepository;
 
+	@Mock
+	private CircuitoService circuitoService;
+
 	private ViajeService service;
 
 	@BeforeEach
 	void setUp() {
-		service = new ViajeService(viajeRepository, new ViajeMapperImpl(), CLOCK);
+		service = new ViajeService(viajeRepository, new ViajeMapperImpl(), CLOCK, circuitoService);
 	}
 
 	@Test

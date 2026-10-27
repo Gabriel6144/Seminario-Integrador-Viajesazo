@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.viajesazo.turismo_backend.dto.request.ViajeBorradorRequest;
 import com.viajesazo.turismo_backend.dto.request.ViajeRequest;
 import com.viajesazo.turismo_backend.dto.response.ViajeResponse;
+import com.viajesazo.turismo_backend.dto.response.CircuitoResponse;
 import com.viajesazo.turismo_backend.exception.BusinessRuleException;
 import com.viajesazo.turismo_backend.exception.ResourceNotFoundException;
 import com.viajesazo.turismo_backend.mapper.ViajeMapper;
@@ -28,6 +29,7 @@ public class ViajeService {
 	private final ViajeRepository viajeRepository;
 	private final ViajeMapper mapper;
 	private final Clock clock;
+	private final CircuitoService circuitoService;
 
 	/** VZ-19: registra el viaje. Nace {@code PLANIFICADO} y asociado a su turista. */
 	@Transactional
@@ -35,7 +37,7 @@ public class ViajeService {
 		validateCreationDate(request);
 		Viaje viaje = mapper.toEntity(request);
 		viaje.setEstado(EstadoViaje.PLANIFICADO);
-		return mapper.toResponse(viajeRepository.save(viaje));
+		return withCircuit(mapper.toResponse(viajeRepository.save(viaje)), viaje.getId());
 	}
 
 	/** VZ-21: modifica una plantilla activa. Un viaje dado de baja responde 404. */
@@ -48,7 +50,7 @@ public class ViajeService {
 
 		mapper.updateEntity(request, viaje);
 		mapper.updateUbicacion(request.ubicacion(), viaje.getZonaInteres());
-		return mapper.toResponse(viajeRepository.save(viaje));
+		return withCircuit(mapper.toResponse(viajeRepository.save(viaje)), viaje.getId());
 	}
 
 	/**
@@ -65,7 +67,7 @@ public class ViajeService {
 	/** Soporte de VZ-21: detalle para editar. Inactivos → 404. */
 	@Transactional(readOnly = true)
 	public ViajeResponse findById(Long id) {
-		return mapper.toResponse(getOrThrow(id));
+		return withCircuit(mapper.toResponse(getOrThrow(id)), id);
 	}
 
 	/** Guarda (crea) un borrador parcial. */
@@ -77,7 +79,7 @@ public class ViajeService {
 		if (viaje.getInteresesCategoria() == null) {
 			viaje.setInteresesCategoria(new ArrayList<>());
 		}
-		return mapper.toResponse(viajeRepository.save(viaje));
+		return withCircuit(mapper.toResponse(viajeRepository.save(viaje)), viaje.getId());
 	}
 
 	/** Actualiza un borrador existente, aplicando solo campos no nulos. */
@@ -97,7 +99,7 @@ public class ViajeService {
 		if (request.interesesCategoria() != null) {
 			viaje.setInteresesCategoria(new ArrayList<>(request.interesesCategoria()));
 		}
-		return mapper.toResponse(viajeRepository.save(viaje));
+		return withCircuit(mapper.toResponse(viajeRepository.save(viaje)), viaje.getId());
 	}
 
 	/** Listado de borradores del turista, paginado. */
@@ -112,7 +114,7 @@ public class ViajeService {
 	public ViajeResponse findDraftById(Long id) {
 		Viaje viaje = viajeRepository.findByIdAndEstado(id, EstadoViaje.BORRADOR)
 				.orElseThrow(() -> new ResourceNotFoundException("No existe el borrador con id " + id));
-		return mapper.toResponse(viaje);
+		return withCircuit(mapper.toResponse(viaje), id);
 	}
 
 	/** Completa el borrador: valida obligatorios y pasa a PLANIFICADO. */
@@ -122,7 +124,7 @@ public class ViajeService {
 				.orElseThrow(() -> new ResourceNotFoundException("No existe el borrador con id " + id));
 		viaje.planificar(clock);
 		viaje.setPasoActual(8);
-		return mapper.toResponse(viajeRepository.save(viaje));
+		return withCircuit(mapper.toResponse(viajeRepository.save(viaje)), id);
 	}
 
 	/** Baja lógica de un borrador: pasa a CANCELADO y deja de listarse. */
@@ -152,9 +154,11 @@ public class ViajeService {
 		if (request.fechaInicio().isBefore(LocalDate.now(clock))) {
 			throw new BusinessRuleException("La fecha de inicio debe ser igual o posterior a la fecha actual");
 		}
+
 		if (request.fechaFin().isBefore(request.fechaInicio())) {
 			throw new BusinessRuleException("La fecha de finalización no puede ser anterior a la de inicio");
 		}
+
 	}
 
 	private void validateUpdateDate(ViajeRequest request, Viaje viaje) {
@@ -271,6 +275,13 @@ public class ViajeService {
 		} catch (IllegalArgumentException e) {
 			throw new BusinessRuleException("Estado inválido: " + estado);
 		}
+	}
+
+	private ViajeResponse withCircuit(ViajeResponse response, Long viajeId) {
+		CircuitoResponse circuit = circuitoService.selected(viajeId);
+		return new ViajeResponse(response.id(), response.nombre(), response.ubicacion(),
+				response.rangoInteresKm(), response.fechaInicio(), response.fechaFin(), response.ritmo(),
+				response.interesesCategoria(), response.estado(), response.pasoActual(), response.usuario(), circuit);
 	}
 
 }

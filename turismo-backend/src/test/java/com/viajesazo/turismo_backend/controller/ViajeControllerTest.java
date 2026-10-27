@@ -31,12 +31,14 @@ import com.viajesazo.turismo_backend.config.AppConfig;
 import com.viajesazo.turismo_backend.dto.request.ViajeRequest;
 import com.viajesazo.turismo_backend.dto.response.UbicacionResponse;
 import com.viajesazo.turismo_backend.dto.response.ViajeResponse;
+import com.viajesazo.turismo_backend.dto.response.GeneracionCircuitoResponse;
 import com.viajesazo.turismo_backend.exception.BusinessRuleException;
 import com.viajesazo.turismo_backend.exception.ResourceNotFoundException;
 import com.viajesazo.turismo_backend.model.EstadoViaje;
 import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.model.TipoRitmo;
 import com.viajesazo.turismo_backend.service.ViajeService;
+import com.viajesazo.turismo_backend.service.CircuitoService;
 
 @WebMvcTest(ViajeController.class)
 // @WebMvcTest es un slice: sin el import, el Clock que usa GlobalExceptionHandler no existiría.
@@ -68,6 +70,9 @@ class ViajeControllerTest {
 
 	@MockitoBean
 	private ViajeService viajeService;
+
+	@MockitoBean
+	private CircuitoService circuitoService;
 
 	@Test
 	@DisplayName("VZ-19: registra el viaje y responde 201 con el viaje creado")
@@ -267,6 +272,32 @@ class ViajeControllerTest {
 				.andExpect(status().isBadRequest());
 	}
 
+	@Test
+	@DisplayName("genera el circuito y devuelve las alternativas")
+	void generatesCircuit() throws Exception {
+		when(circuitoService.generate(7L)).thenReturn(
+				new GeneracionCircuitoResponse(null, null, List.of(), true, "sin propuestas compatibles"));
+
+		mockMvc.perform(post("/api/viajes/7/circuito"))
+				.andExpect(status().isCreated())
+				.andExpect(jsonPath("$.distanciasEstimadas").value(true))
+				.andExpect(jsonPath("$.alternativas").isArray());
+	}
+
+	@Test
+	@DisplayName("selecciona una alternativa del circuito")
+	void selectsCircuitAlternative() throws Exception {
+		when(circuitoService.select(eq(7L), any())).thenReturn(
+				new GeneracionCircuitoResponse(null, com.viajesazo.turismo_backend.model.CircuitStrategy.INTERESES,
+						List.of(), true, null));
+
+		mockMvc.perform(post("/api/viajes/7/circuito/seleccion")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"estrategia\":\"INTERESES\"}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.estrategiaSeleccionada").value("INTERESES"));
+	}
+
 	private ViajeResponse response() {
 		return responseWithState(EstadoViaje.PLANIFICADO);
 	}
@@ -275,6 +306,6 @@ class ViajeControllerTest {
 		return new ViajeResponse(7L, "Escapada serrana",
 				new UbicacionResponse("Villa General Belgrano", "Córdoba", "Villa General Belgrano", -31.95, -64.55),
 				35.0, LocalDate.parse("2026-10-20"), LocalDate.parse("2026-10-22"),
-				TipoRitmo.EQUILIBRADO, List.of(InteresCategoria.CULTURA), estado, 8, USUARIO);
+				TipoRitmo.EQUILIBRADO, List.of(InteresCategoria.CULTURA), estado, 8, USUARIO, null);
 	}
 }

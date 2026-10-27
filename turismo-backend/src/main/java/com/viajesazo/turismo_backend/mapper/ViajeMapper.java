@@ -68,6 +68,7 @@ public interface ViajeMapper {
     void updateEntity(ViajeBorradorRequest request, @MappingTarget Viaje viaje);
  
     @Mapping(target = "ubicacion", source = "zonaInteres")
+    @Mapping(target = "circuito", ignore = true)
     ViajeResponse toResponse(Viaje viaje);
 
 

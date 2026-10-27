@@ -18,8 +18,11 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 import com.viajesazo.turismo_backend.dto.request.ViajeBorradorRequest;
+import com.viajesazo.turismo_backend.dto.request.SeleccionCircuitoRequest;
 import com.viajesazo.turismo_backend.dto.request.ViajeRequest;
 import com.viajesazo.turismo_backend.dto.response.ViajeResponse;
+import com.viajesazo.turismo_backend.dto.response.GeneracionCircuitoResponse;
+import com.viajesazo.turismo_backend.service.CircuitoService;
 import com.viajesazo.turismo_backend.service.ViajeService;
 
 import jakarta.validation.Valid;
@@ -31,6 +34,7 @@ import lombok.RequiredArgsConstructor;
 public class ViajeController {
 
     private final ViajeService viajeService;
+    private final CircuitoService circuitoService;
 
     /** VZ-19: registrar viaje. */
     @PostMapping
@@ -57,6 +61,22 @@ public class ViajeController {
     @GetMapping("/{id}")
     public ViajeResponse findById(@PathVariable Long id) {
         return viajeService.findById(id);
+    }
+
+    @PostMapping("/{id}/circuito")
+    public ResponseEntity<GeneracionCircuitoResponse> generateCircuit(@PathVariable Long id) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(circuitoService.generate(id));
+    }
+
+    @GetMapping("/{id}/circuito")
+    public GeneracionCircuitoResponse findCircuit(@PathVariable Long id) {
+        return circuitoService.find(id);
+    }
+
+    @PostMapping("/{id}/circuito/seleccion")
+    public GeneracionCircuitoResponse selectCircuit(@PathVariable Long id,
+            @Valid @RequestBody SeleccionCircuitoRequest request) {
+        return circuitoService.select(id, request);
     }
 
     /** Guarda un borrador parcial del circuito. */
