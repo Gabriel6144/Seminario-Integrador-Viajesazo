@@ -60,7 +60,7 @@ class ViajeControllerTest {
 			  "fechaInicio": "2026-10-20",
 			  "fechaFin": "2026-10-22",
 			  "ritmo": "EQUILIBRADO",
-			  "intereses": ["CULTURA"],
+			  "interesesCategoria": ["CULTURA"],
 			  "usuario": "turista@test.com"
 			}
 			""";

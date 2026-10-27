@@ -194,32 +194,27 @@ public class ViajeService {
 
 	
 	private void validateDraftRange(ViajeBorradorRequest request, Viaje viaje) {
-		// Validación: la nueva fecha de finalización no puede ser anterior a la fecha de inicio.
+		if (request.fechaInicio() == null || request.fechaFin() == null) {
+			return;
+		}
 		if (request.fechaFin().isBefore(request.fechaInicio())) {
 			throw new BusinessRuleException("La nueva fecha de finalización no puede ser anterior a la de inicio");
 		}
-		// Validación: la nueva fecha de inicio debe ser distinto a la fecha fin guardada
 		if (!request.fechaInicio().equals(viaje.getFechaInicio())) {
-			// Validación: no se puede modificar la fecha de inicio si el viaje ya comenzó.
-			// es opcional y lo hace mas robusto, porque ya sabemos que los viajes en curso no se pueden modificar.
-			if (viaje.getFechaInicio().isBefore(LocalDate.now(clock))) {
+			if (viaje.getFechaInicio() != null && viaje.getFechaInicio().isBefore(LocalDate.now(clock))) {
 				throw new BusinessRuleException("No se puede modificar la fecha de inicio de un viaje que ya comenzó");
 			}
-			// Validación: la nueva fecha de inicio no puede ser anterior a hoy
 			if (request.fechaInicio().isBefore(LocalDate.now(clock))) {
 				throw new BusinessRuleException("La nueva fecha de inicio no puede ser anterior a hoy");
 			}
 		}
-		// Validación: la nueva fecha de finalización debe ser distinto a la fecha fin guardada
 		if (!request.fechaFin().equals(viaje.getFechaFin())) {
-			// Validación: la nueva fecha de finalizacion no puede ser anterior a hoy.
 			if (request.fechaFin().isBefore(LocalDate.now(clock))) {
 				throw new BusinessRuleException("La nueva fecha de finalizacion no puede ser anterior a hoy");
 			}
-			if (viaje.getFechaFin().isBefore(LocalDate.now(clock))) {
-				throw new BusinessRuleException("La nueva fecha de finalizacion no puede ser anterior a la fecha de inicio");
+			if (viaje.getFechaFin() != null && viaje.getFechaFin().isBefore(LocalDate.now(clock))) {
+				throw new BusinessRuleException("La fecha de finalizacion no puede ser anterior a la fecha de inicio");
 			}
-
 		}
 	}
 
