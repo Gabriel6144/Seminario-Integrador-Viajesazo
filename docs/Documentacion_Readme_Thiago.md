@@ -146,4 +146,90 @@ para aplicar la regla de actualización parcial a todo el método. Así, cualqui
 se mapea automáticamente, ignorando los valores null para no pisar datos ya guardados en la base de datos, y dejando anotaciones explícitas solo para los 
 campos que cambian de nombre o que deben bloquearse siempre con ignore = true (como el id o el estado).
 
+---
+
+## 4- Bug de `pasoActual`: diagnóstico y corrección
+
+### ¿Qué se esperaba?
+`pasoActual` es un `Integer` en la entidad `Viaje` que indica el progreso del wizard de creación de borrador.
+El service lo setea en `8` al completar un borrador (`completeDraft`), y también debería poder ser persistido cuando el frontend actualiza el paso actual durante la carga del borrador.
+
+### ¿Qué pasaba realmente? — Tres puntos de falla encadenados
+
+**Punto 1 — `ViajeBorradorRequest` no tenía el campo:**
+El request del borrador no incluía `pasoActual`, entonces el frontend nunca podía enviarlo al backend.
+
+**Punto 2 — `ViajeMapper` lo ignoraba explícitamente en todos los paths de borrador:**
+Los cuatro mappings del mapper tenían `@Mapping(target = "pasoActual", ignore = true)`.
+Incluso si el campo hubiera existido en el request, MapStruct lo descartaba antes de llegar a la entidad.
+
+**Punto 3 — `ViajeService.completeDraft` era el único lugar donde se asignaba:**
+```java
+viaje.setPasoActual(8); // solo al completar, nunca en pasos intermedios
+```
+Esto significa que los pasos 1 a 7 nunca se persistían: el campo siempre quedaba `null` hasta que el borrador se completaba.
+
+### Correcciones aplicadas
+
+**Archivo 1 — `ViajeBorradorRequest.java`: agregar el campo**
+```java
+// ANTES: el campo no existía en el record
+public record ViajeBorradorRequest(String nombre, UbicacionRequest ubicacion, ...) {}
+
+// DESPUÉS: se agrega el campo (sin @NotNull, puede ser nulo entre pasos)
+public record ViajeBorradorRequest(
+    String nombre,
+    UbicacionRequest ubicacion,
+    double rangoInteresKm,
+    LocalDate fechaInicio,
+    LocalDate fechaFin,
+    TipoRitmo ritmo,
+    List<InteresCategoria> interesesCategoria,
+    String usuario,
+    Integer pasoActual   // ← NUEVO
+) {}
+```
+
+**Archivo 2 — `ViajeMapper.java`: quitar el `ignore` solo en los métodos de borrador**
+```java
+// ANTES: ignorado en toEntity(ViajeBorradorRequest)
+@BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+@Mapping(target = "id", ignore = true)
+@Mapping(target = "estado", ignore = true)
+@Mapping(target = "pasoActual", ignore = true)   // ← SE ELIMINA
+@Mapping(target = "zonaInteres", source = "ubicacion")
+Viaje toEntity(ViajeBorradorRequest request);
+
+// ANTES: ignorado en updateEntity(ViajeBorradorRequest, Viaje)
+@BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+@Mapping(target = "id", ignore = true)
+@Mapping(target = "estado", ignore = true)
+@Mapping(target = "pasoActual", ignore = true)   // ← SE ELIMINA
+@Mapping(target = "zonaInteres", ignore = true)
+void updateEntity(ViajeBorradorRequest request, @MappingTarget Viaje viaje);
+```
+
+> **Importante:** Los métodos que mapean desde `ViajeRequest` (viaje completo/planificado) **mantienen** el `@Mapping(target = "pasoActual", ignore = true)` porque un viaje planificado no expone el paso del wizard. El service lo setea a `8` manualmente en `completeDraft`.
+
+**Archivo 3 — `ViajeService.java`: sin cambios necesarios**
+El `setPasoActual(8)` en `completeDraft` ya estaba correcto. Con las correcciones anteriores, los pasos intermedios (1 a 7) también se persisten correctamente desde el frontend.
+
+### Diferencia clave: `NullValuePropertyMappingStrategy.IGNORE` vs `ignore = true`
+
+Este caso ilustra perfectamente la diferencia (también explicada en la sección 3):
+
+- `@Mapping(target = "pasoActual", ignore = true)` → **siempre ignorado**, venga con datos o no. Era el error: aunque el frontend mandara el paso, MapStruct lo descartaba.
+- `NullValuePropertyMappingStrategy.IGNORE` (vía `@BeanMapping`) → **ignorado solo si viene null**. Si el frontend manda `pasoActual: 3`, MapStruct lo actualiza en la entidad.
+
+### Mejores prácticas aplicadas
+
+| # | Práctica | Aplicación |
+|---|----------|------------|
+| 1 | DTOs separados por operación | `ViajeRequest` para viajes completos, `ViajeBorradorRequest` para borradores |
+| 2 | `ignore = true` solo para campos que nunca deben mapearse desde el cliente | `id`, `estado`, y `pasoActual` en ViajeRequest (planificado) |
+| 3 | `@BeanMapping(nullValuePropertyMappingStrategy = IGNORE)` para updates parciales | Permite que el cliente envíe solo los campos modificados sin pisar los demás |
+| 4 | `ReportingPolicy.ERROR` en el mapper | Detecta campos no mapeados en tiempo de compilación, evitando bugs silenciosos |
+| 5 | Lógica de dominio en la entidad | `planificar()`, `cancelar()`, `actualizarEstadoPorFechas()` viven en `Viaje` |
+| 6 | Validaciones en DTO vs en Service | Bean Validation en el DTO para fast-fail HTTP 400; reglas de negocio complejas en el Service |
+
 
