@@ -3,8 +3,9 @@
 API REST y cliente web para centralizar la información turística de la provincia de Córdoba
 (Argentina) y generar itinerarios personalizados según fechas, preferencias y disponibilidad.
 
-Sprint 1 completo (gestión de eventos y publicadores) y Sprint 2 completo (gestión de viajes:
-alta, edición, listado de activos y baja lógica).
+Sprint 1 completo (gestión de eventos y publicadores), Sprint 2 completo (gestión de viajes:
+alta, edición, listado de activos y baja lógica) y Sprint 3 completo (agenda turística y
+generación automática de circuitos).
 
 ## Estructura
 
@@ -29,9 +30,11 @@ cd turismo-backend
 ./mvnw spring-boot:run               # Unix
 ```
 
-Arranca con H2 en memoria y ejecuta `data.sql`, así que ya viene con **3 publicadores, 8
-eventos (cada uno con su imagen), 5 ubicaciones y 5 viajes** de ejemplo. El esquema se recrea
-en cada arranque (`create-drop`): lo que se carga o borra no sobrevive a un reinicio.
+Arranca con H2 en memoria y ejecuta `data.sql`, así que ya viene con **3 publicadores, 23 eventos
+(8 con imagen), 2 actividades, 30 ubicaciones y 5 viajes** de ejemplo. El bloque VZ-25 agrega 15
+propuestas futuras con fechas relativas para que los circuitos se puedan generar cualquier día.
+El esquema se recrea en cada arranque (`create-drop`): lo que se carga o borra no sobrevive a un
+reinicio.
 
 ### 2. El frontend (puerto 5173)
 
@@ -52,8 +55,8 @@ que poner un proxy inverso delante o habilitar CORS en el backend.
 
 | | Comando | Qué corre |
 | --- | --- | --- |
-| Backend | `.\mvnw.cmd clean test` | 117 tests (JUnit 5, Mockito, `@WebMvcTest`, `@DataJpaTest`) |
-| Frontend | `npm test` | 140 tests (Vitest, Testing Library, MSW) |
+| Backend | `.\mvnw.cmd clean test` | 229 tests: 227 en verde y 2 fallos preexistentes por fechas fijas (JUnit 5, Mockito, `@WebMvcTest`, `@DataJpaTest`) |
+| Frontend | `npm test` | 178 tests: 169 en verde y 9 fallos preexistentes de `eventos-page`/`evento-editar-page` (Vitest, Testing Library, MSW) |
 | Frontend | `npm run typecheck` | TypeScript sin emitir |
 | Frontend | `npm run lint` | oxlint |
 | Frontend | `npm run build` | typecheck + build de producción |
@@ -79,6 +82,10 @@ defaults de Spring Data en vez de la configuración del proyecto.
   decisiones de eventos/publicadores con su justificación.
 - [`docs/OPENSTREETMAP.md`](./docs/OPENSTREETMAP.md) — cómo se resuelven las coordenadas con
   Nominatim: búsqueda, reverse, dedup de la query y el caso real del 400.
+- [`docs/CIRCUITOS-AUTOMATICOS.md`](./docs/CIRCUITOS-AUTOMATICOS.md) — generación, selección
+  única, ventana horaria, snapshot y la trampa de orden de los ítems.
+- [`docs/PRUEBAS-MANUALES-POSTMAN.md`](./docs/PRUEBAS-MANUALES-POSTMAN.md) — flujo completo de
+  viajes y circuitos para probar desde Postman.
 
 ## Estado y limitaciones conocidas
 
@@ -98,6 +105,8 @@ defaults de Spring Data en vez de la configuración del proyecto.
 
 ## Sprints siguientes
 
-`Actividad`, `Itinerario`, `Usuario`, `Preferencia`, y el mapa con distancia y traslados. La
-baja de eventos es física, así que cuando exista `Itinerario` hay que decidir si el `DELETE`
-valida los itinerarios asociados: hoy no lo hace y dejaría referencias colgantes.
+`Usuario`, `Preferencia` y la edición manual de circuitos (VZ-27). La generación y selección de
+circuitos ya existe (VZ-25), con distancias estimadas por Haversine; regenerar, reordenar paradas
+o editar el itinerario todavía no. La baja de eventos es física, así que cuando exista un
+itinerario editable hay que decidir si el `DELETE` valida los circuitos asociados: hoy no lo hace
+y dejaría referencias colgantes.

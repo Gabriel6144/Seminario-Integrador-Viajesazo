@@ -442,6 +442,8 @@ export interface ViajeResponse {
   estado: EstadoViaje
   pasoActual: number | null
   usuario: string
+  /** Solo viene en el detalle; el listado de borradores no lo incluye. */
+  circuito?: CircuitoResponse | null
 }
 
 export interface ViajeRequest {
@@ -451,6 +453,70 @@ export interface ViajeRequest {
   fechaInicio: LocalDate
   fechaFin: LocalDate
   ritmo: TipoRitmo
-  interesesCategoria: InteresCategoria[]
+  intereses: InteresCategoria[]
   usuario: string
+}
+
+/**
+ * Estrategias del motor de circuitos. Son tres alternativas fijas que devuelve
+ * `POST /api/viajes/{id}/circuito`; el turista elige una sola vez.
+ */
+export const CIRCUIT_STRATEGIES = ['CERCANIA', 'INTERESES', 'DESCUBRIMIENTO'] as const
+
+export type CircuitStrategy = (typeof CIRCUIT_STRATEGIES)[number]
+
+export const CIRCUIT_STRATEGY_LABELS: Record<CircuitStrategy, string> = {
+  CERCANIA: 'Cerca de todo',
+  INTERESES: 'Según tus intereses',
+  DESCUBRIMIENTO: 'Para descubrir',
+}
+
+/** Espejo de `dto/response/CircuitoItemResponse.java`. El snapshot no depende de la propuesta. */
+export interface CircuitoItemResponse {
+  propuestaId: number
+  propuestaNombre: string
+  descripcion: string | null
+  categoria: InteresCategoria | null
+  tipo: TipoRegistro
+  fecha: LocalDate
+  orden: number
+  horaInicio: LocalTime | null
+  horaFin: LocalTime | null
+  trasladoKm: number
+  trasladoMinutos: number
+  disponible: boolean
+  motivoNoDisponible: string | null
+}
+
+/** Espejo de `dto/response/CircuitoAlternativaResponse.java`. */
+export interface CircuitoAlternativaResponse {
+  estrategia: CircuitStrategy
+  propuestas: CircuitoItemResponse[]
+  distanciaTotalKm: number
+  afinidadIntereses: number
+  categoriasCubiertas: InteresCategoria[]
+  advertencia: string | null
+}
+
+/** Espejo de `dto/response/CircuitoResponse.java`: la alternativa ya seleccionada en el detalle. */
+export interface CircuitoResponse {
+  generadoEn: string | null
+  estrategia: CircuitStrategy
+  alternativa: CircuitoAlternativaResponse
+  distanciasEstimadas: boolean
+  advertencia: string | null
+}
+
+/** Espejo de `dto/response/GeneracionCircuitoResponse.java`. */
+export interface GeneracionCircuitoResponse {
+  generadoEn: string | null
+  estrategiaSeleccionada: CircuitStrategy | null
+  alternativas: CircuitoAlternativaResponse[]
+  distanciasEstimadas: boolean
+  advertencia: string | null
+}
+
+/** Espejo de `dto/request/SeleccionCircuitoRequest.java`. */
+export interface SeleccionCircuitoRequest {
+  estrategia: CircuitStrategy
 }

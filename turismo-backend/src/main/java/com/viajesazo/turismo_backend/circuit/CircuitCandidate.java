@@ -10,6 +10,7 @@ import com.viajesazo.turismo_backend.model.TipoRegistro;
 public record CircuitCandidate(
         Long id,
         String name,
+        String description,
         TipoRegistro type,
         InteresCategoria category,
         double latitude,

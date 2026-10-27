@@ -1,17 +1,19 @@
 package com.viajesazo.turismo_backend.service;
 
 import java.time.Clock;
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -84,7 +86,11 @@ public class CircuitoService {
         for (GeneratedAlternative alternative : generated) {
             circuito.addAlternativa(toEntity(alternative));
         }
-        circuitoRepository.save(circuito);
+        try {
+            circuitoRepository.saveAndFlush(circuito);
+        } catch (DataIntegrityViolationException ex) {
+            throw new BusinessRuleException("el circuito del viaje ya fue generado");
+        }
         return toGenerationResponse(circuito);
     }
 
@@ -103,22 +109,20 @@ public class CircuitoService {
         return toGenerationResponse(circuitoRepository.save(circuito));
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public GeneracionCircuitoResponse find(Long viajeId) {
         Circuito circuito = findCircuit(viajeId);
         refreshAvailability(circuito);
-        circuitoRepository.save(circuito);
         return toGenerationResponse(circuito);
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public com.viajesazo.turismo_backend.dto.response.CircuitoResponse selected(Long viajeId) {
         Circuito circuito = circuitoRepository.findByViajeId(viajeId).orElse(null);
         if (circuito == null || circuito.getEstrategiaSeleccionada() == null) {
             return null;
         }
         refreshAvailability(circuito);
-        circuitoRepository.save(circuito);
         CircuitoAlternativa alternative = circuito.getAlternativas().stream()
                 .filter(item -> item.getEstrategia() == circuito.getEstrategiaSeleccionada())
                 .findFirst()
@@ -190,9 +194,9 @@ public class CircuitoService {
                     ? eventSlots(event, start, viaje.getFechaFin())
                     : activitySlots((Actividad) proposal, start, viaje.getFechaFin());
             if (!slots.isEmpty()) {
-                candidates.add(new CircuitCandidate(proposal.getId(), proposal.getNombre(), proposal.getTipo(),
-                        proposal.getCategoria(), location.getLatitud().doubleValue(), location.getLongitud().doubleValue(),
-                        slots));
+                candidates.add(new CircuitCandidate(proposal.getId(), proposal.getNombre(), proposal.getDescripcion(),
+                        proposal.getTipo(), proposal.getCategoria(), location.getLatitud().doubleValue(),
+                        location.getLongitud().doubleValue(), slots));
             }
         }
         return candidates;
@@ -238,6 +242,8 @@ public class CircuitoService {
             CircuitoItem item = new CircuitoItem();
             item.setPropuestaId(proposal.proposalId());
             item.setPropuestaNombre(proposal.proposalName());
+            item.setDescripcion(proposal.description());
+            item.setCategoria(proposal.category());
             item.setTipo(proposal.type());
             item.setFecha(proposal.date());
             item.setOrden(proposal.order());
@@ -263,22 +269,69 @@ public class CircuitoService {
     }
 
     private void refreshAvailability(Circuito circuito) {
-        Set<Long> unavailable = new java.util.HashSet<>();
-        for (PropuestaTuristica proposal : propuestaRepository.findAll()) {
-            NombreEstado state = proposal.getNombreEstado();
-            if (state == null || INACTIVE_STATES.contains(state)) {
-                unavailable.add(proposal.getId());
-            }
-        }
+        Map<Long, PropuestaTuristica> proposals = propuestaRepository.findAll().stream()
+                .collect(Collectors.toMap(PropuestaTuristica::getId, Function.identity()));
+        LocalDateTime now = LocalDateTime.now(clock);
         for (CircuitoAlternativa alternative : circuito.getAlternativas()) {
             for (CircuitoItem item : alternative.getItems()) {
-                if (unavailable.contains(item.getPropuestaId())
-                        || propuestaRepository.findById(item.getPropuestaId()).isEmpty()) {
-                    item.setDisponible(false);
-                    item.setMotivoNoDisponible("la propuesta ya no está disponible");
-                }
+                String reason = unavailableReason(item, proposals.get(item.getPropuestaId()), now);
+                item.setDisponible(reason == null);
+                item.setMotivoNoDisponible(reason);
             }
         }
+    }
+
+    private String unavailableReason(CircuitoItem item, PropuestaTuristica proposal, LocalDateTime now) {
+        if (proposal == null) {
+            return "la propuesta ya no está disponible";
+        }
+        NombreEstado state = proposal.getNombreEstado();
+        if (state == NombreEstado.CANCELADO) {
+            return "la propuesta está cancelada";
+        }
+        if (state == NombreEstado.FINALIZADO) {
+            return "la propuesta está finalizada";
+        }
+        if (LocalDateTime.of(item.getFecha(), item.getHoraFin()).isBefore(now)) {
+            return "la fecha de la propuesta ya pasó";
+        }
+        if (proposal instanceof Evento event) {
+            return eventChanged(event, item) ? "la propuesta cambió de fecha u horario" : null;
+        }
+        if (proposal instanceof Actividad activity) {
+            return activityUnavailable(activity, item) ? "la disponibilidad de la actividad cambió" : null;
+        }
+        return null;
+    }
+
+    private boolean eventChanged(Evento event, CircuitoItem item) {
+        if (event.getFechaInicio() == null || event.getFechaFin() == null) {
+            return false;
+        }
+        if (item.getFecha().isBefore(event.getFechaInicio()) || item.getFecha().isAfter(event.getFechaFin())) {
+            return true;
+        }
+        LocalTime start = event.getHorarioInicio() == null || event.getHorarioFin() == null
+                ? EVENT_START : event.getHorarioInicio();
+        LocalTime end = event.getHorarioInicio() == null || event.getHorarioFin() == null
+                ? EVENT_END : event.getHorarioFin();
+        return !start.equals(item.getHoraInicio()) || !end.equals(item.getHoraFin());
+    }
+
+    private boolean activityUnavailable(Actividad activity, CircuitoItem item) {
+        if (activity.getDisponibilidades() == null || item.getHoraInicio() == null || item.getHoraFin() == null) {
+            return true;
+        }
+        for (var availability : activity.getDisponibilidades()) {
+            if (availability.getDiaSemana() != item.getFecha().getDayOfWeek()) {
+                continue;
+            }
+            if (!item.getHoraInicio().isBefore(availability.getHoraInicio())
+                    && !item.getHoraFin().isAfter(availability.getHoraFin())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private GeneracionCircuitoResponse toGenerationResponse(Circuito circuito) {
@@ -292,10 +345,10 @@ public class CircuitoService {
 
     private CircuitoAlternativaResponse toResponse(CircuitoAlternativa alternative) {
         List<CircuitoItemResponse> items = alternative.getItems().stream()
-                .map(item -> new CircuitoItemResponse(item.getPropuestaId(), item.getPropuestaNombre(), item.getTipo(),
-                        item.getFecha(), item.getOrden(), item.getHoraInicio(), item.getHoraFin(),
-                        item.getTrasladoKm(), item.getTrasladoMinutos(), item.isDisponible(),
-                        item.getMotivoNoDisponible()))
+                .map(item -> new CircuitoItemResponse(item.getPropuestaId(), item.getPropuestaNombre(),
+                        item.getDescripcion(), item.getCategoria(), item.getTipo(), item.getFecha(), item.getOrden(),
+                        item.getHoraInicio(), item.getHoraFin(), item.getTrasladoKm(), item.getTrasladoMinutos(),
+                        item.isDisponible(), item.getMotivoNoDisponible()))
                 .toList();
         return new CircuitoAlternativaResponse(alternative.getEstrategia(), items, alternative.getDistanciaTotalKm(),
                 alternative.getAfinidadIntereses(), new LinkedHashSet<>(alternative.getCategoriasCubiertas()),

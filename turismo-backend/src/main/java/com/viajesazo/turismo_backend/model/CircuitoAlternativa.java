@@ -17,7 +17,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
-import jakarta.persistence.OrderColumn;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -57,7 +57,7 @@ public class CircuitoAlternativa {
     private String advertencia;
 
     @OneToMany(mappedBy = "alternativa", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderColumn(name = "orden")
+    @OrderBy("orden ASC")
     private List<CircuitoItem> items = new ArrayList<>();
 
     public void addItem(CircuitoItem item) {

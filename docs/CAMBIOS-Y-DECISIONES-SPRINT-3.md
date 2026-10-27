@@ -1,7 +1,9 @@
 # Cambios y decisiones — Sprint 3
 
-> **Estado:** implementado y verificado en backend.
-> **Última verificación:** 177 tests en verde, arranque con `data.sql` correcto y endpoints principales respondiendo 200.
+> **Estado:** implementado y verificado en backend y frontend.
+> **Última verificación:** 229 tests backend (227 en verde) y 178 tests frontend (169 en verde),
+> arranque con `data.sql` correcto y flujo de circuito generado/seleccionado respondiendo 201/200.
+> Los fallos restantes son preexistentes y ajenos a este sprint.
 > **Documento de API para frontend:** [`API-PROPUESTAS-FRONTEND.md`](./API-PROPUESTAS-FRONTEND.md)
 > **Documento histórico:** [`HERENCIA-PROPUESTA-TURISTICA.md`](./HERENCIA-PROPUESTA-TURISTICA.md). Ese documento fue el diseño inicial y quedó desactualizado; ante cualquier diferencia, manda este documento y el código.
 
@@ -20,11 +22,13 @@ Se completó:
 - Validaciones de dominio con respuesta `422 ProblemDetail`.
 - Control de concurrencia optimista con `@Version` y respuesta `409 ProblemDetail`.
 - Seed reescrito para el esquema nuevo, con fechas relativas y dos actividades de ejemplo.
-- 177 tests automatizados en verde.
+- Circuitos automáticos VZ-25: tres alternativas, snapshot persistido y selección única.
+- Integración del planificador en el frontend (pasos 9 y 10).
+- 229 tests backend y 178 tests frontend (con fallos preexistentes ajenos).
 
 Lo que **no** incluye este sprint:
 
-- Cambios en el frontend.
+- Edición manual, reordenamiento o regeneración de circuitos (VZ-27).
 - Migraciones de base de datos para producción (`create-drop` sigue siendo el modo de desarrollo).
 - Autenticación/autorización.
 - Pruebas reales contra Nominatim en la suite automatizada.
@@ -342,8 +346,8 @@ Resultado verificado con la app levantada:
 
 | Endpoint | Resultado |
 | --- | --- |
-| `/api/propuestas` | 10 propuestas (8 eventos + 2 actividades) |
-| `/api/eventos` | 8 eventos |
+| `/api/propuestas` | 25 propuestas (23 eventos + 2 actividades) |
+| `/api/eventos` | 23 eventos |
 | `/api/actividades` | 2 actividades |
 | `/api/agenda/semanal` | 2 eventos |
 | `/api/viajes?usuario=turista.demo@viajesazo.com` | 2 viajes |
@@ -361,8 +365,9 @@ cd turismo-backend
 
 > Usar siempre `clean test`. Un `application.properties` viejo en `target/test-classes` puede opacar el de `main`.
 
-Resultado: **207 tests, 202 en verde y 5 fallos preexistentes** (`PropuestaTuristicaTest` ×4 y
-`ActividadServiceTest` ×1, por `tiposPermitidos`).
+Resultado: **229 tests, 227 en verde y 2 fallos preexistentes por fechas fijas ya vencidas**
+(`ViajeMapperTest` ×1 y `ViajeTest` ×1). Los fallos de `tiposPermitidos` mencionados en versiones
+anteriores de este documento ya no existen.
 
 | Suite | Tests |
 | --- | ---: |
@@ -373,11 +378,14 @@ Resultado: **207 tests, 202 en verde y 5 fallos preexistentes** (`PropuestaTuris
 | `ImagenServingTest` | 2 |
 | `PropuestaControllerTest` | 3 |
 | `PublicadorControllerTest` | 10 |
-| `ViajeControllerTest` | 17 |
+| `ViajeControllerTest` | 23 |
 | `ViajeMapperTest` | 4 |
 | `EstadoViajeTest` | 3 |
 | `PropuestaTuristicaTest` | 11 |
 | `ViajeTest` | 11 |
+| `CircuitGeneratorTest` | 7 |
+| `CircuitoServiceTest` | 8 |
+| `CircuitoRepositoryTest` | 1 |
 | `EventoRepositoryTest` | 16 |
 | `PropuestaRepositoryTest` | 18 |
 | `PublicadorRepositoryTest` | 5 |
@@ -397,13 +405,15 @@ Cobertura conceptual:
 - Repositorios: agenda semanal, agenda turística VZ-18, filtros y orden del listado unificado.
 - Servicios: creación, actualización, borrado, geocodificación mockeada, errores.
 - Controllers: validación, 404, 422, 409, paginación y contrato JSON.
+- Circuitos VZ-25: motor, snapshot, selección única y recarga con ítems ordenados.
+- Frontend: flujo completo del planificador contra MSW (generar, elegir alternativa, guardar).
 
 No cubierto por la suite:
 
 - Llamadas reales a Nominatim.
 - Concurrencia real con dos transacciones.
 - Arranque con `data.sql` en CI (se verifica manualmente).
-- Frontend.
+- Ruteo real por calles; las distancias de circuitos son Haversine.
 
 ## 9. Incidente de truncado y recuperación
 
@@ -526,3 +536,19 @@ La app queda en `http://localhost:8080`.
 - [`ONBOARDING.md`](./ONBOARDING.md): guía de inicio del backend.
 - [`SPRINT-1.md`](./SPRINT-1.md) y [`SPRINT-2.md`](./SPRINT-2.md): alcance de sprints anteriores.
 - `turismo-backend/AGENTS.md`: convenciones y decisiones del backend.
+
+## 14. Circuitos automáticos (VZ-25)
+
+- `POST /api/viajes/{id}/circuito` genera `CERCANIA`, `INTERESES` y `DESCUBRIMIENTO`; se guardan
+  como snapshot y **no se regeneran**.
+- `POST /api/viajes/{id}/circuito/seleccion` elige una sola alternativa; una segunda respuesta es
+  `400`.
+- La ventana diaria es `06:00–23:59`; un evento sin horario ocupa `09:00–18:00`.
+- Las distancias son Haversine (30 km/h), por eso la respuesta trae `distanciasEstimadas=true`.
+- `CircuitoAlternativa.items` se ordena con `@OrderBy("orden ASC")`; usar `@OrderColumn` sobre la
+  misma columna rompe la recarga con elementos `null`.
+- El planificador del frontend persiste el viaje antes de generar; si la generación falla, el
+  reintento reutiliza el viaje ya creado.
+
+Detalle completo: [`CIRCUITOS-AUTOMATICOS.md`](./CIRCUITOS-AUTOMATICOS.md). Pruebas manuales:
+[`PRUEBAS-MANUALES-POSTMAN.md`](./PRUEBAS-MANUALES-POSTMAN.md).

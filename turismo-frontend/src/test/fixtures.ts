@@ -1,4 +1,10 @@
-import type { EventoResponse, Page, PublicadorResponse, ViajeResponse } from '@/types/api'
+import type {
+  EventoResponse,
+  GeneracionCircuitoResponse,
+  Page,
+  PublicadorResponse,
+  ViajeResponse,
+} from '@/types/api'
 
 /**
  * Datos de prueba.
@@ -238,3 +244,104 @@ export const BORRADORES: ViajeResponse[] = [
     usuario: 'turista_demo',
   },
 ]
+
+/**
+ * Respuesta de `POST /api/viajes/{id}/circuito`. Las tres alternativas son fijas y comparten
+ * fechas para que el test pueda recorrer los tabs sin depender del reloj. Los ítems traen el
+ * snapshot (`descripcion`/`categoria`) que devuelve el backend real.
+ */
+export const CIRCUITO: GeneracionCircuitoResponse = {
+  generadoEn: '2026-10-20T12:00:00',
+  estrategiaSeleccionada: null,
+  distanciasEstimadas: false,
+  advertencia: null,
+  alternativas: [
+    {
+      estrategia: 'CERCANIA',
+      distanciaTotalKm: 8.4,
+      afinidadIntereses: 0.5,
+      categoriasCubiertas: ['CULTURA', 'GASTRONOMIA'],
+      advertencia: null,
+      propuestas: [
+        {
+          propuestaId: 3,
+          propuestaNombre: 'Circuito Peatonal Histórico Córdoba Jesuítica',
+          descripcion: 'Recorrido patrimonial guiado por templos y museos fundacionales.',
+          categoria: 'CULTURA',
+          tipo: 'EVENTO',
+          fecha: '2026-11-01',
+          orden: 1,
+          horaInicio: '09:00:00',
+          horaFin: '11:00:00',
+          trasladoKm: 0,
+          trasladoMinutos: 0,
+          disponible: true,
+          motivoNoDisponible: null,
+        },
+        {
+          propuestaId: 2,
+          propuestaNombre: 'Semana Gastronómica de las Sierras Chicas',
+          descripcion: 'Sabores típicos y cocina criolla en el corazón de las Sierras Chicas.',
+          categoria: 'GASTRONOMIA',
+          tipo: 'EVENTO',
+          fecha: '2026-11-01',
+          orden: 2,
+          horaInicio: '12:30:00',
+          horaFin: '14:30:00',
+          trasladoKm: 3.2,
+          trasladoMinutos: 18,
+          disponible: true,
+          motivoNoDisponible: null,
+        },
+      ],
+    },
+    {
+      estrategia: 'INTERESES',
+      distanciaTotalKm: 12.7,
+      afinidadIntereses: 0.87,
+      categoriasCubiertas: ['CULTURA', 'MUSICA'],
+      advertencia: null,
+      propuestas: [
+        {
+          propuestaId: 1,
+          propuestaNombre: 'Festival de Doma y Folklore de Jesús María',
+          descripcion: 'La mayor fiesta de la tradición gaucha y música folklórica.',
+          categoria: 'MUSICA',
+          tipo: 'EVENTO',
+          fecha: '2026-11-01',
+          orden: 1,
+          horaInicio: '20:00:00',
+          horaFin: '23:30:00',
+          trasladoKm: 0,
+          trasladoMinutos: 0,
+          disponible: true,
+          motivoNoDisponible: null,
+        },
+      ],
+    },
+    {
+      estrategia: 'DESCUBRIMIENTO',
+      distanciaTotalKm: 21.3,
+      afinidadIntereses: 0.25,
+      categoriasCubiertas: ['NATURALEZA', 'HISTORIA'],
+      advertencia: 'Hay pocas propuestas compatibles; el itinerario puede quedar corto.',
+      propuestas: [
+        {
+          propuestaId: 3,
+          propuestaNombre: 'Circuito Peatonal Histórico Córdoba Jesuítica',
+          descripcion: 'Recorrido patrimonial guiado por templos y museos fundacionales.',
+          categoria: 'HISTORIA',
+          tipo: 'EVENTO',
+          fecha: '2026-11-01',
+          orden: 1,
+          horaInicio: '17:00:00',
+          horaFin: '19:00:00',
+          trasladoKm: 0,
+          trasladoMinutos: 0,
+          disponible: false,
+          motivoNoDisponible: 'la fecha de la propuesta ya pasó',
+        },
+      ],
+    },
+  ],
+}

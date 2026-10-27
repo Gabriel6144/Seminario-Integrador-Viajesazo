@@ -9,14 +9,15 @@ servidor ni lógica de negocio: la UI **consume** la API.
 Los dos proyectos viven en el **mismo repositorio git**, como subcarpetas. Eso no los hace
 acoplados de build: cada uno tiene su `package.json` / `pom.xml` y sus propios comandos.
 
-- Estado actual: Sprint 1 completo y **agenda turística VZ-18** (Sprint 3). Listados paginados de
-  eventos y publicadores, detalle de ambos, agenda, **CRUD de eventos y alta de publicadores**, y
-  ruta 404. La agenda (VZ-18) filtra y pagina en el servidor. El alta/edición
-  de eventos ya soporta **tipo de acceso y arancel** (`GRATUITO` / `DE_PAGO` con monto y link al
-  sitio oficial) y **ubicación con mapa** (Leaflet + OpenStreetMap), incluido un **selector de
-  ubicación** con buscador y pin arrastrable. **177 tests en 19 archivos (168 en verde).** Los 9
-  que fallan son preexistentes y ajenos: 8 de `eventos-page.test.tsx` (mockea `/api/eventos` y la
-  página usa `/api/propuestas`) y 1 de `evento-editar-page.test.tsx` (validación de fecha).
+- Estado actual: Sprints 1–3 completos. Listados paginados de eventos y publicadores, detalle de
+  ambos, agenda (VZ-18), **CRUD de eventos y alta de publicadores**, **planificador de viajes con
+  generación y selección de circuitos (VZ-25)** y ruta 404. La agenda filtra y pagina en el
+  servidor. El alta/edición de eventos soporta **tipo de acceso y arancel** (`GRATUITO` / `DE_PAGO`
+  con monto y link al sitio oficial) y **ubicación con mapa** (Leaflet + OpenStreetMap), incluido
+  un **selector de ubicación** con buscador y pin arrastrable. **178 tests en 19 archivos (169 en
+  verde).** Los 9 que fallan son preexistentes y ajenos: 8 de `eventos-page.test.tsx` (mockea
+  `/api/eventos` y la página usa `/api/propuestas`) y 1 de `evento-editar-page.test.tsx`
+  (validación de fecha).
 - Sigue sin autenticación: cualquiera que abra la app puede crear, editar y borrar eventos. Es
   una limitación conocida del alcance de la tesis, no una decisión de diseño closed.
 - Para la API ver el `AGENTS.md` y el `PRUEBAS-MANUALES.md` de `../turismo-backend`.
@@ -84,6 +85,11 @@ Cosas que se olvidan fácil y ya están resueltas en el código, para no volver 
   la borre de verdad.
 - **`publicadorNombre` viene aplanado**: es un JOIN del backend, no un campo del DTO de entrada.
   No se manda al crear ni al editar.
+- **`ViajeRequest` y `ViajeBorradorRequest` no comparten el nombre de los intereses**:
+  `POST/PUT /api/viajes` usa `intereses`; `POST/PUT /api/viajes/borradores` usa
+  `interesesCategoria`. El planificador arma ambos desde `buildViajeData()`; no castear un payload
+  de borrador a `ViajeRequest`, porque el backend responde `400` con “la lista de intereses no
+  puede estar vacía”. El handler de MSW valida `intereses` para que el test lo detecte.
 - **El alta/edición de un evento geocodifica de verdad**: el backend resuelve
   `lugarRecinto + direccion + localidad` con Nominatim (OpenStreetMap) y **rechaza con 400** si no
   encuentra la ubicación (`no se encontró la ubicación del evento: ...`). O sea, crear o editar un
@@ -96,6 +102,37 @@ Cosas que se olvidan fácil y ya están resueltas en el código, para no volver 
 - **El email duplicado responde 400 con un string plano** (`"ya existe un publicador con ese
   email"`), no con errores por campo. `PublicadorService` lo anticipa con `existsByEmail` para dar
   un mensaje claro en vez del error de constraint de H2.
+
+## Planificador y circuitos (VZ-25)
+
+`src/pages/planificador-page.tsx` orquesta los pasos 1–10. Los pasos 1–8 son el wizard; el 9 es la
+animación de generación y el 10 muestra las tres alternativas reales.
+
+- **El viaje se persiste antes de generar.** `runCircuitGeneration` completa el borrador o crea el
+  viaje, guarda `tripId` y recién ahí llama a `POST /api/viajes/{id}/circuito`. Si la generación
+  falla, el viaje ya quedó guardado: el reintento reutiliza `tripId` y no duplica el alta.
+- **La animación no decide el resultado.** El paso 9 muestra cuatro mensajes cada 1100 ms, pero
+  solo se pasa al 10 cuando terminó la animación **y** llegó el circuito. Un error cancela el
+  intervalo, muestra toast y vuelve al paso 8.
+- **La generación es única.** Si el backend responde `400` con "ya fue generado" (por ejemplo, al
+  reintentar), el page hace un `GET` del circuito existente y lo muestra; no vuelve a generar.
+- **La selección también es única.** `useSeleccionarCircuito` actualiza la caché del circuito; la
+  UI deshabilita el botón cuando `estrategiaSeleccionada !== null`. Cambiar de pestaña solo cambia
+  la vista (`activeStrategy`), no selecciona.
+- **`isTripSaved` se deriva de `tripId !== null`**, no de un flag aparte. El botón de guardado
+  cambia a "Ver en Mis viajes" cuando el viaje ya existe.
+- **`buildViajePayload` mapea los intereses de la UI a `InteresCategoria`** con `INTEREST_MAP`;
+  `interests` en el estado guarda los labels visibles. El `pasoActual` que se manda es el `step`
+  actual.
+- `useCircuito` existe para reabrir un circuito desde un viaje guardado; el flujo del wizard usa
+  las mutaciones de generación/selección.
+- **El detalle del viaje NO devuelve `GeneracionCircuitoResponse`**: `GET /api/viajes/{id}` trae
+  `circuito: { estrategia, alternativa, ... }` (singular), mientras que
+  `GET /api/viajes/{id}/circuito` trae `estrategiaSeleccionada` y `alternativas` (plural). En
+  `types/api.ts` son `CircuitoResponse` y `GeneracionCircuitoResponse` respectivamente.
+- **MSW replica el ciclo completo**: `POST /api/viajes`, `POST/GET /api/viajes/:id/circuito` y
+  `POST .../seleccion` sobre `src/test/store.ts`. El fixture `CIRCUITO` trae las tres estrategias
+  con paradas; sin ese estado, el test del paso 10 no podría verificar la selección.
 
 ## Escritura: cómo está armado
 
@@ -236,8 +273,8 @@ Cuidado con los bordes de la paginación: `pointer-events-none` depende del CSS 
 
 ## Tests
 
-Vitest + Testing Library + MSW. 177 tests en 19 archivos (9 en rojo, preexistentes y ajenos a la
-agenda: 8 de `eventos-page` y 1 de `evento-editar-page`).
+Vitest + Testing Library + MSW. 178 tests en 19 archivos (9 en rojo, preexistentes y ajenos a la
+agenda y al planificador: 8 de `eventos-page` y 1 de `evento-editar-page`).
 
 - **Nominatim se mockea con handlers MSW** (`/nominatim/search` y `/nominatim/reverse`), igual que
   la API: `onUnhandledRequest: 'error'` no perdona una request real. El test del selector mockea

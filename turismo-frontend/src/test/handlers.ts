@@ -7,18 +7,29 @@ import {
   allPublicadores,
   completeBorrador,
   createBorrador,
+  createCircuito,
   createEvento,
   createPublicador,
+  createViaje,
   deleteBorrador,
   deleteEvento,
   findBorrador,
+  findCircuito,
   findEvento,
   findPublicador,
   findPublicadorByEmail,
+  selectCircuito,
   updateBorrador,
   updateEvento,
 } from './store'
-import type { EventoRequest, PublicadorRequest, ViajeBorradorRequest } from '@/types/api'
+import { CIRCUIT_STRATEGIES } from '@/types/api'
+import type {
+  EventoRequest,
+  PublicadorRequest,
+  SeleccionCircuitoRequest,
+  ViajeBorradorRequest,
+  ViajeRequest,
+} from '@/types/api'
 
 /**
  * Handlers de MSW que replican la API real.
@@ -194,6 +205,87 @@ export const handlers = [
       return HttpResponse.json(errorBody(404, `No existe el borrador con id ${String(params.id)}`), { status: 404 })
     }
     return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.post('/api/viajes', async ({ request }) => {
+    const body = await readJson<Partial<ViajeRequest>>(request)
+    if (body.nombre === undefined || body.nombre.trim().length === 0) {
+      return HttpResponse.json(errorBody(400, 'nombre: el nombre es obligatorio'), { status: 400 })
+    }
+    if (!Array.isArray(body.intereses) || body.intereses.length === 0) {
+      return HttpResponse.json(
+        errorBody(400, 'intereses: La lista de intereses de categoría no puede estar vacía'),
+        { status: 400 },
+      )
+    }
+    return HttpResponse.json(createViaje(body as ViajeRequest), { status: 201 })
+  }),
+
+  http.get('/api/viajes/:id/circuito', ({ params }) => {
+    const viaje = findBorrador(Number(params.id))
+    if (viaje === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el viaje con id ${String(params.id)}`), {
+        status: 404,
+      })
+    }
+    const circuito = findCircuito(viaje.id)
+    if (circuito === undefined) {
+      return HttpResponse.json(errorBody(404, 'El viaje todavía no tiene un circuito generado'), {
+        status: 404,
+      })
+    }
+    return HttpResponse.json(circuito)
+  }),
+
+  http.post('/api/viajes/:id/circuito', ({ params }) => {
+    const viaje = findBorrador(Number(params.id))
+    if (viaje === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el viaje con id ${String(params.id)}`), {
+        status: 404,
+      })
+    }
+    if (findCircuito(viaje.id) !== undefined) {
+      return HttpResponse.json(
+        errorBody(400, 'el circuito del viaje ya fue generado; no se permite regenerarlo'),
+        { status: 400 },
+      )
+    }
+    return HttpResponse.json(createCircuito(viaje.id), { status: 201 })
+  }),
+
+  http.post('/api/viajes/:id/circuito/seleccion', async ({ params, request }) => {
+    const viaje = findBorrador(Number(params.id))
+    if (viaje === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el viaje con id ${String(params.id)}`), {
+        status: 404,
+      })
+    }
+    const body = await readJson<Partial<SeleccionCircuitoRequest>>(request)
+    if (body.estrategia === undefined || !CIRCUIT_STRATEGIES.includes(body.estrategia)) {
+      return HttpResponse.json(errorBody(400, 'la estrategia del circuito no es válida'), {
+        status: 400,
+      })
+    }
+    const circuito = findCircuito(viaje.id)
+    if (circuito === undefined) {
+      return HttpResponse.json(errorBody(404, 'El viaje todavía no tiene un circuito generado'), {
+        status: 404,
+      })
+    }
+    if (circuito.estrategiaSeleccionada !== null) {
+      return HttpResponse.json(
+        errorBody(400, 'el circuito del viaje ya tiene una alternativa seleccionada'),
+        { status: 400 },
+      )
+    }
+    if (!circuito.alternativas.some((alternativa) => alternativa.estrategia === body.estrategia)) {
+      return HttpResponse.json(
+        errorBody(400, 'la alternativa seleccionada no existe en el circuito generado'),
+        { status: 400 },
+      )
+    }
+    const seleccionado = selectCircuito(viaje.id, body.estrategia)
+    return HttpResponse.json(seleccionado)
   }),
 
   http.get('/api/agenda', ({ request }) => {

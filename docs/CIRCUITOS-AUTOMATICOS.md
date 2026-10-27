@@ -10,7 +10,7 @@ La API genera circuitos para un viaje registrado mediante `POST
 - `DESCUBRIMIENTO`: prioriza variedad y propuestas con menos días disponibles.
 
 El motor es determinista y está separado de Spring y de JPA. Las distancias se estiman con
-Haversine y una velocidad media configurable dentro del proveedor; la respuesta informa
+Haversine y una velocidad media fija de 30 km/h; la respuesta informa
 `distanciasEstimadas=true`. El proveedor se puede reemplazar sin modificar el algoritmo.
 
 ## Reglas confirmadas
@@ -47,3 +47,30 @@ Haversine y una velocidad media configurable dentro del proveedor; la respuesta 
 comparables (`distanciaTotalKm`, `afinidadIntereses`, `categoriasCubiertas`) y los ítems con
 fecha, orden, horario y traslado desde el ítem anterior. `GET /api/viajes/{id}` devuelve además
 la alternativa seleccionada, sin regenerarla.
+
+## Agenda y ventana horaria
+
+El motor planifica desde `max(hoy, fechaInicio)` hasta `fechaFin`, con una ventana diaria de
+**06:00 a 23:59**. Una actividad se agenda en el horario exacto de su franja de disponibilidad; el
+traslado desde la parada anterior tiene que caber antes del inicio. Un evento sin horario ocupa
+`09:00–18:00`. El ritmo fija el máximo de paradas por día: 2 (`TRANQUILO`), 3 (`EQUILIBRADO`) o 4
+(`INTENSIVO`).
+
+## Persistencia
+
+- El circuito se guarda como snapshot completo: nombre, descripción y categoría de cada propuesta,
+  además de fecha, orden, horario, traslado y disponibilidad.
+- `CircuitoAlternativa.items` se ordena con `@OrderBy("orden ASC")`. **No usar `@OrderColumn` sobre
+  `orden`**: duplica la columna, al releer la lista llegan elementos `null` y la respuesta explota
+  con NPE. Lo cubre `CircuitoRepositoryTest`.
+- El seed carga ubicaciones de propuestas que comparten ciudad. Las subconsultas de `data.sql` para
+  la zona del viaje deben filtrar además `direccion IS NULL`; si no, H2 devuelve más de una fila y
+  el seed falla.
+
+## En el frontend
+
+El planificador (`/planificador`) persiste el viaje y después llama a la generación. El paso 9 es
+solo animación: el paso 10 aparece cuando terminaron los mensajes y llegó la respuesta. Si la
+generación falla, el viaje ya quedó guardado y el reintento reutiliza ese `id` en vez de crear otro.
+La pantalla final permite comparar las tres estrategias, ver las paradas por día, seleccionar una
+sola alternativa y guardar el viaje en “Mis viajes”.

@@ -18,8 +18,8 @@ import com.viajesazo.turismo_backend.model.TipoRitmo;
 @Component
 public class CircuitGenerator {
 
-    private static final LocalTime DAY_START = LocalTime.of(9, 0);
-    private static final LocalTime DAY_END = LocalTime.of(18, 0);
+    private static final LocalTime PLANNING_DAY_START = LocalTime.of(6, 0);
+    private static final LocalTime PLANNING_DAY_END = LocalTime.of(23, 59);
 
     private final DistanceProvider distanceProvider;
 
@@ -45,7 +45,7 @@ public class CircuitGenerator {
         int dailyLimit = dailyLimit(rhythm);
 
         for (LocalDate day = start; !day.isAfter(end); day = day.plusDays(1)) {
-            LocalTime cursor = DAY_START;
+            LocalTime cursor = PLANNING_DAY_START;
             CircuitCandidate previous = null;
             int order = 1;
             while (order <= dailyLimit) {
@@ -60,14 +60,11 @@ public class CircuitGenerator {
                 }
                 TravelEstimate transfer = previous == null ? new TravelEstimate(0, 0)
                         : distance(previous, candidate);
-                LocalTime startTime = slot.start().plusMinutes(previous == null ? 0 : transfer.durationMinutes());
-                if (startTime.isAfter(slot.end())) {
-                    remaining.remove(candidate);
-                    continue;
-                }
+                LocalTime startTime = slot.start();
                 LocalTime endTime = slot.end();
-                scheduled.add(new ScheduledProposal(candidate.id(), candidate.name(), candidate.type(), day, order,
-                        startTime, endTime, transfer.distanceKm(), transfer.durationMinutes(), true, null));
+                scheduled.add(new ScheduledProposal(candidate.id(), candidate.name(), candidate.description(),
+                        candidate.type(), candidate.category(), day, order, startTime, endTime,
+                        transfer.distanceKm(), transfer.durationMinutes(), true, null));
                 totalDistance += transfer.distanceKm();
                 cursor = endTime;
                 previous = candidate;
@@ -77,9 +74,11 @@ public class CircuitGenerator {
             }
         }
 
-        String warning = candidates.size() > 1 && scheduled.size() < 2
-                ? "Hay pocas propuestas compatibles con las restricciones del viaje"
-                : null;
+        String warning = scheduled.isEmpty()
+                ? "No hay propuestas compatibles con las restricciones del viaje"
+                : candidates.size() > 1 && scheduled.size() < 2
+                        ? "Hay pocas propuestas compatibles con las restricciones del viaje"
+                        : null;
         return new GeneratedAlternative(strategy, scheduled, totalDistance,
                 affinity(scheduled, candidates, interests), covered, warning);
     }
@@ -111,15 +110,19 @@ public class CircuitGenerator {
 
     private CircuitCandidate.TimeSlot slotFor(CircuitCandidate candidate, LocalDate day,
             LocalTime cursor, CircuitCandidate previous) {
+        TravelEstimate transfer = previous == null ? new TravelEstimate(0, 0) : distance(previous, candidate);
+        LocalTime earliestArrival = cursor.plusMinutes(transfer.durationMinutes());
         for (CircuitCandidate.TimeSlot slot : candidate.slots()) {
-            if (!slot.date().equals(day) || slot.start().isBefore(cursor)) {
+            if (!slot.date().equals(day)) {
                 continue;
             }
-            TravelEstimate transfer = previous == null ? new TravelEstimate(0, 0) : distance(previous, candidate);
-            if (!slot.start().plusMinutes(transfer.durationMinutes()).isAfter(slot.end())
-                    && !slot.end().isAfter(DAY_END)) {
-                return slot;
+            if (slot.start().isBefore(PLANNING_DAY_START) || slot.end().isAfter(PLANNING_DAY_END)) {
+                continue;
             }
+            if (slot.start().isBefore(earliestArrival)) {
+                continue;
+            }
+            return slot;
         }
         return null;
     }

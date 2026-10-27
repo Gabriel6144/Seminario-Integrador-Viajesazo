@@ -38,6 +38,13 @@ public class CircuitoItem {
     @Column(nullable = false, length = 150)
     private String propuestaNombre;
 
+    @Column(length = 1000)
+    private String descripcion;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 32)
+    private InteresCategoria categoria;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
     private TipoRegistro tipo;

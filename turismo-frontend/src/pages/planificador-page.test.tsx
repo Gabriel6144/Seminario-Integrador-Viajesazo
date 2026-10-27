@@ -1,9 +1,20 @@
 import { screen } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { PlanificadorPage } from '@/pages/planificador-page'
 import { renderWithProviders } from '@/test/utils'
+
+// El mapa de destino es Leaflet puro y jsdom no tiene layout: se reemplaza por un stub.
+vi.mock('@/components/planificador/destino-mapa', () => ({
+  DestinoMapa: () => null,
+}))
+
+function isoDate(offsetDays: number): string {
+  const date = new Date()
+  date.setDate(date.getDate() + offsetDays)
+  return date.toISOString().slice(0, 10)
+}
 
 describe('PlanificadorPage', () => {
   it('renderiza la bienvenida (paso 1) y avanza al paso 2 al clickear Empecemos', async () => {
@@ -134,4 +145,47 @@ describe('PlanificadorPage', () => {
 
     expect(await screen.findByText(/borrador guardado correctamente/i)).toBeInTheDocument()
   })
+
+  it('crea el viaje, genera el circuito y permite elegir una alternativa', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<PlanificadorPage />)
+
+    await user.click(screen.getByRole('button', { name: /empecemos/i }))
+    await user.click(screen.getByRole('button', { name: 'Aventura cordobesa' }))
+    await user.click(screen.getByRole('button', { name: /continuar/i }))
+
+    await user.type(screen.getByLabelText(/fecha de llegada/i), isoDate(30))
+    await user.type(screen.getByLabelText(/fecha de partida/i), isoDate(32))
+    await user.click(screen.getByRole('button', { name: /continuar/i }))
+
+    await user.click(
+      screen.getByRole('button', { name: /Villa Carlos Paz \(Valle de Punilla\)/i }),
+    )
+    await user.click(screen.getByRole('button', { name: /continuar/i }))
+
+    await user.click(screen.getByRole('button', { name: /continuar/i }))
+    await user.click(screen.getByRole('button', { name: /Cultura/i }))
+    await user.click(screen.getByRole('button', { name: /continuar/i }))
+
+    await user.click(screen.getByRole('button', { name: /EQUILIBRADO/i }))
+    await user.click(screen.getByRole('button', { name: /continuar/i }))
+
+    await user.click(screen.getByRole('button', { name: /generar mi circuito/i }))
+
+    // La animación dura 4 pasos × 1100 ms; el circuito llega antes y la pantalla espera a las dos.
+    expect(
+      await screen.findByText('Itinerario Oficial', {}, { timeout: 8000 }),
+    ).toBeInTheDocument()
+    expect(screen.getAllByText(/cerca de todo/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/según tus intereses/i).length).toBeGreaterThan(0)
+
+    await user.click(screen.getByRole('button', { name: /elegir esta alternativa/i }))
+
+    expect(
+      await screen.findByRole('button', { name: /alternativa elegida/i }),
+    ).toBeDisabled()
+
+    await user.click(screen.getByRole('button', { name: /Ver en Mis viajes/i }))
+    expect(await screen.findByText(/guardado en mis viajes/i)).toBeInTheDocument()
+  }, 15000)
 })

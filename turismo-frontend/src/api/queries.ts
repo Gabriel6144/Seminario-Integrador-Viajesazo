@@ -43,6 +43,8 @@ export const queryKeys = {
   borradores: (page: number, size: number) => ['borradores', { page, size }] as const,
   borradoresAll: () => ['borradores'] as const,
   borrador: (id: number) => ['borrador', id] as const,
+  circuito: (viajeId: number) => ['circuito', viajeId] as const,
+  circuitosAll: () => ['circuito'] as const,
   /**
    * Prefijo de los eventos de un publicador. No es `['publicador', id]` a propósito: eso
    * matchearía también el detalle del publicador, que no tiene por qué refetchearse cuando

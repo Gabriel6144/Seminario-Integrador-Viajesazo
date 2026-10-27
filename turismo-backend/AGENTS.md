@@ -11,13 +11,15 @@ Tesis de facultad: API REST que centraliza la información turística de la prov
   son subcarpetas del mismo repo git, no repos separados. Se puede tocar el backend y el frontend
   en el mismo commit, y es lo normal: la API y el cliente se cambian juntos. El `.gitignore` de la
   raíz es el que manda.
-- Estado actual: Sprints 1–3 completos (eventos, viajes y agenda turística VZ-18), con
-  **207 tests: 202 en verde y 5 fallos preexistentes de `tiposPermitidos`**. Incluye paginación,
-  CRUD de eventos, alta de publicadores, CRUD de viajes con baja lógica, listado unificado de
-  propuestas (eventos + actividades), **agenda filtrable por fecha/tipo/categoría/ubicación/acceso**,
-  seed de datos, mapeo con MapStruct, **geocodificación de la ubicación del evento con
-  OpenStreetMap (Nominatim)** y **subida de imágenes a disco con servido estático**.
-  Pendientes: `Itinerario`, `Usuario`, `Preferencia` y rutas/traslados.
+- Estado actual: Sprints 1–3 completos (eventos, viajes, agenda VZ-18 y circuitos VZ-25), con
+  **229 tests: 227 en verde y 2 fallos preexistentes por fechas fijas ya vencidas
+  (`ViajeMapperTest`, `ViajeTest`)**. Incluye paginación, CRUD de eventos, alta de publicadores,
+  CRUD de viajes con baja lógica, listado unificado de propuestas (eventos + actividades),
+  **agenda filtrable por fecha/tipo/categoría/ubicación/acceso**, **generación y selección única de
+  tres alternativas de circuito con distancias estimadas**, seed de datos, mapeo con MapStruct,
+  **geocodificación de la ubicación del evento con OpenStreetMap (Nominatim)** y **subida de
+  imágenes a disco con servido estático**. Pendientes: `Itinerario` editable (VZ-27), `Usuario`,
+  `Preferencia` y ruteo real (OSRM).
 - Para probar los endpoints a mano ver **`PRUEBAS-MANUALES.md`**: levantar, curl de cada ruta,
   casos de error, el detalle de los acentos y los bordes conocidos sin cubrir.
 
@@ -131,10 +133,12 @@ Consecuencias que hay que tener presentes:
 
 ### Seed: `data.sql`
 
-`src/main/resources/data.sql` siembra 3 publicadores, 8 eventos (cada uno con una imagen),
-5 ubicaciones y 5 viajes. Como `ddl-auto=create-drop` borra todo en cada arranque, sin el script
+`src/main/resources/data.sql` siembra 3 publicadores, 23 eventos (8 con imagen), 2 actividades,
+30 ubicaciones y 5 viajes. Como `ddl-auto=create-drop` borra todo en cada arranque, sin el script
 la app levanta vacía. Los eventos del seed traen `tipo_acceso`, `estado_propuesta` y
-`latitud`/`longitud` de ejemplo (ya calculadas, sin pasar por Nominatim en el arranque).
+`latitud`/`longitud` de ejemplo (ya calculadas, sin pasar por Nominatim en el arranque). El bloque
+VZ-25 agrega 15 eventos futuros (tres por zona, incluida una propuesta nocturna) con fechas
+relativas para que el demo de circuitos funcione cualquier día.
 
 Nota de Sprint 2: los viajes se siembran **después** de las ubicaciones, porque `zonaInteres` es
 una FK a `ubicacion`. Todos van con `estado='PLANIFICADO'` a propósito: VZ-22 lista con
@@ -153,11 +157,11 @@ Tres propiedades hacen que funcione, y las tres hacen falta:
   solo se ve en desarrollo; en Linux el default ya es UTF-8 y pasa desapercibido. Si aparecen
   mojibake en los datos, es esto primero.
 
-Los **viajes** usan fechas **relativas a hoy** a propósito (`DATEADD('DAY', 7, CURRENT_TIMESTAMP)`,
-etc.), así el demo siempre tiene viajes futuros sin importar cuándo se levante. Al agregar viajes,
-mantener esa propiedad. Los **eventos**, en cambio, hoy usan fechas **fijas** 2026/2027 en el
-seed; si el demo necesita eventos vigentes en la agenda, hay que volver a fechas relativas
-(`DATEADD('DAY', n, CURRENT_DATE)`).
+Los **viajes** y las **propuestas del bloque VZ-25** usan fechas **relativas a hoy** a propósito
+(`DATEADD('DAY', 7, CURRENT_DATE)`, etc.), así el demo siempre tiene viajes y circuitos futuros
+sin importar cuándo se levante. Al agregar filas para el demo, mantener esa propiedad. Los **8
+eventos originales** siguen con fechas **fijas** 2026/2027; si se quiere que también aparezcan en
+la agenda vigente, hay que pasarlos a `DATEADD('DAY', n, CURRENT_DATE)`.
 
 ### El seed no debe correr en los tests
 
@@ -210,10 +214,14 @@ de nombres").
 - `Preferencia` / nivel de interés por categoría — se apoya en `Categoria`.
 - `Actividad` — descripción, categoría, ubicación, horarios de disponibilidad, duración estimada,
   imágenes, publicada por un `Publicador`.
-- `Itinerario` — se genera a partir de viaje + preferencias + disponibilidad; admite edición manual
-  (agregar, eliminar, reorganizar) y regeneración.
+- `Circuito` — **ya existe** (VZ-25): tres alternativas generadas a partir de viaje + propuestas +
+  disponibilidad, guardadas como snapshot. `CircuitoAlternativa` agrupa los ítems y
+  `CircuitoItem` guarda la parada con fecha, orden, horario y traslado.
+- `Itinerario` editable — **pendiente (VZ-27)**: agregar, eliminar, reorganizar y regenerar
+  paradas sobre el circuito ya generado.
 - `Usuario` — registro, modificación, baja, inicio de sesión.
-- Rutas y traslados — distancia entre puntos, duración estimada, visualización en mapa.
+- Rutas y traslados — hoy Haversine con velocidad media; falta ruteo real (OSRM) y visualización
+  en mapa.
 
 `imagenes` está en `LAZY` porque es un `@ElementCollection`: con `EAGER` cada consulta de evento
 se traía todas las imágenes de la tabla entera.
@@ -350,6 +358,39 @@ Decisiones que no son obvias:
 - **`/api/propuestas` también acepta `ubicacion`** (mismo criterio), además de los filtros que ya
   tenía.
 
+## API del Sprint 3 – Circuitos automáticos (VZ-25)
+
+| Método | Ruta | Caso de uso |
+| --- | --- | --- |
+| POST | `/api/viajes/{id}/circuito` | Genera y persiste las tres alternativas (**201**) |
+| GET | `/api/viajes/{id}/circuito` | Devuelve el circuito guardado (404 si no existe) |
+| POST | `/api/viajes/{id}/circuito/seleccion` | Selecciona una alternativa (200) |
+
+Las alternativas son `CERCANIA`, `INTERESES` y `DESCUBRIMIENTO`. Se generan una sola vez y se
+guardan como instantánea: regenerar devuelve `400`, igual que una segunda selección. La selección
+queda expuesta en `GET /api/viajes/{id}` dentro de `circuito`; el `GET` del circuito no persiste
+nada al refrescar disponibilidad.
+
+Decisiones y trampas:
+
+- **El motor (`circuit/CircuitGenerator`) no conoce Spring ni JPA.** Recibe candidatos, ritmo e
+  intereses, y devuelve alternativas. `CircuitoService` arma los candidatos y persiste el snapshot.
+- **Ventana diaria `06:00–23:59`.** Las actividades se agendan en el horario exacto de su franja;
+  el traslado tiene que caber antes del inicio. Un evento sin horario ocupa `09:00–18:00`.
+- **Las distancias son Haversine** (`HaversineDistanceProvider`, 30 km/h), no OSRM. La respuesta
+  trae `distanciasEstimadas=true`.
+- **El snapshot guarda `descripcion` y `categoria`**, no solo el id: si la propuesta cambia o se
+  da de baja, el circuito sigue mostrando lo que se generó, marcando `disponible=false`.
+- **`CircuitoAlternativa.items` usa `@OrderBy("orden ASC")`, nunca `@OrderColumn`.** El campo
+  `CircuitoItem.orden` ya es una columna real; un `@OrderColumn(name = "orden")` la duplicaba y al
+  releer la lista llegaban `null`, con NPE en `toResponse`/`refreshAvailability`. Lo cubre
+  `CircuitoRepositoryTest`.
+- **`data.sql` necesita subconsultas únicas para la zona del viaje.** Las ubicaciones de eventos
+  comparten `ciudad`, así que buscar solo por ciudad devuelve varias filas; en el seed se agrega
+  `AND direccion IS NULL` para Córdoba y La Cumbrecita.
+- **Errores de generación**: `404` si el viaje no existe (o está cancelado), `400` si faltan datos,
+  si el viaje no tiene días o si ya fue generado. Los estados terminales no se pueden generar.
+
 ## Servicios
 
 `EventoService` y `PublicadorService` usan Lombok `@RequiredArgsConstructor` (todos los collaborators
@@ -476,12 +517,13 @@ Reglas de arancel (`EventoService.validateAcceso`): un evento `DE_PAGO` **exige*
 opcional. Un `GRATUITO` ignora los tres campos. El estado (`EstadoPropuesta`) y el tipo de acceso
 por defecto los fija el service, no el JSON.
 
-## Ruteo / distancias: decisión pendiente
+## Ruteo / distancias
 
-`GeocodingService` cubre el "dónde queda" del evento. **Todavía no hay nada para calcular
-distancias ni duración de traslados** ("distancia entre puntos", "tiempo de viaje"). Cuando toque,
-la opción natural es **OSRM** (sin clave, sobre OpenStreetMap), en línea con la decisión de
-Nominatim. **No hardcodear claves en `application.properties`.**
+`GeocodingService` cubre el "dónde queda" del evento. Para los circuitos, `DistanceProvider` usa
+**Haversine** con una velocidad media de 30 km/h: alcanza para comparar alternativas y estimar
+traslados, pero **no es un ruteo real**. Si se necesita respetar calles, la opción natural es
+**OSRM** (sin clave, sobre OpenStreetMap), en línea con la decisión de Nominatim. **No hardcodear
+claves en `application.properties`.**
 
 ## Tests: imports distintos a los de Boot 3
 
@@ -496,29 +538,33 @@ Las anotaciones de test **cambiaron de package**. Importar desde el package viej
 `@MockBean` ya no existe. Para tests unitarios con Mockito alcanza con
 `@ExtendWith(MockitoExtension.class)` + `@Mock`, sin contexto de Spring.
 
-Reparto actual (207 tests; 5 fallos preexistentes en `PropuestaTuristicaTest` y `ActividadServiceTest` por `tiposPermitidos`):
+Reparto actual (229 tests; 2 fallos preexistentes por fechas fijas ya vencidas en `ViajeMapperTest`
+y `ViajeTest`):
 
 | Archivo | Tests | Cubre |
 | --- | --- | --- |
 | `PropuestaServiceTest` | 23 | US1–US5, US7, reglas de negocio, arancel, estado, geocoding |
 | `PropuestaRepositoryTest` | 18 | listado unificado, filtros, orden, **agenda VZ-18 (orden, solapamiento, cancelados, ubicación sin tildes)** |
-| `ViajeControllerTest` | 17 | VZ-19/VZ-21/VZ-22/VZ-23, 400/404, `?usuario` obligatorio |
+| `ViajeControllerTest` | 23 | VZ-19/VZ-21/VZ-22/VZ-23 + **VZ-25 circuitos**, 400/404, `?usuario` obligatorio |
 | `EventoRepositoryTest` | 16 | solapamiento, bordes, orden, paginación, filtro por publicador, listado completo |
 | `EventoControllerTest` | 15 | US1–US4, US7, errores 400/404, cuerpo inválido |
-| `PropuestaTuristicaTest` | 11 | invariantes del modelo base (**4 fallos preexistentes por `tiposPermitidos`**) |
-| `ViajeTest` | 11 | modelo de viaje, transiciones y validaciones |
+| `PropuestaTuristicaTest` | 11 | invariantes del modelo base |
+| `ViajeTest` | 11 | modelo de viaje, transiciones y validaciones (**1 fallo preexistente por fecha fija**) |
 | `ViajeServiceTest` | 11 | VZ-19–VZ-23, baja lógica, fecha invertida, 404 |
 | `PublicadorControllerTest` | 10 | validación, ruta anidada, página vacía, US7, **email duplicado → 400** |
-| `ActividadServiceTest` | 9 | reglas de actividad (**1 fallo preexistente por `tiposPermitidos`**) |
+| `ActividadServiceTest` | 9 | reglas de actividad |
 | `ActividadControllerTest` | 8 | CRUD de `/api/actividades`, validación, 400/404 |
 | `AgendaControllerTest` | 7 | `/api/agenda` (filtros, orden fijo, 400) y `/api/agenda/semanal` (paginación, tope de `size`) |
 | `AgendaSemanalTest` | 7 | límites de la semana ISO, paginación |
+| `CircuitGeneratorTest` | 7 | **VZ-25: ventana 06:00–23:59, agenda, ritmo, estrategias y traslados** |
+| `CircuitoServiceTest` | 8 | **VZ-25: generación, snapshot, selección única, disponibilidad y errores** |
 | `PublicadorServiceTest` | 7 | alta, consulta, 404, US7, **pre-chequeo de email** |
 | `ImagenServiceTest` | 6 | **guardar/borrar, magic bytes, tope 5 MB, anti path traversal (`@TempDir`)** |
 | `GeocodingServiceTest` | 5 | **dedup de la query de Nominatim, campos vacíos, provincia** |
 | `PublicadorRepositoryTest` | 5 | orden alfabético, paginación, página vacía, **derived query + constraint de unicidad** |
-| `ViajeMapperTest` | 4 | mapeo entidad↔DTO, fechas `LocalDate`↔`LocalDateTime` |
+| `ViajeMapperTest` | 4 | mapeo entidad↔DTO, fechas `LocalDate`↔`LocalDateTime` (**1 fallo preexistente por fecha fija**) |
 | `ViajeRepositoryTest` | 4 | activos por usuario, exclusión de cancelados, orden |
+| `CircuitoRepositoryTest` | 1 | **VZ-25: recarga el circuito con ítems ordenados y sin `null`** |
 | `ImagenControllerTest` | 4 | **POST/DELETE de `/api/imagenes`, parte faltante y archivo vacío → 400** |
 | `PropuestaControllerTest` | 3 | listado unificado, filtros (incluida `ubicacion`), 400 |
 | `EstadoViajeTest` | 3 | transiciones válidas e inválidas |
