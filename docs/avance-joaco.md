@@ -376,3 +376,58 @@ Ahora se incluyen únicamente los estados permitidos por el listado y se excluye
                   CANCELADO
                   FINALIZADO
 La lógica está implementada en ViajeService.java y se expone mediante ViajeController.java.
+# Filtro de viajes por estado
+
+## Archivos backend ajustados
+
+Para permitir la consulta de viajes en estado `BORRADOR`, `PLANIFICADO` y `EN_CURSO`, se ajustaron los siguientes archivos del backend:
+
+- `turismo-backend/src/main/java/com/viajesazo/turismo_backend/controller/ViajeController.java`
+  - Se mantuvo el listado general `GET /api/viajes`.
+  - Se incorporó el endpoint `GET /api/viajes/estado`.
+  - El endpoint recibe el usuario y uno o más valores mediante el parámetro repetible `estado`.
+  - La respuesta conserva el formato paginado mediante `PagedModel<ViajeResponse>`.
+
+- `turismo-backend/src/main/java/com/viajesazo/turismo_backend/service/ViajeService.java`
+  - El listado general ahora consulta únicamente los estados permitidos: `BORRADOR`, `PLANIFICADO` y `EN_CURSO`.
+  - Se agregó la lógica para filtrar por uno o varios estados solicitados.
+  - Se valida que los estados recibidos pertenezcan al enum `EstadoViaje`.
+  - `CANCELADO` y `FINALIZADO` no están permitidos en este listado.
+  - Los estados inválidos o no permitidos generan un error de negocio explícito.
+
+- `turismo-backend/src/main/java/com/viajesazo/turismo_backend/repository/ViajeRepository.java`
+  - Se agregó la consulta paginada `findByUsuarioAndEstadoInOrderByFechaInicioAsc(...)`.
+  - La consulta filtra por usuario, restringe los estados solicitados y mantiene el orden por fecha de inicio ascendente.
+
+## Pruebas backend ajustadas
+
+- `turismo-backend/src/test/java/com/viajesazo/turismo_backend/controller/ViajeControllerTest.java`
+  - Se verificó el filtro por un estado.
+  - Se verificó el filtro combinado por `BORRADOR`, `PLANIFICADO` y `EN_CURSO`.
+
+- `turismo-backend/src/test/java/com/viajesazo/turismo_backend/service/ViajeServiceTest.java`
+  - Se verificó que el listado general devuelva los tres estados permitidos.
+  - Se verificó que los estados terminales no formen parte del resultado.
+
+- `turismo-backend/src/test/java/com/viajesazo/turismo_backend/repository/ViajeRepositoryTest.java`
+  - Se verificó el filtrado por estados permitidos.
+  - Se verificó la exclusión de viajes `CANCELADO` y `FINALIZADO`.
+  - Se verificó el filtro por usuario y el orden por fecha de inicio.
+
+## Resultado logrado
+
+El backend permite consultar los viajes de un turista en los estados operativos requeridos:
+
+- `BORRADOR`
+- `PLANIFICADO`
+- `EN_CURSO`
+
+El listado general `GET /api/viajes?usuario=...` devuelve únicamente esos estados y excluye `CANCELADO` y `FINALIZADO`.
+
+Además, el endpoint `GET /api/viajes/estado` permite solicitar un estado específico o varios estados, por ejemplo:
+
+```text
+GET /api/viajes/estado?usuario=turista@test.com&estado=BORRADOR&estado=PLANIFICADO&estado=EN_CURSO
+```
+
+Las consultas mantienen la paginación, el filtro por usuario y el orden ascendente por fecha de inicio. No se realizaron ajustes en el frontend.
