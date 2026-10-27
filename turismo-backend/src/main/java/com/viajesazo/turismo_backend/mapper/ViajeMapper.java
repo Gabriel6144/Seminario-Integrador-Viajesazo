@@ -31,6 +31,7 @@ public interface ViajeMapper {
      * {@code zonaInteres} se mapea desde la {@code ubicacion} del request; con el
      * {@code cascade = ALL} de la entidad, el guardado persiste la ubicación nueva.
      */
+    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "estado", ignore = true)
     @Mapping(target = "pasoActual", ignore = true)
@@ -44,6 +45,7 @@ public interface ViajeMapper {
      * {@link #updateUbicacion(UbicacionRequest, Ubicacion)} para no dejar una fila
      * {@code ubicacion} huérfana en cada modificación.
      */
+    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "estado", ignore = true)
     @Mapping(target = "pasoActual", ignore = true)
