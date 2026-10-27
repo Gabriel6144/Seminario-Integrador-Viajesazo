@@ -54,7 +54,6 @@ public interface ViajeMapper {
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "estado", ignore = true)
-    @Mapping(target = "pasoActual", ignore = true)
     @Mapping(target = "zonaInteres", source = "ubicacion")
     @Mapping(target = "interesesCategoria", source = "interesesCategoria")
     Viaje toEntity(ViajeBorradorRequest request);
@@ -62,7 +61,6 @@ public interface ViajeMapper {
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "estado", ignore = true)
-    @Mapping(target = "pasoActual", ignore = true)
     @Mapping(target = "zonaInteres", ignore = true)
     @Mapping(target = "interesesCategoria", source = "interesesCategoria") 
     void updateEntity(ViajeBorradorRequest request, @MappingTarget Viaje viaje);

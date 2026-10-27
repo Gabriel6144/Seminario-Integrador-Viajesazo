@@ -35,6 +35,9 @@ public record ViajeBorradorRequest(
     @NotNull(message = "El ritmo del viaje no puede estar vacío")
     TipoRitmo ritmo,
 
+    @NotNull(message = "El paso actual no puede estar vacío")
+    Integer pasoActual,
+
     @NotEmpty (message = "La lista de intereses de categoría no puede estar vacía")
     List<@NotNull(message = "El interés de categoría no puede ser nulo") InteresCategoria> interesesCategoria,
     
