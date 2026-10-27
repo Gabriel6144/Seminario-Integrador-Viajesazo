@@ -105,8 +105,8 @@ export function PlanificadorPage() {
   const loadingSteps: LoadingStep[] = [
     { title: 'Estamos buscando experiencias para vos...', sub: 'Explorando paradas serranas y recomendaciones locales...', bar: 30 },
     { title: 'Encontramos actividades que coinciden con tus intereses...', sub: `Combinando ${interests.slice(0, 2).join(' & ')}...`, bar: 65 },
-    { title: 'Estamos armando la mejor combinación...', sub: 'Calculando tiempos óptimos sin apurarte...', bar: 88 },
-    { title: '¡Tu aventura está lista!', sub: 'Itinerario optimizado con éxito.', bar: 100 },
+    { title: 'Estamos armando las mejores combinaciones...', sub: 'Organizamos opciones de circuitos optimizadas con mapas, atractivos y gastronomía cordobesa.', bar: 88 },
+    { title: '¡Tu aventura está lista!', sub: 'Alternativas de circuitos optimizadas con éxito.', bar: 100 },
   ]
 
   // Validation helpers for each step
@@ -272,7 +272,7 @@ export function PlanificadorPage() {
     if (borradorId !== null) {
       completarBorrador.mutate(borradorId, {
         onSuccess: (data) => {
-          showToast(`¡Viaje "${data.nombre ?? 'sin nombre'}" guardado en Mis viajes! 💙`)
+          showToast(`¡Viaje "${data.nombre ?? 'sin nombre'}" guardado en Mis viajes!`)
           setBorradorId(null)
           setTimeout(() => navigate('/borradores'), 1200)
         },
@@ -285,7 +285,7 @@ export function PlanificadorPage() {
 
     crearViaje.mutate(buildViajePayload() as ViajeRequest, {
       onSuccess: (data) => {
-        showToast(`¡Viaje "${data.nombre ?? 'sin nombre'}" guardado en Mis viajes! 💙`)
+        showToast(`¡Viaje "${data.nombre ?? 'sin nombre'}" guardado en Mis viajes!`)
         setTimeout(() => navigate('/borradores'), 1200)
       },
       onError: (error) => {
@@ -428,6 +428,7 @@ export function PlanificadorPage() {
               onSaveTrip={handleSaveTrip}
               onExploreMap={() => setStep(5)}
               onRestart={() => setStep(1)}
+              onBackToResumen={() => setStep(8)}
             />
           )}
         </main>

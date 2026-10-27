@@ -155,10 +155,11 @@ export function Paso8Resumen({
           onClick={onGenerate}
           className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-sky-600 via-sky-500 to-amber-500 px-8 py-4 font-heading text-lg font-bold text-white shadow-xl shadow-sky-500/25 transition-all hover:opacity-95 active:scale-[0.98]"
         >
-          <span>Generar mi circuito</span>
+          <span>Generar opciones de circuitos</span>
+          <span className="material-symbols-outlined text-xl">arrow_forward</span>
         </button>
-        <p className="mt-2 text-center text-xs text-slate-400">
-          Personalizado con motor turístico de Viajesazo
+        <p className="mt-2.5 text-center text-xs text-slate-500">
+          Organizamos opciones de circuitos optimizadas con mapas, atractivos y gastronomía cordobesa.
         </p>
       </div>
     </div>
