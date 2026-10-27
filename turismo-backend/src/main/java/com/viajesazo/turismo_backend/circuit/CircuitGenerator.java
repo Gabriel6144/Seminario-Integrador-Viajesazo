@@ -64,7 +64,7 @@ public class CircuitGenerator {
                 LocalTime endTime = slot.end();
                 scheduled.add(new ScheduledProposal(candidate.id(), candidate.name(), candidate.description(),
                         candidate.type(), candidate.category(), day, order, startTime, endTime,
-                        transfer.distanceKm(), transfer.durationMinutes(), true, null));
+                        transfer.distanceKm(), transfer.durationMinutes(), true, null, candidate.details()));
                 totalDistance += transfer.distanceKm();
                 cursor = endTime;
                 previous = candidate;

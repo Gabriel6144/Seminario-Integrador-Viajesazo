@@ -14,7 +14,7 @@ acoplados de build: cada uno tiene su `package.json` / `pom.xml` y sus propios c
   generación y selección de circuitos (VZ-25)** y ruta 404. La agenda filtra y pagina en el
   servidor. El alta/edición de eventos soporta **tipo de acceso y arancel** (`GRATUITO` / `DE_PAGO`
   con monto y link al sitio oficial) y **ubicación con mapa** (Leaflet + OpenStreetMap), incluido
-  un **selector de ubicación** con buscador y pin arrastrable. **178 tests en 19 archivos (169 en
+  un **selector de ubicación** con buscador y pin arrastrable. **182 tests en 21 archivos (173 en
   verde).** Los 9 que fallan son preexistentes y ajenos: 8 de `eventos-page.test.tsx` (mockea
   `/api/eventos` y la página usa `/api/propuestas`) y 1 de `evento-editar-page.test.tsx`
   (validación de fecha).
@@ -108,8 +108,8 @@ Cosas que se olvidan fácil y ya están resueltas en el código, para no volver 
 `src/pages/planificador-page.tsx` orquesta los pasos 1–10. Los pasos 1–8 son el wizard; el 9 es la
 animación de generación y el 10 muestra las tres alternativas reales.
 
-- **El viaje se persiste antes de generar.** `runCircuitGeneration` completa el borrador o crea el
-  viaje, guarda `tripId` y recién ahí llama a `POST /api/viajes/{id}/circuito`. Si la generación
+- **El viaje se persiste antes de generar.** `startCircuitGeneration` completa el borrador o crea
+  el viaje, guarda `tripId` y recién ahí llama a `POST /api/viajes/{id}/circuito`. Si la generación
   falla, el viaje ya quedó guardado: el reintento reutiliza `tripId` y no duplica el alta.
 - **La animación no decide el resultado.** El paso 9 muestra cuatro mensajes cada 1100 ms, pero
   solo se pasa al 10 cuando terminó la animación **y** llegó el circuito. Un error cancela el
@@ -121,18 +121,33 @@ animación de generación y el 10 muestra las tres alternativas reales.
   la vista (`activeStrategy`), no selecciona.
 - **`isTripSaved` se deriva de `tripId !== null`**, no de un flag aparte. El botón de guardado
   cambia a "Ver en Mis viajes" cuando el viaje ya existe.
-- **`buildViajePayload` mapea los intereses de la UI a `InteresCategoria`** con `INTEREST_MAP`;
+- **No se guarda otro borrador después de persistir el viaje.** `handleSaveDraft` corta si
+  `tripId !== null` y navega a Mis viajes; de lo contrario, con `borradorId` actualiza y sin él
+  crea un borrador nuevo. Sin esa guarda, cerrar el planificador después de generar creaba un
+  duplicado (o intentaba actualizar un borrador ya completado).
+- **`buildViajeRequest` mapea los intereses de la UI a `InteresCategoria`** con `INTEREST_MAP`;
   `interests` en el estado guarda los labels visibles. El `pasoActual` que se manda es el `step`
   actual.
 - `useCircuito` existe para reabrir un circuito desde un viaje guardado; el flujo del wizard usa
   las mutaciones de generación/selección.
+- **`circuito-view-model.ts` es el único adaptador API → UI.** `toCircuitoRecomendado` agrupa los
+  ítems por `fecha`, arma `days`/`stopsByDay`, resuelve imagen o placeholder y calcula la duración;
+  `buildMapStops` y `firstDayWithStops` alimentan los mapas. El detalle y los mapas no deben
+  volver a leer campos de la propuesta ni usar los mocks que se quitaron de `constants.ts`.
+- **“Mis viajes” usa `GET /api/viajes?usuario=`**, no `/borradores`: el listado trae borradores y
+  viajes confirmados. `estado !== 'BORRADOR'` decide si la tarjeta muestra “Circuito confirmado” y
+  oculta descartar/continuar. `useViajes` invalida `viajesAll` al crear, completar y descartar.
+- **Sustituir/eliminar paradas están deshabilitados** con “Próximamente”: VZ-27 no está
+  implementado en el backend, así que la UI no finge una acción que no persiste.
 - **El detalle del viaje NO devuelve `GeneracionCircuitoResponse`**: `GET /api/viajes/{id}` trae
   `circuito: { estrategia, alternativa, ... }` (singular), mientras que
   `GET /api/viajes/{id}/circuito` trae `estrategiaSeleccionada` y `alternativas` (plural). En
   `types/api.ts` son `CircuitoResponse` y `GeneracionCircuitoResponse` respectivamente.
-- **MSW replica el ciclo completo**: `POST /api/viajes`, `POST/GET /api/viajes/:id/circuito` y
-  `POST .../seleccion` sobre `src/test/store.ts`. El fixture `CIRCUITO` trae las tres estrategias
-  con paradas; sin ese estado, el test del paso 10 no podría verificar la selección.
+- **MSW replica el ciclo completo**: `POST /api/viajes`, `GET /api/viajes`, `POST/GET
+  /api/viajes/:id/circuito` y `POST .../seleccion` sobre `src/test/store.ts`. El fixture
+  `CIRCUITO` trae las tres estrategias con paradas y el snapshot visual/de ubicación; sin ese
+  estado, el test del paso 10 no podría verificar la selección. `BORRADORES` incluye un viaje
+  confirmado además del borrador para cubrir “Mis viajes”.
 
 ## Escritura: cómo está armado
 
@@ -273,8 +288,9 @@ Cuidado con los bordes de la paginación: `pointer-events-none` depende del CSS 
 
 ## Tests
 
-Vitest + Testing Library + MSW. 178 tests en 19 archivos (9 en rojo, preexistentes y ajenos a la
-agenda y al planificador: 8 de `eventos-page` y 1 de `evento-editar-page`).
+Vitest + Testing Library + MSW. 182 tests en 21 archivos (9 en rojo, preexistentes y ajenos a la
+agenda y al planificador: 8 de `eventos-page` y 1 de `evento-editar-page`). `circuito-view-model`
+cubre el adaptador real y `borradores-page` el listado mixto borrador/confirmado.
 
 - **Nominatim se mockea con handlers MSW** (`/nominatim/search` y `/nominatim/reverse`), igual que
   la API: `onUnhandledRequest: 'error'` no perdona una request real. El test del selector mockea

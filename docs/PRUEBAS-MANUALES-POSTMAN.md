@@ -374,6 +374,12 @@ El flujo de borradores va por separado:
 - **Status esperado:** `200 OK`
 - **Nota:** devuelve las tres alternativas con sus ítems, distancias y métricas. Si el viaje
   todavía no tiene circuito generado, responde `404`.
+- **Campos de cada ítem:** además de `propuestaId`, `nombre`, `descripcion`, `categoria`, `fecha`,
+  `orden`, `horaInicio`, `horaFin`, `trasladoDesdeAnteriorMinutos` y `disponible`, la respuesta
+  trae el snapshot visual y de ubicación: `imagenes`, `ciudad`, `localidad`, `direccion`,
+  `lugarRecinto`, `latitud`, `longitud`, `tipoAcceso`, `montoEstimado`, `descripcionArancel`,
+  `sitioOficial` y `duracionMinutos`. Verificar que `latitud`/`longitud` no sean nulos cuando la
+  propuesta tenía ubicación.
 
 ### 7.3 `POST /api/viajes/{id}/circuito/seleccion` — seleccionar alternativa
 

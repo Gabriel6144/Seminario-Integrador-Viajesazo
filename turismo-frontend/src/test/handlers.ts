@@ -165,6 +165,16 @@ export const handlers = [
     return HttpResponse.json(createPublicador(body as PublicadorRequest), { status: 201 })
   }),
 
+  http.get('/api/viajes', ({ request }) => {
+    const params = new URL(request.url).searchParams
+    const usuario = params.get('usuario')
+    const viajes = allBorradores().filter(
+      (viaje) => usuario === null || viaje.usuario === usuario,
+    )
+    const { content, meta } = paginate(viajes, request.url)
+    return HttpResponse.json(page(content, meta))
+  }),
+
   http.get('/api/viajes/borradores', ({ request }) => {
     const { content, meta } = paginate(allBorradores(), request.url)
     return HttpResponse.json(page(content, meta))

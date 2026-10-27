@@ -41,6 +41,7 @@ import com.viajesazo.turismo_backend.model.Evento;
 import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.model.NombreEstado;
 import com.viajesazo.turismo_backend.model.PropuestaTuristica;
+import com.viajesazo.turismo_backend.model.TipoAcceso;
 import com.viajesazo.turismo_backend.model.TipoRegistro;
 import com.viajesazo.turismo_backend.model.TipoRitmo;
 import com.viajesazo.turismo_backend.model.Ubicacion;
@@ -120,8 +121,21 @@ class CircuitoServiceTest {
         assertThat(response.alternativas()).hasSize(3);
         assertThat(response.alternativas()).allSatisfy(alternative -> {
             assertThat(alternative.propuestas()).hasSize(1);
-            assertThat(alternative.propuestas().get(0).descripcion()).isEqualTo("Descripción");
-            assertThat(alternative.propuestas().get(0).categoria()).isEqualTo(InteresCategoria.CULTURA);
+            var item = alternative.propuestas().get(0);
+            assertThat(item.descripcion()).isEqualTo("Descripción");
+            assertThat(item.categoria()).isEqualTo(InteresCategoria.CULTURA);
+            assertThat(item.imagenes()).containsExactly("https://imagen.test/evento.jpg");
+            assertThat(item.ciudad()).isEqualTo("Córdoba");
+            assertThat(item.localidad()).isEqualTo("Nueva Córdoba");
+            assertThat(item.direccion()).isEqualTo("Av. Hipólito Yrigoyen 325");
+            assertThat(item.lugarRecinto()).isEqualTo("Paseo del Buen Pastor");
+            assertThat(item.latitud()).isEqualByComparingTo("-31.4");
+            assertThat(item.longitud()).isEqualByComparingTo("-64.2");
+            assertThat(item.tipoAcceso()).isEqualTo(TipoAcceso.DE_PAGO);
+            assertThat(item.montoEstimado()).isEqualByComparingTo("1500.00");
+            assertThat(item.descripcionArancel()).isEqualTo("Entrada general");
+            assertThat(item.sitioOficial()).isEqualTo("https://evento.test");
+            assertThat(item.duracionMinutos()).isEqualTo(60);
         });
 
         ArgumentCaptor<Circuito> captor = ArgumentCaptor.forClass(Circuito.class);
@@ -130,6 +144,10 @@ class CircuitoServiceTest {
             CircuitoItem item = alternative.getItems().get(0);
             assertThat(item.getDescripcion()).isEqualTo("Descripción");
             assertThat(item.getCategoria()).isEqualTo(InteresCategoria.CULTURA);
+            assertThat(item.getImagenes()).containsExactly("https://imagen.test/evento.jpg");
+            assertThat(item.getTipoAcceso()).isEqualTo(TipoAcceso.DE_PAGO);
+            assertThat(item.getMontoEstimado()).isEqualByComparingTo("1500.00");
+            assertThat(item.getDuracionMinutos()).isEqualTo(60);
         });
     }
 
@@ -230,6 +248,9 @@ class CircuitoServiceTest {
 
     private Ubicacion zone() {
         return Ubicacion.builder()
+                .ciudad("Córdoba")
+                .localidad("Nueva Córdoba")
+                .direccion("Av. Hipólito Yrigoyen 325")
                 .latitud(BigDecimal.valueOf(-31.4))
                 .longitud(BigDecimal.valueOf(-64.2))
                 .build();
@@ -241,8 +262,14 @@ class CircuitoServiceTest {
                 .nombre("Evento")
                 .descripcion("Descripción")
                 .categoria(InteresCategoria.CULTURA)
+                .tipoAcceso(TipoAcceso.DE_PAGO)
                 .estadoPropuesta(estado(state))
                 .ubicacion(zone())
+                .lugarRecinto("Paseo del Buen Pastor")
+                .montoEstimado(BigDecimal.valueOf(1500))
+                .descripcionArancel("Entrada general")
+                .sitioOficial("https://evento.test")
+                .imagenes(List.of("https://imagen.test/evento.jpg"))
                 .fechaInicio(date)
                 .fechaFin(date)
                 .horarioInicio(start)

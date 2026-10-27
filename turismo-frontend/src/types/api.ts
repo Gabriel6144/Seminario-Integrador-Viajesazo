@@ -486,6 +486,18 @@ export interface CircuitoItemResponse {
   trasladoMinutos: number
   disponible: boolean
   motivoNoDisponible: string | null
+  imagenes: string[]
+  ciudad: string | null
+  localidad: string | null
+  direccion: string | null
+  lugarRecinto: string | null
+  latitud: number | null
+  longitud: number | null
+  tipoAcceso: TipoAcceso | null
+  montoEstimado: number | null
+  descripcionArancel: string | null
+  sitioOficial: string | null
+  duracionMinutos: number | null
 }
 
 /** Espejo de `dto/response/CircuitoAlternativaResponse.java`. */

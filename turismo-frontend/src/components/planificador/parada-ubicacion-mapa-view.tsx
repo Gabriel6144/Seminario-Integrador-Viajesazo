@@ -54,7 +54,7 @@ export function ParadaUbicacionMapaView({
     markerEl.className = 'flex flex-col items-center pointer-events-auto'
     markerEl.innerHTML = `
       <div class="mb-1.5 flex items-center gap-1.5 rounded-full border border-white/20 bg-slate-900/90 px-3 py-1 text-white shadow-lg backdrop-blur-md">
-        <span class="flex h-4 w-4 items-center justify-center rounded-full bg-sky-600 text-[10px] font-black text-white">1</span>
+        <span class="flex h-4 w-4 items-center justify-center rounded-full bg-sky-600 text-[10px] font-black text-white">${parada.number}</span>
         <span class="text-xs font-bold tracking-tight whitespace-nowrap"></span>
       </div>
       <div class="relative flex h-14 w-14 items-center justify-center rounded-2xl border-2 border-sky-600 bg-white p-1.5 shadow-xl">
@@ -101,7 +101,7 @@ export function ParadaUbicacionMapaView({
       map.remove()
       mapRef.current = null
     }
-  }, [lat, lng, parada.title])
+  }, [lat, lng, parada.title, parada.number])
 
   const encodedQuery = encodeURIComponent(`${parada.title} ${parada.location} Córdoba`)
 
@@ -192,10 +192,11 @@ export function ParadaUbicacionMapaView({
         {/* Chip informativo de proximidad & traslado */}
         <div className="absolute top-4 left-4 z-20 flex items-center gap-2 rounded-full border border-slate-200/90 bg-white/95 px-3 py-1.5 shadow-md backdrop-blur-md">
           <span className="material-symbols-outlined text-base text-sky-600">
-            directions_walk
+            directions_car
           </span>
-          <span className="text-xs font-bold text-slate-800">A 450 m de tu hotel</span>
-          <span className="text-[11px] font-medium text-slate-500">(~6 min)</span>
+          <span className="text-xs font-bold text-slate-800">
+            {parada.walkNext ?? 'Punto de partida del día'}
+          </span>
         </div>
 
         {/* 3. FICHA / TARJETA INFERIOR DE ACTIVIDAD (BOTTOM SHEET) */}
@@ -209,7 +210,7 @@ export function ParadaUbicacionMapaView({
                 CÓRDOBA
               </span>
               <span className="absolute top-1 left-1 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[10px] font-black text-sky-700 shadow">
-                1
+                {parada.number}
               </span>
             </div>
 
@@ -218,11 +219,9 @@ export function ParadaUbicacionMapaView({
                 <span className="inline-flex items-center rounded-md border border-amber-200/60 bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700">
                   {parada.category}
                 </span>
-                <span className="inline-flex items-center text-xs font-bold text-slate-700">
-                  <span className="material-symbols-outlined fill mr-0.5 text-sm text-amber-400">
-                    star
-                  </span>
-                  <span>4.8</span>
+                <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-700">
+                  <span className="material-symbols-outlined text-sm text-slate-400">schedule</span>
+                  <span>{parada.duration}</span>
                 </span>
               </div>
 
@@ -237,7 +236,7 @@ export function ParadaUbicacionMapaView({
               <div className="mt-1.5 flex items-center gap-2">
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-600">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  <span>Abierto ahora</span>
+                  <span>En tu itinerario</span>
                 </span>
                 <span className="text-[11px] font-medium text-slate-400">{parada.price}</span>
               </div>

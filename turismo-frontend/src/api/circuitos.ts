@@ -27,11 +27,17 @@ export function useGenerarCircuito() {
   })
 }
 
+export function fetchCircuito(
+  viajeId: number,
+  signal?: AbortSignal,
+): Promise<GeneracionCircuitoResponse> {
+  return apiGet<GeneracionCircuitoResponse>(`/api/viajes/${viajeId}/circuito`, signal)
+}
+
 export function useCircuito(viajeId: number | null) {
   return useQuery({
     queryKey: queryKeys.circuito(viajeId ?? 0),
-    queryFn: ({ signal }) =>
-      apiGet<GeneracionCircuitoResponse>(`/api/viajes/${viajeId}/circuito`, signal),
+    queryFn: ({ signal }) => fetchCircuito(viajeId ?? 0, signal),
     enabled: viajeId !== null,
   })
 }
@@ -51,6 +57,7 @@ export function useSeleccionarCircuito() {
       ),
     onSuccess: (data, { viajeId }) => {
       queryClient.setQueryData(queryKeys.circuito(viajeId), data)
+      void queryClient.invalidateQueries({ queryKey: queryKeys.viajesAll() })
     },
   })
 }

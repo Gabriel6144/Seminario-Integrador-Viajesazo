@@ -170,22 +170,25 @@ describe('PlanificadorPage', () => {
     await user.click(screen.getByRole('button', { name: /EQUILIBRADO/i }))
     await user.click(screen.getByRole('button', { name: /continuar/i }))
 
-    await user.click(screen.getByRole('button', { name: /generar mi circuito/i }))
-
-    // La animación dura 4 pasos × 1100 ms; el circuito llega antes y la pantalla espera a las dos.
+    await user.click(screen.getByRole('button', { name: /generar opciones de circuitos/i }))
+    // La animación dura 4 pasos x 1100 ms; el circuito llega antes y la pantalla espera a las dos.
     expect(
-      await screen.findByText('Itinerario Oficial', {}, { timeout: 8000 }),
+      await screen.findByText('Circuitos Recomendados', {}, { timeout: 8000 }),
     ).toBeInTheDocument()
     expect(screen.getAllByText(/cerca de todo/i).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/según tus intereses/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/para descubrir/i).length).toBeGreaterThan(0)
 
-    await user.click(screen.getByRole('button', { name: /elegir esta alternativa/i }))
+    await user.click(screen.getAllByRole('button', { name: /ver circuito/i })[0])
+
+    expect(await screen.findByText(/circuito peatonal histórico/i)).toBeInTheDocument()
+    expect(screen.getByText(/semana gastronómica/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /confirmar y guardar circuito/i }))
 
     expect(
-      await screen.findByRole('button', { name: /alternativa elegida/i }),
-    ).toBeDisabled()
-
-    await user.click(screen.getByRole('button', { name: /Ver en Mis viajes/i }))
-    expect(await screen.findByText(/guardado en mis viajes/i)).toBeInTheDocument()
+      await screen.findByText(/circuito guardado con éxito/i),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /ver en mis viajes/i })).toBeInTheDocument()
   }, 15000)
 })

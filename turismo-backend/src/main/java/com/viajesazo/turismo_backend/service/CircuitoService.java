@@ -1,6 +1,7 @@
 package com.viajesazo.turismo_backend.service;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -194,9 +195,19 @@ public class CircuitoService {
                     ? eventSlots(event, start, viaje.getFechaFin())
                     : activitySlots((Actividad) proposal, start, viaje.getFechaFin());
             if (!slots.isEmpty()) {
+                Evento event = proposal instanceof Evento value ? value : null;
+                Actividad activity = proposal instanceof Actividad value ? value : null;
+                CircuitCandidate.ProposalDetails details = new CircuitCandidate.ProposalDetails(
+                        proposal.getImagenes(), location.getCiudad(), location.getLocalidad(),
+                        location.getDireccion(), proposal.getLugarRecinto(), location.getLatitud(),
+                        location.getLongitud(), proposal.getTipoAcceso(),
+                        event == null ? null : event.getMontoEstimado(),
+                        event == null ? null : event.getDescripcionArancel(),
+                        event == null ? null : event.getSitioOficial(),
+                        activity == null ? null : activity.getDuracionMinutos());
                 candidates.add(new CircuitCandidate(proposal.getId(), proposal.getNombre(), proposal.getDescripcion(),
                         proposal.getTipo(), proposal.getCategoria(), location.getLatitud().doubleValue(),
-                        location.getLongitud().doubleValue(), slots));
+                        location.getLongitud().doubleValue(), slots, details));
             }
         }
         return candidates;
@@ -231,6 +242,14 @@ public class CircuitoService {
         return slots;
     }
 
+    private Integer durationMinutes(LocalTime start, LocalTime end) {
+        if (start == null || end == null) {
+            return null;
+        }
+        long minutes = Duration.between(start, end).toMinutes();
+        return minutes > 0 ? (int) minutes : null;
+    }
+
     private CircuitoAlternativa toEntity(GeneratedAlternative source) {
         CircuitoAlternativa result = new CircuitoAlternativa();
         result.setEstrategia(CircuitStrategy.valueOf(source.strategy().name()));
@@ -253,6 +272,21 @@ public class CircuitoService {
             item.setTrasladoMinutos(proposal.transferMinutes());
             item.setDisponible(proposal.available());
             item.setMotivoNoDisponible(proposal.unavailableReason());
+            CircuitCandidate.ProposalDetails details = proposal.details();
+            item.setImagenes(new ArrayList<>(details.images()));
+            item.setCiudad(details.city());
+            item.setLocalidad(details.locality());
+            item.setDireccion(details.address());
+            item.setLugarRecinto(details.venue());
+            item.setLatitud(details.latitude());
+            item.setLongitud(details.longitude());
+            item.setTipoAcceso(details.accessType());
+            item.setMontoEstimado(details.price());
+            item.setDescripcionArancel(details.priceDescription());
+            item.setSitioOficial(details.officialSite());
+            item.setDuracionMinutos(details.durationMinutes() != null
+                    ? details.durationMinutes()
+                    : durationMinutes(proposal.start(), proposal.end()));
             result.addItem(item);
         }
         return result;
@@ -348,7 +382,11 @@ public class CircuitoService {
                 .map(item -> new CircuitoItemResponse(item.getPropuestaId(), item.getPropuestaNombre(),
                         item.getDescripcion(), item.getCategoria(), item.getTipo(), item.getFecha(), item.getOrden(),
                         item.getHoraInicio(), item.getHoraFin(), item.getTrasladoKm(), item.getTrasladoMinutos(),
-                        item.isDisponible(), item.getMotivoNoDisponible()))
+                        item.isDisponible(), item.getMotivoNoDisponible(),
+                        item.getImagenes() == null ? List.of() : List.copyOf(item.getImagenes()),
+                        item.getCiudad(), item.getLocalidad(), item.getDireccion(), item.getLugarRecinto(),
+                        item.getLatitud(), item.getLongitud(), item.getTipoAcceso(), item.getMontoEstimado(),
+                        item.getDescripcionArancel(), item.getSitioOficial(), item.getDuracionMinutos()))
                 .toList();
         return new CircuitoAlternativaResponse(alternative.getEstrategia(), items, alternative.getDistanciaTotalKm(),
                 alternative.getAfinidadIntereses(), new LinkedHashSet<>(alternative.getCategoriasCubiertas()),

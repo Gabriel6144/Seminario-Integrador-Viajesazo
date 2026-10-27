@@ -134,7 +134,7 @@ class CircuitGeneratorTest {
     private CircuitCandidate candidate(Long id, String name, InteresCategoria category,
             CircuitCandidate.TimeSlot slot) {
         return new CircuitCandidate(id, name, null, TipoRegistro.ACTIVIDAD, category, -31.4, -64.2,
-                List.of(slot));
+                List.of(slot), CircuitCandidate.ProposalDetails.empty());
     }
 
     private CircuitCandidate.TimeSlot slot(LocalDate date, String start, String end) {

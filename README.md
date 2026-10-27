@@ -56,7 +56,7 @@ que poner un proxy inverso delante o habilitar CORS en el backend.
 | | Comando | Qué corre |
 | --- | --- | --- |
 | Backend | `.\mvnw.cmd clean test` | 229 tests: 227 en verde y 2 fallos preexistentes por fechas fijas (JUnit 5, Mockito, `@WebMvcTest`, `@DataJpaTest`) |
-| Frontend | `npm test` | 178 tests: 169 en verde y 9 fallos preexistentes de `eventos-page`/`evento-editar-page` (Vitest, Testing Library, MSW) |
+| Frontend | `npm test` | 182 tests: 173 en verde y 9 fallos preexistentes de `eventos-page`/`evento-editar-page` (Vitest, Testing Library, MSW) |
 | Frontend | `npm run typecheck` | TypeScript sin emitir |
 | Frontend | `npm run lint` | oxlint |
 | Frontend | `npm run build` | typecheck + build de producción |

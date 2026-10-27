@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -40,6 +41,7 @@ import com.viajesazo.turismo_backend.exception.BusinessRuleException;
 import com.viajesazo.turismo_backend.exception.ResourceNotFoundException;
 import com.viajesazo.turismo_backend.model.EstadoViaje;
 import com.viajesazo.turismo_backend.model.InteresCategoria;
+import com.viajesazo.turismo_backend.model.TipoAcceso;
 import com.viajesazo.turismo_backend.model.TipoRitmo;
 import com.viajesazo.turismo_backend.service.ViajeService;
 import com.viajesazo.turismo_backend.service.CircuitoService;
@@ -299,7 +301,19 @@ class ViajeControllerTest {
 				.andExpect(jsonPath("$.alternativas[0].propuestas[0].categoria").value("CULTURA"))
 				.andExpect(jsonPath("$.alternativas[0].propuestas[0].disponible").value(false))
 				.andExpect(jsonPath("$.alternativas[0].propuestas[0].motivoNoDisponible")
-						.value("la propuesta está cancelada"));
+						.value("la propuesta está cancelada"))
+				.andExpect(jsonPath("$.alternativas[0].propuestas[0].imagenes[0]").value("https://imagen.test/evento.jpg"))
+				.andExpect(jsonPath("$.alternativas[0].propuestas[0].ciudad").value("Córdoba"))
+				.andExpect(jsonPath("$.alternativas[0].propuestas[0].localidad").value("Nueva Córdoba"))
+				.andExpect(jsonPath("$.alternativas[0].propuestas[0].direccion").value("Av. Hipólito Yrigoyen 325"))
+				.andExpect(jsonPath("$.alternativas[0].propuestas[0].lugarRecinto").value("Paseo del Buen Pastor"))
+				.andExpect(jsonPath("$.alternativas[0].propuestas[0].latitud").value(-31.4))
+				.andExpect(jsonPath("$.alternativas[0].propuestas[0].longitud").value(-64.2))
+				.andExpect(jsonPath("$.alternativas[0].propuestas[0].tipoAcceso").value("DE_PAGO"))
+				.andExpect(jsonPath("$.alternativas[0].propuestas[0].montoEstimado").value(1500.0))
+				.andExpect(jsonPath("$.alternativas[0].propuestas[0].descripcionArancel").value("Entrada general"))
+				.andExpect(jsonPath("$.alternativas[0].propuestas[0].sitioOficial").value("https://evento.test"))
+				.andExpect(jsonPath("$.alternativas[0].propuestas[0].duracionMinutos").value(60));
 	}
 
 	@Test
@@ -349,7 +363,11 @@ class ViajeControllerTest {
 	private GeneracionCircuitoResponse circuitResponse() {
 		CircuitoItemResponse item = new CircuitoItemResponse(1L, "Evento", "Descripción", InteresCategoria.CULTURA,
 				com.viajesazo.turismo_backend.model.TipoRegistro.EVENTO, LocalDate.parse("2026-10-20"), 1,
-				LocalTime.of(10, 0), LocalTime.of(11, 0), 2.5, 5, false, "la propuesta está cancelada");
+				LocalTime.of(10, 0), LocalTime.of(11, 0), 2.5, 5, false, "la propuesta está cancelada",
+				List.of("https://imagen.test/evento.jpg"), "Córdoba", "Nueva Córdoba",
+				"Av. Hipólito Yrigoyen 325", "Paseo del Buen Pastor", BigDecimal.valueOf(-31.4),
+				BigDecimal.valueOf(-64.2), TipoAcceso.DE_PAGO, BigDecimal.valueOf(1500),
+				"Entrada general", "https://evento.test", 60);
 		CircuitoAlternativaResponse alternative = new CircuitoAlternativaResponse(
 				com.viajesazo.turismo_backend.model.CircuitStrategy.CERCANIA, List.of(item), 2.5, 1.0,
 				Set.of(InteresCategoria.CULTURA), null);

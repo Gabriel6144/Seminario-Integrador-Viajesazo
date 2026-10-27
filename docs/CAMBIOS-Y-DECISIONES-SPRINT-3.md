@@ -1,7 +1,7 @@
 # Cambios y decisiones — Sprint 3
 
 > **Estado:** implementado y verificado en backend y frontend.
-> **Última verificación:** 229 tests backend (227 en verde) y 178 tests frontend (169 en verde),
+> **Última verificación:** 229 tests backend (227 en verde) y 182 tests frontend (173 en verde),
 > arranque con `data.sql` correcto y flujo de circuito generado/seleccionado respondiendo 201/200.
 > Los fallos restantes son preexistentes y ajenos a este sprint.
 > **Documento de API para frontend:** [`API-PROPUESTAS-FRONTEND.md`](./API-PROPUESTAS-FRONTEND.md)
@@ -23,8 +23,12 @@ Se completó:
 - Control de concurrencia optimista con `@Version` y respuesta `409 ProblemDetail`.
 - Seed reescrito para el esquema nuevo, con fechas relativas y dos actividades de ejemplo.
 - Circuitos automáticos VZ-25: tres alternativas, snapshot persistido y selección única.
-- Integración del planificador en el frontend (pasos 9 y 10).
-- 229 tests backend y 178 tests frontend (con fallos preexistentes ajenos).
+- Snapshot de circuito enriquecido: imágenes, ubicación/coordenadas, acceso, arancel, sitio
+  oficial y duración, para que el detalle y los mapas se dibujen sin datos mockeados.
+- Integración del planificador en el frontend (pasos 9 y 10), detalle y mapas reales, y “Mis
+  viajes” con borradores y circuitos confirmados.
+- 229 tests backend (227 en verde) y 182 tests frontend (173 en verde); los 9 fallos frontend
+  restantes son preexistentes y ajenos.
 
 Lo que **no** incluye este sprint:
 
@@ -406,7 +410,8 @@ Cobertura conceptual:
 - Servicios: creación, actualización, borrado, geocodificación mockeada, errores.
 - Controllers: validación, 404, 422, 409, paginación y contrato JSON.
 - Circuitos VZ-25: motor, snapshot, selección única y recarga con ítems ordenados.
-- Frontend: flujo completo del planificador contra MSW (generar, elegir alternativa, guardar).
+- Frontend: flujo completo del planificador contra MSW (generar, elegir alternativa, guardar),
+  adaptador del circuito a `stopsByDay` y listado mixto de borradores/circuitos confirmados.
 
 No cubierto por la suite:
 
@@ -541,6 +546,9 @@ La app queda en `http://localhost:8080`.
 
 - `POST /api/viajes/{id}/circuito` genera `CERCANIA`, `INTERESES` y `DESCUBRIMIENTO`; se guardan
   como snapshot y **no se regeneran**.
+- El snapshot de cada ítem incluye `imagenes`, `ciudad`, `localidad`, `direccion`, `lugarRecinto`,
+  `latitud`, `longitud`, `tipoAcceso`, `montoEstimado`, `descripcionArancel`, `sitioOficial` y
+  `duracionMinutos`. Así el detalle y los mapas no vuelven a consultar la propuesta original.
 - `POST /api/viajes/{id}/circuito/seleccion` elige una sola alternativa; una segunda respuesta es
   `400`.
 - La ventana diaria es `06:00–23:59`; un evento sin horario ocupa `09:00–18:00`.

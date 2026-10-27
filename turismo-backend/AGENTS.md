@@ -380,7 +380,10 @@ Decisiones y trampas:
 - **Las distancias son Haversine** (`HaversineDistanceProvider`, 30 km/h), no OSRM. La respuesta
   trae `distanciasEstimadas=true`.
 - **El snapshot guarda `descripcion` y `categoria`**, no solo el id: si la propuesta cambia o se
-  da de baja, el circuito sigue mostrando lo que se generó, marcando `disponible=false`.
+  da de baja, el circuito sigue mostrando lo que se generó, marcando `disponible=false`. También
+  guarda `imagenes`, `ciudad`, `localidad`, `direccion`, `lugarRecinto`, `latitud`, `longitud`,
+  `tipoAcceso`, `montoEstimado`, `descripcionArancel`, `sitioOficial` y `duracionMinutos`, para que
+  el detalle y los mapas del frontend no dependan de otra consulta.
 - **`CircuitoAlternativa.items` usa `@OrderBy("orden ASC")`, nunca `@OrderColumn`.** El campo
   `CircuitoItem.orden` ya es una columna real; un `@OrderColumn(name = "orden")` la duplicaba y al
   releer la lista llegaban `null`, con NPE en `toResponse`/`refreshAvailability`. Lo cubre

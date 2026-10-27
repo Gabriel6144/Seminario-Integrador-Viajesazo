@@ -2,9 +2,11 @@ package com.viajesazo.turismo_backend.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,6 +17,7 @@ import com.viajesazo.turismo_backend.model.Circuito;
 import com.viajesazo.turismo_backend.model.CircuitoAlternativa;
 import com.viajesazo.turismo_backend.model.CircuitoItem;
 import com.viajesazo.turismo_backend.model.EstadoViaje;
+import com.viajesazo.turismo_backend.model.TipoAcceso;
 import com.viajesazo.turismo_backend.model.TipoRegistro;
 import com.viajesazo.turismo_backend.model.TipoRitmo;
 import com.viajesazo.turismo_backend.model.Ubicacion;
@@ -72,6 +75,17 @@ class CircuitoRepositoryTest {
 		assertThat(reloaded.getAlternativas().get(0).getItems())
 				.extracting(CircuitoItem::getOrden)
 				.containsExactly(1, 2);
+		CircuitoItem first = reloaded.getAlternativas().get(0).getItems().get(0);
+		assertThat(first.getImagenes()).containsExactly("https://imagen.test/evento.jpg");
+		assertThat(first.getCiudad()).isEqualTo("Córdoba");
+		assertThat(first.getLocalidad()).isEqualTo("Nueva Córdoba");
+		assertThat(first.getDireccion()).isEqualTo("Av. Hipólito Yrigoyen 325");
+		assertThat(first.getLugarRecinto()).isEqualTo("Paseo del Buen Pastor");
+		assertThat(first.getLatitud()).isEqualByComparingTo("-31.4");
+		assertThat(first.getLongitud()).isEqualByComparingTo("-64.2");
+		assertThat(first.getTipoAcceso()).isEqualTo(TipoAcceso.DE_PAGO);
+		assertThat(first.getMontoEstimado()).isEqualByComparingTo("1500.00");
+		assertThat(first.getDuracionMinutos()).isEqualTo(60);
 	}
 
 	private CircuitoItem item(int orden, LocalTime inicio) {
@@ -86,6 +100,18 @@ class CircuitoRepositoryTest {
 		item.setTrasladoKm(0.0);
 		item.setTrasladoMinutos(0);
 		item.setDisponible(true);
+		item.setImagenes(List.of("https://imagen.test/evento.jpg"));
+		item.setCiudad("Córdoba");
+		item.setLocalidad("Nueva Córdoba");
+		item.setDireccion("Av. Hipólito Yrigoyen 325");
+		item.setLugarRecinto("Paseo del Buen Pastor");
+		item.setLatitud(BigDecimal.valueOf(-31.4));
+		item.setLongitud(BigDecimal.valueOf(-64.2));
+		item.setTipoAcceso(TipoAcceso.DE_PAGO);
+		item.setMontoEstimado(BigDecimal.valueOf(1500));
+		item.setDescripcionArancel("Entrada general");
+		item.setSitioOficial("https://evento.test");
+		item.setDuracionMinutos(60);
 		return item;
 	}
 }

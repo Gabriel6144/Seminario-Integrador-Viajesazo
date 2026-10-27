@@ -19,5 +19,6 @@ public record ScheduledProposal(
         double transferDistanceKm,
         int transferMinutes,
         boolean available,
-        String unavailableReason) {
+        String unavailableReason,
+        CircuitCandidate.ProposalDetails details) {
 }
