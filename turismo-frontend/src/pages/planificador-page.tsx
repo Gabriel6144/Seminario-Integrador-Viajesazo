@@ -1,6 +1,5 @@
 import { useEffect, useState, useId, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { useGenerarCircuito, useSeleccionarCircuito } from '@/api/circuitos'
 import {
   useBorrador,
   useActualizarBorrador,
@@ -8,7 +7,6 @@ import {
   useCrearViaje,
   useGuardarBorrador,
 } from '@/api/viajes'
-import { ApiError, apiGet, toUserMessage } from '@/lib/http'
 import {
   INTEREST_MAP,
   RADIO_MAX_KM,
@@ -29,8 +27,6 @@ import { PlanificadorExitModal } from '@/components/planificador/planificador-ex
 import { PlanificadorHeader } from '@/components/planificador/planificador-header'
 import type { DestinoSeleccionado, LoadingStep } from '@/components/planificador/types'
 import type {
-  CircuitStrategy,
-  GeneracionCircuitoResponse,
   InteresCategoria,
   TipoRitmo,
   ViajeBorradorRequest,
@@ -67,8 +63,6 @@ export function PlanificadorPage() {
   const actualizarBorrador = useActualizarBorrador()
   const completarBorrador = useCompletarBorrador()
   const crearViaje = useCrearViaje()
-  const generarCircuito = useGenerarCircuito()
-  const seleccionarCircuito = useSeleccionarCircuito()
 
   const tripNameId = useId()
   const dateFromId = useId()
@@ -97,33 +91,22 @@ export function PlanificadorPage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [activeDay, setActiveDay] = useState<number>(1)
 
-  // Circuito generado. El viaje se persiste antes de llamar al motor, así que `tripId` también
-  // sirve para saber si ya está en Mis viajes.
-  const [tripId, setTripId] = useState<number | null>(null)
-  const [circuito, setCircuito] = useState<GeneracionCircuitoResponse | null>(null)
-  const [activeStrategy, setActiveStrategy] = useState<CircuitStrategy>('CERCANIA')
-  const [generationFinished, setGenerationFinished] = useState<boolean>(false)
-  const [generationError, setGenerationError] = useState<string | null>(null)
-
   // Loading animation state
   const [loadingStepIndex, setLoadingStepIndex] = useState<number>(0)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  const clearGenerationTimers = () => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-      intervalRef.current = null
-    }
-  }
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    return () => clearGenerationTimers()
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    }
   }, [])
   const loadingSteps: LoadingStep[] = [
     { title: 'Estamos buscando experiencias para vos...', sub: 'Explorando paradas serranas y recomendaciones locales...', bar: 30 },
     { title: 'Encontramos actividades que coinciden con tus intereses...', sub: `Combinando ${interests.slice(0, 2).join(' & ')}...`, bar: 65 },
-    { title: 'Estamos armando la mejor combinación...', sub: 'Calculando tiempos óptimos sin apurarte...', bar: 88 },
-    { title: '¡Tu aventura está lista!', sub: 'Itinerario optimizado con éxito.', bar: 100 },
+    { title: 'Estamos armando las mejores combinaciones...', sub: 'Organizamos opciones de circuitos optimizadas con mapas, atractivos y gastronomía cordobesa.', bar: 88 },
+    { title: '¡Tu aventura está lista!', sub: 'Alternativas de circuitos optimizadas con éxito.', bar: 100 },
   ]
 
   // Validation helpers for each step
@@ -186,9 +169,7 @@ export function PlanificadorPage() {
     crearViaje.isPending ||
     guardarBorrador.isPending ||
     actualizarBorrador.isPending ||
-    completarBorrador.isPending ||
-    generarCircuito.isPending ||
-    seleccionarCircuito.isPending
+    completarBorrador.isPending
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
@@ -246,61 +227,12 @@ export function PlanificadorPage() {
     setStep(targetStep)
   }
 
-  useEffect(() => {
-    if (step === 9 && generationFinished && circuito !== null && generationError === null) {
-      setStep(10)
-    }
-  }, [step, generationFinished, circuito, generationError])
-
-  const runCircuitGeneration = async () => {
-    let id = tripId
-    try {
-      if (id === null) {
-        const trip =
-          borradorId !== null
-            ? await completarBorrador.mutateAsync(borradorId)
-            : await crearViaje.mutateAsync(buildViajeRequest())
-        id = trip.id
-        setTripId(id)
-        if (borradorId !== null) setBorradorId(null)
-      }
-      const generated = await generarCircuito.mutateAsync(id)
-      setCircuito(generated)
-      setActiveStrategy(generated.estrategiaSeleccionada ?? generated.alternativas[0]?.estrategia ?? 'CERCANIA')
-      setActiveDay(1)
-    } catch (error) {
-      if (
-        id !== null &&
-        error instanceof ApiError &&
-        error.status === 400 &&
-        error.message.includes('ya fue generado')
-      ) {
-        try {
-          const existing = await apiGet<GeneracionCircuitoResponse>(`/api/viajes/${id}/circuito`)
-          setCircuito(existing)
-          setActiveStrategy(
-            existing.estrategiaSeleccionada ?? existing.alternativas[0]?.estrategia ?? 'CERCANIA',
-          )
-          setActiveDay(1)
-          return
-        } catch {
-          // Si tampoco se puede leer el circuito existente, se muestra el error original abajo.
-        }
-      }
-      clearGenerationTimers()
-      const message = toUserMessage(error)
-      setGenerationError(message)
-      setStep(8)
-      showToast(message)
-    }
-  }
-
   const startCircuitGeneration = () => {
     setStep(9)
     setLoadingStepIndex(0)
-    setGenerationFinished(false)
-    setGenerationError(null)
-    clearGenerationTimers()
+
+    if (intervalRef.current) clearInterval(intervalRef.current)
+    if (timeoutRef.current) clearTimeout(timeoutRef.current)
 
     let idx = 0
     intervalRef.current = setInterval(() => {
@@ -308,55 +240,15 @@ export function PlanificadorPage() {
       if (idx < loadingSteps.length) {
         setLoadingStepIndex(idx)
       } else {
-        clearGenerationTimers()
-        setLoadingStepIndex(loadingSteps.length - 1)
-        setGenerationFinished(true)
+        if (intervalRef.current) clearInterval(intervalRef.current)
+        timeoutRef.current = setTimeout(() => {
+          setStep(10)
+        }, 500)
       }
     }, 1100)
-
-    void runCircuitGeneration()
   }
 
-  const handleSelectStrategy = (strategy: CircuitStrategy) => {
-    if (tripId === null) return
-    seleccionarCircuito.mutate(
-      { viajeId: tripId, estrategia: strategy },
-      {
-        onSuccess: (data) => {
-          setCircuito(data)
-          setActiveStrategy(strategy)
-          showToast('Alternativa seleccionada')
-        },
-        onError: (error) => showToast(toUserMessage(error)),
-      },
-    )
-  }
-
-  const handleChangeStrategy = (strategy: CircuitStrategy) => {
-    setActiveStrategy(strategy)
-    setActiveDay(1)
-  }
-
-  const resetWizard = () => {
-    clearGenerationTimers()
-    setStep(1)
-    setTripName('')
-    setDateFrom('')
-    setDateTo('')
-    setDestino(null)
-    setRadiusKm(8)
-    setInterests([])
-    setRhythm('')
-    setBorradorId(null)
-    setTripId(null)
-    setCircuito(null)
-    setActiveStrategy('CERCANIA')
-    setActiveDay(1)
-    setGenerationFinished(false)
-    setGenerationError(null)
-  }
-
-  const buildViajeData = () => ({
+  const buildViajePayload = (): ViajeBorradorRequest => ({
     nombre: tripName.trim() || 'Escapada a Córdoba',
     fechaInicio: dateFrom,
     fechaFin: dateTo,
@@ -371,34 +263,16 @@ export function PlanificadorPage() {
           },
     rangoInteresKm: Number(radiusKm),
     ritmo: RHYTHM_MAP[rhythm] ?? 'EQUILIBRADO',
-    intereses: interests.map((item) => INTEREST_MAP[item] ?? 'NATURALEZA'),
+    interesesCategoria: interests.map((item) => INTEREST_MAP[item] ?? 'NATURALEZA'),
+    pasoActual: step,
     usuario: 'turista_demo',
   })
 
-  const buildViajePayload = (): ViajeBorradorRequest => {
-    const { intereses, ...data } = buildViajeData()
-    return { ...data, interesesCategoria: intereses, pasoActual: step }
-  }
-
-  const buildViajeRequest = (): ViajeRequest => {
-    const { ubicacion, ...data } = buildViajeData()
-    if (ubicacion === null) {
-      throw new Error('Falta la zona de destino para guardar el viaje')
-    }
-    return { ...data, ubicacion }
-  }
-
   const handleSaveTrip = () => {
-    if (tripId !== null) {
-      showToast(`¡Viaje "${tripName}" guardado en Mis viajes! 💙`)
-      setTimeout(() => navigate('/borradores'), 800)
-      return
-    }
-
     if (borradorId !== null) {
       completarBorrador.mutate(borradorId, {
         onSuccess: (data) => {
-          showToast(`¡Viaje "${data.nombre ?? 'sin nombre'}" guardado en Mis viajes! 💙`)
+          showToast(`¡Viaje "${data.nombre ?? 'sin nombre'}" guardado en Mis viajes!`)
           setBorradorId(null)
           setTimeout(() => navigate('/borradores'), 1200)
         },
@@ -409,9 +283,9 @@ export function PlanificadorPage() {
       return
     }
 
-    crearViaje.mutate(buildViajeRequest(), {
+    crearViaje.mutate(buildViajePayload() as ViajeRequest, {
       onSuccess: (data) => {
-        showToast(`¡Viaje "${data.nombre ?? 'sin nombre'}" guardado en Mis viajes! 💙`)
+        showToast(`¡Viaje "${data.nombre ?? 'sin nombre'}" guardado en Mis viajes!`)
         setTimeout(() => navigate('/borradores'), 1200)
       },
       onError: (error) => {
@@ -548,18 +422,13 @@ export function PlanificadorPage() {
               tripName={tripName}
               daysCount={daysCount}
               rhythm={rhythm}
-              circuito={circuito}
-              activeStrategy={activeStrategy}
               activeDay={activeDay}
               isSavingTrip={isSavingTrip}
-              isSelecting={seleccionarCircuito.isPending}
-              isTripSaved={tripId !== null}
-              onChangeStrategy={handleChangeStrategy}
               onChangeActiveDay={setActiveDay}
-              onSelectStrategy={handleSelectStrategy}
               onSaveTrip={handleSaveTrip}
               onExploreMap={() => setStep(5)}
-              onRestart={resetWizard}
+              onRestart={() => setStep(1)}
+              onBackToResumen={() => setStep(8)}
             />
           )}
         </main>

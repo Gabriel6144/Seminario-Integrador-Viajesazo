@@ -101,7 +101,7 @@ export function TopAppBar() {
               alt="Logo de Viajesazo"
               className="h-9 w-9 rounded-full object-cover shadow-sm"
             />
-            <span className="font-heading text-lg font-bold text-[#00658d] tracking-tight">
+            <span className="font-heading text-lg font-bold text-[#bb0413] tracking-tight">
               Viajesazo
             </span>
           </Link>
@@ -210,9 +210,9 @@ export function TopAppBar() {
         <div className="flex items-center gap-2">
           <div
             title={`${clima.descripcion} en Córdoba Capital`}
-            className="flex items-center gap-1 rounded-full border border-sky-100 bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 shadow-sm"
+            className="flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-[#bb0413] shadow-sm"
           >
-            <span className="material-symbols-outlined text-sm text-sky-500" aria-hidden>
+            <span className="material-symbols-outlined text-sm text-[#df2a29]" aria-hidden>
               {clima.icono}
             </span>
             <span className="text-sm">{clima.temperatura}°C Córdoba</span>

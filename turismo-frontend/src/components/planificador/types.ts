@@ -52,3 +52,55 @@ export interface ActivityItem {
   title: string
   desc: string
 }
+
+export interface CircuitoChip {
+  icon: string
+  label: string
+  variant: 'sky' | 'amber' | 'slate'
+}
+
+export interface CircuitoRecomendado {
+  id: string
+  title: string
+  affinity: string
+  image: string
+  categoryTag: string
+  categoryIcon: string
+  daysLabel: string
+  paceLabel: string
+  chips: CircuitoChip[]
+  ventajas: string[]
+  consideraciones: string[]
+}
+
+export interface ParadaCircuitoDetalle {
+  id: string
+  time: string
+  title: string
+  category: string
+  badgeClass: string
+  description: string
+  detailDescription: string
+  location: string
+  hours: string
+  price: string
+  image: string
+  walkNext?: string
+  latitud?: number
+  longitud?: number
+}
+
+export interface AlternativaReemplazo {
+  id: string
+  title: string
+  category: string
+  badgeClass: string
+  description: string
+  walkDistance: string
+  image: string
+  location: string
+  hours: string
+  price: string
+  latitud?: number
+  longitud?: number
+}
