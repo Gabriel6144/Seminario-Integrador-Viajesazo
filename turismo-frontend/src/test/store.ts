@@ -1,5 +1,15 @@
-import { BORRADORES, EVENTOS, PUBLICADORES } from './fixtures'
-import type { EventoRequest, EventoResponse, PublicadorRequest, PublicadorResponse, ViajeBorradorRequest, ViajeResponse } from '@/types/api'
+import { BORRADORES, CIRCUITO, EVENTOS, PUBLICADORES } from './fixtures'
+import type {
+  CircuitStrategy,
+  EventoRequest,
+  EventoResponse,
+  GeneracionCircuitoResponse,
+  PublicadorRequest,
+  PublicadorResponse,
+  ViajeBorradorRequest,
+  ViajeRequest,
+  ViajeResponse,
+} from '@/types/api'
 
 /**
  * Base de datos en memoria para los tests.
@@ -17,6 +27,7 @@ import type { EventoRequest, EventoResponse, PublicadorRequest, PublicadorRespon
 let eventos: EventoResponse[] = []
 let publicadores: PublicadorResponse[] = []
 let borradores: ViajeResponse[] = []
+let circuitos = new Map<number, GeneracionCircuitoResponse>()
 let nextEventoId = 0
 let nextPublicadorId = 0
 let nextBorradorId = 0
@@ -25,6 +36,7 @@ export function resetStore(): void {
   eventos = structuredClone(EVENTOS)
   publicadores = structuredClone(PUBLICADORES)
   borradores = structuredClone(BORRADORES)
+  circuitos = new Map()
   // Los fixtures ya traen ids 1..3 y 1..7, así que los siguientes arrancan por arriba.
   nextEventoId = Math.max(0, ...EVENTOS.map((evento) => evento.id)) + 1
   nextPublicadorId = Math.max(0, ...PUBLICADORES.map((publicador) => publicador.id)) + 1
@@ -101,6 +113,46 @@ export function completeBorrador(id: number): ViajeResponse | undefined {
   borrador.estado = 'PLANIFICADO'
   borrador.pasoActual = 8
   return borrador
+}
+
+/** `POST /api/viajes`: el viaje queda persistido antes de pedir el circuito. */
+export function createViaje(request: ViajeRequest): ViajeResponse {
+  const created = createBorrador({
+    nombre: request.nombre,
+    ubicacion: request.ubicacion,
+    rangoInteresKm: request.rangoInteresKm,
+    fechaInicio: request.fechaInicio,
+    fechaFin: request.fechaFin,
+    ritmo: request.ritmo,
+    interesesCategoria: request.intereses,
+    pasoActual: 8,
+    usuario: request.usuario,
+  })
+  created.estado = 'PLANIFICADO'
+  return created
+}
+
+export function findCircuito(viajeId: number): GeneracionCircuitoResponse | undefined {
+  return circuitos.get(viajeId)
+}
+
+export function createCircuito(viajeId: number): GeneracionCircuitoResponse {
+  const created = structuredClone(CIRCUITO)
+  circuitos.set(viajeId, created)
+  return created
+}
+
+export function selectCircuito(
+  viajeId: number,
+  estrategia: CircuitStrategy,
+): GeneracionCircuitoResponse | undefined {
+  const circuito = circuitos.get(viajeId)
+  if (circuito === undefined || circuito.estrategiaSeleccionada !== null) return undefined
+  if (!circuito.alternativas.some((alternativa) => alternativa.estrategia === estrategia)) {
+    return undefined
+  }
+  circuito.estrategiaSeleccionada = estrategia
+  return circuito
 }
 
 export function deleteBorrador(id: number): boolean {

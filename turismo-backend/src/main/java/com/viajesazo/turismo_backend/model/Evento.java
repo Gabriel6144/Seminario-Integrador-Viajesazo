@@ -54,7 +54,7 @@ public class Evento extends PropuestaTuristica {
 
 	@Override
 	public Set<TipoPropuesta> tiposPermitidos() {
-		return EnumSet.allOf(TipoPropuesta.class);
+		return EnumSet.complementOf(EnumSet.of(TipoPropuesta.VISITA_GUIADA));
 	}
 
 	@Override

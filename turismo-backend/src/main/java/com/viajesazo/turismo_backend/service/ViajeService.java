@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.viajesazo.turismo_backend.dto.request.ViajeBorradorRequest;
 import com.viajesazo.turismo_backend.dto.request.ViajeRequest;
 import com.viajesazo.turismo_backend.dto.response.ViajeResponse;
+import com.viajesazo.turismo_backend.dto.response.CircuitoResponse;
 import com.viajesazo.turismo_backend.exception.BusinessRuleException;
 import com.viajesazo.turismo_backend.exception.ResourceNotFoundException;
 import com.viajesazo.turismo_backend.mapper.ViajeMapper;
@@ -28,25 +29,28 @@ public class ViajeService {
 	private final ViajeRepository viajeRepository;
 	private final ViajeMapper mapper;
 	private final Clock clock;
+	private final CircuitoService circuitoService;
 
 	/** VZ-19: registra el viaje. Nace {@code PLANIFICADO} y asociado a su turista. */
 	@Transactional
 	public ViajeResponse create(ViajeRequest request) {
-		validateRange(request);
+		validateCreationDate(request);
 		Viaje viaje = mapper.toEntity(request);
 		viaje.setEstado(EstadoViaje.PLANIFICADO);
-		return mapper.toResponse(viajeRepository.save(viaje));
+		return withCircuit(mapper.toResponse(viajeRepository.save(viaje)), viaje.getId());
 	}
 
 	/** VZ-21: modifica una plantilla activa. Un viaje dado de baja responde 404. */
 	@Transactional
 	public ViajeResponse update(Long id, ViajeRequest request) {
-		validateRange(request);
 		Viaje viaje = getOrThrow(id);
 		viaje.validarEditable();
+
+		validateUpdateDate(request, viaje);
+
 		mapper.updateEntity(request, viaje);
 		mapper.updateUbicacion(request.ubicacion(), viaje.getZonaInteres());
-		return mapper.toResponse(viajeRepository.save(viaje));
+		return withCircuit(mapper.toResponse(viajeRepository.save(viaje)), viaje.getId());
 	}
 
 	/**
@@ -63,28 +67,28 @@ public class ViajeService {
 	/** Soporte de VZ-21: detalle para editar. Inactivos → 404. */
 	@Transactional(readOnly = true)
 	public ViajeResponse findById(Long id) {
-		return mapper.toResponse(getOrThrow(id));
+		return withCircuit(mapper.toResponse(getOrThrow(id)), id);
 	}
 
 	/** Guarda (crea) un borrador parcial. */
 	@Transactional
 	public ViajeResponse saveDraft(ViajeBorradorRequest request) {
-		validateDraftRange(request);
 		Viaje viaje = mapper.toEntity(request);
+		validateDraftRange(request, viaje);
 		viaje.setEstado(EstadoViaje.BORRADOR);
 		if (viaje.getInteresesCategoria() == null) {
 			viaje.setInteresesCategoria(new ArrayList<>());
 		}
-		return mapper.toResponse(viajeRepository.save(viaje));
+		return withCircuit(mapper.toResponse(viajeRepository.save(viaje)), viaje.getId());
 	}
 
 	/** Actualiza un borrador existente, aplicando solo campos no nulos. */
 	@Transactional
 	public ViajeResponse updateDraft(Long id, ViajeBorradorRequest request) {
-		validateDraftRange(request);
 		Viaje viaje = viajeRepository.findByIdAndUsuarioAndEstado(id, request.usuario(), EstadoViaje.BORRADOR)
 				.orElseThrow(() -> new ResourceNotFoundException("No existe el borrador con id " + id));
 		mapper.updateEntity(request, viaje);
+		validateDraftRange(request, viaje);
 		if (request.ubicacion() != null) {
 			if (viaje.getZonaInteres() == null) {
 				viaje.setZonaInteres(mapper.toUbicacionEntity(request.ubicacion()));
@@ -95,7 +99,7 @@ public class ViajeService {
 		if (request.interesesCategoria() != null) {
 			viaje.setInteresesCategoria(new ArrayList<>(request.interesesCategoria()));
 		}
-		return mapper.toResponse(viajeRepository.save(viaje));
+		return withCircuit(mapper.toResponse(viajeRepository.save(viaje)), viaje.getId());
 	}
 
 	/** Listado de borradores del turista, paginado. */
@@ -110,7 +114,7 @@ public class ViajeService {
 	public ViajeResponse findDraftById(Long id) {
 		Viaje viaje = viajeRepository.findByIdAndEstado(id, EstadoViaje.BORRADOR)
 				.orElseThrow(() -> new ResourceNotFoundException("No existe el borrador con id " + id));
-		return mapper.toResponse(viaje);
+		return withCircuit(mapper.toResponse(viaje), id);
 	}
 
 	/** Completa el borrador: valida obligatorios y pasa a PLANIFICADO. */
@@ -120,7 +124,7 @@ public class ViajeService {
 				.orElseThrow(() -> new ResourceNotFoundException("No existe el borrador con id " + id));
 		viaje.planificar(clock);
 		viaje.setPasoActual(8);
-		return mapper.toResponse(viajeRepository.save(viaje));
+		return withCircuit(mapper.toResponse(viajeRepository.save(viaje)), id);
 	}
 
 	/** Baja lógica de un borrador: pasa a CANCELADO y deja de listarse. */
@@ -146,15 +150,80 @@ public class ViajeService {
 		}
 	}
 
-	private void validateDraftRange(ViajeBorradorRequest request) {
-		if (request.fechaInicio() != null && request.fechaFin() != null
-				&& request.fechaFin().isBefore(request.fechaInicio())) {
-			throw new BusinessRuleException("la fecha de finalización no puede ser anterior a la de inicio");
+	private void validateCreationDate(ViajeRequest request) {
+		if (request.fechaInicio().isBefore(LocalDate.now(clock))) {
+			throw new BusinessRuleException("La fecha de inicio debe ser igual o posterior a la fecha actual");
 		}
-		if (request.rangoInteresKm() != null && request.rangoInteresKm() <= 0) {
-			throw new BusinessRuleException("El rango de interés debe ser mayor a cero");
+
+		if (request.fechaFin().isBefore(request.fechaInicio())) {
+			throw new BusinessRuleException("La fecha de finalización no puede ser anterior a la de inicio");
+		}
+
+	}
+
+	private void validateUpdateDate(ViajeRequest request, Viaje viaje) {
+		// Validación: la nueva fecha de finalización no puede ser anterior a la fecha de inicio.
+		if (request.fechaFin().isBefore(request.fechaInicio())) {
+			throw new BusinessRuleException("La nueva fecha de finalización no puede ser anterior a la de inicio");
+		}
+		// Validación: la nueva fecha de inicio debe ser distinto a la fecha fin guardada
+		if (!request.fechaInicio().equals(viaje.getFechaInicio())) {
+			// Validación: no se puede modificar la fecha de inicio si el viaje ya comenzó.
+			// es opcional y lo hace mas robusto, porque ya sabemos que los viajes en curso no se pueden modificar.
+			if (viaje.getFechaInicio().isBefore(LocalDate.now(clock))) {
+				throw new BusinessRuleException("No se puede modificar la fecha de inicio de un viaje que ya comenzó");
+			}
+			// Validación: la nueva fecha de inicio no puede ser anterior a hoy
+			if (request.fechaInicio().isBefore(LocalDate.now(clock))) {
+				throw new BusinessRuleException("La nueva fecha de inicio no puede ser anterior a hoy");
+			}
+		}
+
+		// Validación: la nueva fecha de finalización debe ser distinto a la fecha fin guardada
+		if (!request.fechaFin().equals(viaje.getFechaFin())) {
+			// Validación: la nueva fecha de finalizacion no puede ser anterior a hoy.
+			if (request.fechaFin().isBefore(LocalDate.now(clock))) {
+				throw new BusinessRuleException("La nueva fecha de finalizacion no puede ser anterior a hoy");
+			}
+			if (viaje.getFechaFin().isBefore(LocalDate.now(clock))) {
+				throw new BusinessRuleException("La fecha de finalizacion no puede ser anterior a la fecha actual");
+			}
+
 		}
 	}
+
+	
+	private void validateDraftRange(ViajeBorradorRequest request, Viaje viaje) {
+		// Validación: la nueva fecha de finalización no puede ser anterior a la fecha de inicio.
+		if (request.fechaFin().isBefore(request.fechaInicio())) {
+			throw new BusinessRuleException("La nueva fecha de finalización no puede ser anterior a la de inicio");
+		}
+		// Validación: la nueva fecha de inicio debe ser distinto a la fecha fin guardada
+		if (!request.fechaInicio().equals(viaje.getFechaInicio())) {
+			// Validación: no se puede modificar la fecha de inicio si el viaje ya comenzó.
+			// es opcional y lo hace mas robusto, porque ya sabemos que los viajes en curso no se pueden modificar.
+			if (viaje.getFechaInicio().isBefore(LocalDate.now(clock))) {
+				throw new BusinessRuleException("No se puede modificar la fecha de inicio de un viaje que ya comenzó");
+			}
+			// Validación: la nueva fecha de inicio no puede ser anterior a hoy
+			if (request.fechaInicio().isBefore(LocalDate.now(clock))) {
+				throw new BusinessRuleException("La nueva fecha de inicio no puede ser anterior a hoy");
+			}
+		}
+		// Validación: la nueva fecha de finalización debe ser distinto a la fecha fin guardada
+		if (!request.fechaFin().equals(viaje.getFechaFin())) {
+			// Validación: la nueva fecha de finalizacion no puede ser anterior a hoy.
+			if (request.fechaFin().isBefore(LocalDate.now(clock))) {
+				throw new BusinessRuleException("La nueva fecha de finalizacion no puede ser anterior a hoy");
+			}
+			if (viaje.getFechaFin().isBefore(LocalDate.now(clock))) {
+				throw new BusinessRuleException("La nueva fecha de finalizacion no puede ser anterior a la fecha de inicio");
+			}
+
+		}
+	}
+
+
 
 	/** VZ-22: listado de viajes permitidos del turista, paginado. */
 	@Transactional(readOnly = true)
@@ -208,10 +277,11 @@ public class ViajeService {
 		}
 	}
 
-	private void validateRange(ViajeRequest request) {
-		if (request.fechaFin().isBefore(request.fechaInicio())) {
-			throw new BusinessRuleException("la fecha de finalización no puede ser anterior a la de inicio");
-		}
+	private ViajeResponse withCircuit(ViajeResponse response, Long viajeId) {
+		CircuitoResponse circuit = circuitoService.selected(viajeId);
+		return new ViajeResponse(response.id(), response.nombre(), response.ubicacion(),
+				response.rangoInteresKm(), response.fechaInicio(), response.fechaFin(), response.ritmo(),
+				response.interesesCategoria(), response.estado(), response.pasoActual(), response.usuario(), circuit);
 	}
 
 }

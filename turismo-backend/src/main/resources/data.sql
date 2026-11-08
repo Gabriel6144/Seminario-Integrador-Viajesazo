@@ -342,6 +342,157 @@ INSERT INTO actividad_disponibilidad (actividad_id, orden, dia_semana, hora_inic
 
 
 -- ============================================================
+-- PROPUESTAS FUTURAS PARA EL CIRCUITO AUTOMÁTICO (VZ-25)
+-- ============================================================
+-- Cada viaje del seed tiene al menos tres propuestas dentro de su ventana de
+-- fechas y de su radio de interés. Se usan fechas relativas para que el demo
+-- siga funcionando sin importar cuándo se levante la aplicación.
+
+INSERT INTO ubicacion (ciudad, localidad, direccion, latitud, longitud) VALUES
+    ('Villa General Belgrano', 'Villa General Belgrano', 'Río Los Reartes, Villa General Belgrano', -31.9400, -64.5600),
+    ('Villa General Belgrano', 'Villa General Belgrano', 'Museo de la Cerveza, Villa General Belgrano', -31.9520, -64.5480),
+    ('Villa General Belgrano', 'Villa General Belgrano', 'Cervecería artesanal, Villa General Belgrano', -31.9530, -64.5510),
+    ('Ciudad de Córdoba', 'Córdoba', 'Manzana Jesuítica, Córdoba', -31.4170, -64.1870),
+    ('Ciudad de Córdoba', 'Córdoba', 'Feria de artesanos, Córdoba', -31.4130, -64.1830),
+    ('Ciudad de Córdoba', 'Córdoba', 'Cañada de Córdoba', -31.4190, -64.1850),
+    ('Carlos Paz', 'Carlos Paz', 'Lago San Roque, Carlos Paz', -31.4160, -64.5050),
+    ('Carlos Paz', 'Carlos Paz', 'Teleférico, Carlos Paz', -31.4250, -64.4980),
+    ('Carlos Paz', 'Carlos Paz', 'Teatro del Lago, Carlos Paz', -31.4210, -64.5020),
+    ('Alta Gracia', 'Alta Gracia', 'Museo Casa del Che, Alta Gracia', -31.6550, -64.4280),
+    ('Alta Gracia', 'Alta Gracia', 'Feria de productores, Alta Gracia', -31.6530, -64.4310),
+    ('Alta Gracia', 'Alta Gracia', 'Peña de los cerros, Alta Gracia', -31.6570, -64.4260),
+    ('La Cumbrecita', 'La Cumbrecita', 'Bosque de los Pioneros, La Cumbrecita', -31.8990, -64.7710),
+    ('La Cumbrecita', 'La Cumbrecita', 'Cascada de La Cumbrecita', -31.9020, -64.7680),
+    ('La Cumbrecita', 'La Cumbrecita', 'Fogón de la montaña, La Cumbrecita', -31.8980, -64.7730);
+
+INSERT INTO propuesta_turistica
+    (subtipo, version, nombre, descripcion, tipo_propuesta, categoria, modalidad, tipo_acceso,
+     estado_propuesta_id, lugar_recinto, ubicacion_id, publicador_id)
+VALUES
+    ('EVENTO', 0, 'Caminata al Río Los Reartes',
+     'Caminata guiada por los senderos ribereños de Villa General Belgrano.',
+     'DEPORTIVO', 'NATURALEZA', 'PEDESTRE', 'GRATUITO',
+     (SELECT id FROM estado_propuesta WHERE nombre = 'INICIADO'),
+     'Río Los Reartes',
+     (SELECT id FROM ubicacion WHERE direccion = 'Río Los Reartes, Villa General Belgrano'), 1),
+    ('EVENTO', 0, 'Museo de la Cerveza',
+     'Recorrido por la historia cervecera de la localidad con degustación final.',
+     'EXPOSICION', 'HISTORIA', 'PEDESTRE', 'GRATUITO',
+     (SELECT id FROM estado_propuesta WHERE nombre = 'INICIADO'),
+     'Museo de la Cerveza',
+     (SELECT id FROM ubicacion WHERE direccion = 'Museo de la Cerveza, Villa General Belgrano'), 1),
+    ('EVENTO', 0, 'Noche de cerveza artesanal',
+     'Encuentro nocturno con productores locales, música en vivo y food trucks.',
+     'ENCUENTRO', 'VIDA_NOCTURNA', 'PEDESTRE', 'GRATUITO',
+     (SELECT id FROM estado_propuesta WHERE nombre = 'INICIADO'),
+     'Cervecería artesanal',
+     (SELECT id FROM ubicacion WHERE direccion = 'Cervecería artesanal, Villa General Belgrano'), 1),
+    ('EVENTO', 0, 'Visita a la Manzana Jesuítica',
+     'Recorrido guiado por el conjunto histórico declarado Patrimonio de la Humanidad.',
+     'EXPOSICION', 'CULTURA', 'PEDESTRE', 'GRATUITO',
+     (SELECT id FROM estado_propuesta WHERE nombre = 'INICIADO'),
+     'Manzana Jesuítica',
+     (SELECT id FROM ubicacion WHERE direccion = 'Manzana Jesuítica, Córdoba'), 2),
+    ('EVENTO', 0, 'Feria de artesanos del Centro',
+     'Puestos de artesanías, diseño independiente y productos regionales.',
+     'FERIA', 'COMPRAS', 'PEDESTRE', 'GRATUITO',
+     (SELECT id FROM estado_propuesta WHERE nombre = 'INICIADO'),
+     'Feria de artesanos',
+     (SELECT id FROM ubicacion WHERE direccion = 'Feria de artesanos, Córdoba'), 3),
+    ('EVENTO', 0, 'Peña en la Cañada',
+     'Noche de folklore, guitarreada y gastronomía criolla junto a la Cañada.',
+     'ESPECTACULO', 'MUSICA', 'PEDESTRE', 'GRATUITO',
+     (SELECT id FROM estado_propuesta WHERE nombre = 'INICIADO'),
+     'Cañada de Córdoba',
+     (SELECT id FROM ubicacion WHERE direccion = 'Cañada de Córdoba'), 2),
+    ('EVENTO', 0, 'Kayak en el lago San Roque',
+     'Salida guiada en kayak por la costa del lago, con equipo incluido.',
+     'DEPORTIVO', 'AVENTURA', 'PEDESTRE', 'GRATUITO',
+     (SELECT id FROM estado_propuesta WHERE nombre = 'INICIADO'),
+     'Lago San Roque',
+     (SELECT id FROM ubicacion WHERE direccion = 'Lago San Roque, Carlos Paz'), 1),
+    ('EVENTO', 0, 'Teleférico y mirador',
+     'Ascenso al mirador panorámico del valle de Punilla.',
+     'EXPOSICION', 'NATURALEZA', 'PEDESTRE', 'GRATUITO',
+     (SELECT id FROM estado_propuesta WHERE nombre = 'INICIADO'),
+     'Teleférico',
+     (SELECT id FROM ubicacion WHERE direccion = 'Teleférico, Carlos Paz'), 1),
+    ('EVENTO', 0, 'Teatro en Carlos Paz',
+     'Función nocturna de teatro y música en la sala principal del lago.',
+     'ESPECTACULO', 'VIDA_NOCTURNA', 'PEDESTRE', 'GRATUITO',
+     (SELECT id FROM estado_propuesta WHERE nombre = 'INICIADO'),
+     'Teatro del Lago',
+     (SELECT id FROM ubicacion WHERE direccion = 'Teatro del Lago, Carlos Paz'), 2),
+    ('EVENTO', 0, 'Museo Casa del Che',
+     'Visita al museo que recorre la vida de Ernesto Guevara en Alta Gracia.',
+     'EXPOSICION', 'HISTORIA', 'PEDESTRE', 'GRATUITO',
+     (SELECT id FROM estado_propuesta WHERE nombre = 'INICIADO'),
+     'Museo Casa del Che',
+     (SELECT id FROM ubicacion WHERE direccion = 'Museo Casa del Che, Alta Gracia'), 3),
+    ('EVENTO', 0, 'Feria de productores de Alta Gracia',
+     'Productos de la región, conservas, dulces y cocina de estación.',
+     'FERIA', 'GASTRONOMIA', 'PEDESTRE', 'GRATUITO',
+     (SELECT id FROM estado_propuesta WHERE nombre = 'INICIADO'),
+     'Feria de productores',
+     (SELECT id FROM ubicacion WHERE direccion = 'Feria de productores, Alta Gracia'), 3),
+    ('EVENTO', 0, 'Peña de los cerros',
+     'Peña nocturna con artistas locales y comidas típicas de las sierras.',
+     'ESPECTACULO', 'VIDA_NOCTURNA', 'PEDESTRE', 'GRATUITO',
+     (SELECT id FROM estado_propuesta WHERE nombre = 'INICIADO'),
+     'Peña de los cerros',
+     (SELECT id FROM ubicacion WHERE direccion = 'Peña de los cerros, Alta Gracia'), 2),
+    ('EVENTO', 0, 'Bosque de los Pioneros',
+     'Caminata interpretativa por el bosque nativo y sus senderos de montaña.',
+     'DEPORTIVO', 'NATURALEZA', 'PEDESTRE', 'GRATUITO',
+     (SELECT id FROM estado_propuesta WHERE nombre = 'INICIADO'),
+     'Bosque de los Pioneros',
+     (SELECT id FROM ubicacion WHERE direccion = 'Bosque de los Pioneros, La Cumbrecita'), 1),
+    ('EVENTO', 0, 'Cascada de La Cumbrecita',
+     'Caminata hasta la cascada y los pozones naturales del río Almbach.',
+     'DEPORTIVO', 'AVENTURA', 'PEDESTRE', 'GRATUITO',
+     (SELECT id FROM estado_propuesta WHERE nombre = 'INICIADO'),
+     'Cascada de La Cumbrecita',
+     (SELECT id FROM ubicacion WHERE direccion = 'Cascada de La Cumbrecita'), 1),
+    ('EVENTO', 0, 'Fogón bajo las estrellas',
+     'Noche de fogón, música acústica y chocolate caliente en la montaña.',
+     'ENCUENTRO', 'VIDA_NOCTURNA', 'PEDESTRE', 'GRATUITO',
+     (SELECT id FROM estado_propuesta WHERE nombre = 'INICIADO'),
+     'Fogón de la montaña',
+     (SELECT id FROM ubicacion WHERE direccion = 'Fogón de la montaña, La Cumbrecita'), 1);
+
+INSERT INTO evento (id, fecha_inicio, fecha_fin, horario_inicio, horario_fin) VALUES
+    ((SELECT id FROM propuesta_turistica WHERE nombre = 'Caminata al Río Los Reartes'),
+     DATEADD('DAY', 7, CURRENT_DATE), DATEADD('DAY', 9, CURRENT_DATE), '09:00:00', '13:00:00'),
+    ((SELECT id FROM propuesta_turistica WHERE nombre = 'Museo de la Cerveza'),
+     DATEADD('DAY', 7, CURRENT_DATE), DATEADD('DAY', 9, CURRENT_DATE), '10:00:00', '18:00:00'),
+    ((SELECT id FROM propuesta_turistica WHERE nombre = 'Noche de cerveza artesanal'),
+     DATEADD('DAY', 7, CURRENT_DATE), DATEADD('DAY', 9, CURRENT_DATE), '20:00:00', '23:30:00'),
+    ((SELECT id FROM propuesta_turistica WHERE nombre = 'Visita a la Manzana Jesuítica'),
+     DATEADD('DAY', 14, CURRENT_DATE), DATEADD('DAY', 17, CURRENT_DATE), '10:00:00', '13:00:00'),
+    ((SELECT id FROM propuesta_turistica WHERE nombre = 'Feria de artesanos del Centro'),
+     DATEADD('DAY', 14, CURRENT_DATE), DATEADD('DAY', 17, CURRENT_DATE), '11:00:00', '19:00:00'),
+    ((SELECT id FROM propuesta_turistica WHERE nombre = 'Peña en la Cañada'),
+     DATEADD('DAY', 14, CURRENT_DATE), DATEADD('DAY', 17, CURRENT_DATE), '21:00:00', '23:59:00'),
+    ((SELECT id FROM propuesta_turistica WHERE nombre = 'Kayak en el lago San Roque'),
+     DATEADD('DAY', 21, CURRENT_DATE), DATEADD('DAY', 24, CURRENT_DATE), '09:00:00', '12:00:00'),
+    ((SELECT id FROM propuesta_turistica WHERE nombre = 'Teleférico y mirador'),
+     DATEADD('DAY', 21, CURRENT_DATE), DATEADD('DAY', 24, CURRENT_DATE), '10:00:00', '18:00:00'),
+    ((SELECT id FROM propuesta_turistica WHERE nombre = 'Teatro en Carlos Paz'),
+     DATEADD('DAY', 21, CURRENT_DATE), DATEADD('DAY', 24, CURRENT_DATE), '21:00:00', '23:30:00'),
+    ((SELECT id FROM propuesta_turistica WHERE nombre = 'Museo Casa del Che'),
+     DATEADD('DAY', 28, CURRENT_DATE), DATEADD('DAY', 30, CURRENT_DATE), '10:00:00', '13:00:00'),
+    ((SELECT id FROM propuesta_turistica WHERE nombre = 'Feria de productores de Alta Gracia'),
+     DATEADD('DAY', 28, CURRENT_DATE), DATEADD('DAY', 30, CURRENT_DATE), '11:00:00', '18:00:00'),
+    ((SELECT id FROM propuesta_turistica WHERE nombre = 'Peña de los cerros'),
+     DATEADD('DAY', 28, CURRENT_DATE), DATEADD('DAY', 30, CURRENT_DATE), '20:30:00', '23:30:00'),
+    ((SELECT id FROM propuesta_turistica WHERE nombre = 'Bosque de los Pioneros'),
+     DATEADD('DAY', 35, CURRENT_DATE), DATEADD('DAY', 38, CURRENT_DATE), '09:00:00', '13:00:00'),
+    ((SELECT id FROM propuesta_turistica WHERE nombre = 'Cascada de La Cumbrecita'),
+     DATEADD('DAY', 35, CURRENT_DATE), DATEADD('DAY', 38, CURRENT_DATE), '10:00:00', '14:00:00'),
+    ((SELECT id FROM propuesta_turistica WHERE nombre = 'Fogón bajo las estrellas'),
+     DATEADD('DAY', 35, CURRENT_DATE), DATEADD('DAY', 38, CURRENT_DATE), '20:00:00', '23:30:00');
+
+-- ============================================================
 -- VIAJES SUGERIDOS PARA TURISTAS
 -- ============================================================
 --
@@ -385,7 +536,7 @@ INSERT INTO viaje (
 )
 VALUES (
     'Cultura y naturaleza en Córdoba',
-    (SELECT id FROM ubicacion WHERE ciudad = 'Ciudad de Córdoba'),
+    (SELECT id FROM ubicacion WHERE ciudad = 'Ciudad de Córdoba' AND direccion IS NULL),
     50,
     DATEADD('DAY', 14, CURRENT_TIMESTAMP),
     DATEADD('DAY', 17, CURRENT_TIMESTAMP),
@@ -448,7 +599,7 @@ INSERT INTO viaje (
 )
 VALUES (
     'Recorrido familiar por las sierras',
-    (SELECT id FROM ubicacion WHERE ciudad = 'La Cumbrecita'),
+    (SELECT id FROM ubicacion WHERE ciudad = 'La Cumbrecita' AND direccion IS NULL),
     40,
     DATEADD('DAY', 35, CURRENT_TIMESTAMP),
     DATEADD('DAY', 38, CURRENT_TIMESTAMP),
@@ -456,3 +607,27 @@ VALUES (
     'PLANIFICADO',
     'familia.demo@viajesazo.com'
 );
+
+-- ============================================================
+-- INTERESES DE LOS VIAJES DEL SEED
+-- ============================================================
+-- Sin intereses, la estrategia INTERESES queda empatada y el circuito no
+-- refleja las preferencias del turista.
+
+INSERT INTO viaje_intereses_categoria (viaje_id, categoria)
+VALUES
+    ((SELECT id FROM viaje WHERE nombre = 'Escapada serrana por Villa General Belgrano'), 'NATURALEZA'),
+    ((SELECT id FROM viaje WHERE nombre = 'Escapada serrana por Villa General Belgrano'), 'GASTRONOMIA'),
+    ((SELECT id FROM viaje WHERE nombre = 'Escapada serrana por Villa General Belgrano'), 'VIDA_NOCTURNA'),
+    ((SELECT id FROM viaje WHERE nombre = 'Cultura y naturaleza en Córdoba'), 'CULTURA'),
+    ((SELECT id FROM viaje WHERE nombre = 'Cultura y naturaleza en Córdoba'), 'HISTORIA'),
+    ((SELECT id FROM viaje WHERE nombre = 'Cultura y naturaleza en Córdoba'), 'COMPRAS'),
+    ((SELECT id FROM viaje WHERE nombre = 'Aventura en el Valle de Punilla'), 'AVENTURA'),
+    ((SELECT id FROM viaje WHERE nombre = 'Aventura en el Valle de Punilla'), 'NATURALEZA'),
+    ((SELECT id FROM viaje WHERE nombre = 'Aventura en el Valle de Punilla'), 'VIDA_NOCTURNA'),
+    ((SELECT id FROM viaje WHERE nombre = 'Sabores y tradiciones de Córdoba'), 'GASTRONOMIA'),
+    ((SELECT id FROM viaje WHERE nombre = 'Sabores y tradiciones de Córdoba'), 'HISTORIA'),
+    ((SELECT id FROM viaje WHERE nombre = 'Sabores y tradiciones de Córdoba'), 'CULTURA'),
+    ((SELECT id FROM viaje WHERE nombre = 'Recorrido familiar por las sierras'), 'NATURALEZA'),
+    ((SELECT id FROM viaje WHERE nombre = 'Recorrido familiar por las sierras'), 'AVENTURA'),
+    ((SELECT id FROM viaje WHERE nombre = 'Recorrido familiar por las sierras'), 'FAMILIAR_Y_RELAX');

@@ -26,6 +26,7 @@ import com.viajesazo.turismo_backend.dto.response.PropuestaResumenResponse;
 import com.viajesazo.turismo_backend.exception.BusinessRuleException;
 import com.viajesazo.turismo_backend.mapper.PropuestaResumenMapper;
 import com.viajesazo.turismo_backend.model.Actividad;
+import com.viajesazo.turismo_backend.model.Disponibilidad;
 import com.viajesazo.turismo_backend.model.EstadoPropuesta;
 import com.viajesazo.turismo_backend.model.Evento;
 import com.viajesazo.turismo_backend.model.InteresCategoria;
@@ -385,6 +386,11 @@ class PropuestaRepositoryTest {
 		actividad.setUbicacion(ubicacion);
 		actividad.setLugarRecinto("Cabildo");
 		actividad.setDuracionMinutos(duracion);
+		actividad.setDisponibilidades(List.of(Disponibilidad.builder()
+				.diaSemana(java.time.DayOfWeek.MONDAY)
+				.horaInicio(LocalTime.of(9, 0))
+				.horaFin(LocalTime.of(12, 0))
+				.build()));
 		return actividad;
 	}
 }

@@ -1,4 +1,4 @@
-import type { UbicacionRequest } from '@/types/api'
+import type { CircuitStrategy, UbicacionRequest } from '@/types/api'
 
 export interface ZoneItem {
   name: string
@@ -59,8 +59,15 @@ export interface CircuitoChip {
   variant: 'sky' | 'amber' | 'slate'
 }
 
+export interface CircuitoDia {
+  number: number
+  fecha: string
+  summary: string
+}
+
 export interface CircuitoRecomendado {
   id: string
+  estrategia: CircuitStrategy
   title: string
   affinity: string
   image: string
@@ -71,10 +78,13 @@ export interface CircuitoRecomendado {
   chips: CircuitoChip[]
   ventajas: string[]
   consideraciones: string[]
+  days: CircuitoDia[]
+  stopsByDay: Record<number, ParadaCircuitoDetalle[]>
 }
 
 export interface ParadaCircuitoDetalle {
   id: string
+  number: number
   time: string
   title: string
   category: string
@@ -85,9 +95,12 @@ export interface ParadaCircuitoDetalle {
   hours: string
   price: string
   image: string
+  duration: string
   walkNext?: string
   latitud?: number
   longitud?: number
+  disponible: boolean
+  motivoNoDisponible?: string | null
 }
 
 export interface AlternativaReemplazo {

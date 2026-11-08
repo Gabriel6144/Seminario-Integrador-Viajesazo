@@ -17,6 +17,7 @@ public record ViajeResponse(
     List<InteresCategoria> interesesCategoria,
     EstadoViaje estado,
     Integer pasoActual,
-    String usuario
+    String usuario,
+    CircuitoResponse circuito
 
 ) {}

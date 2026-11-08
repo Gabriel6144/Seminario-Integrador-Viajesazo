@@ -3,7 +3,7 @@
 - **Área:** Backend / integración full-stack
 - **Foco:** modelo de dominio, API REST, persistencia, filtros, integración con el frontend y documentación técnica
 - **Ramas habituales:** `Backend`, `main`, `develop`, `backend/*`, `feat/*`, `fix/*`, `docs/*`
-- **Última actualización:** 2026-10-25
+- **Última actualización:** 2026-10-27
 
 > Una entrada por PR o tarea relevante, en orden cronológico inverso. Cada entrada registra qué se hizo, por qué se tomó cada decisión y cómo se verificó. Los merges de trabajo ajeno se documentan como integración, sin atribuirse el código.
 
@@ -11,6 +11,7 @@
 
 | Fecha | Hito | Referencia |
 |---|---|---|
+| 2026-10-27 | Integración full-stack de circuitos y “Mis viajes” | `devGaby`, working tree |
 | 2026-10-25 | VZ-18: agenda turística server-side | working tree, sin commit |
 | 2026-10-24 | Animación del mapa al cambiar el destino | `4437abd` |
 | 2026-10-23 | Planificador OSM: pasos 4 y 5 | `dd684c7` · PR #11 |
@@ -23,6 +24,114 @@
 | 2026-10-10 | Planificación Sprint 2 y flujo de PR | `f958918`, `faf7bd5` · PR #2 |
 | 2026-10-08 | Integración del PR #1 de `sbrito` | `4f4dbab` |
 | 2026-09-27 | Base del repositorio y Sprint 1 | `40fc87a` |
+
+## 2026-10-27 — Integración full-stack de circuitos y “Mis viajes”
+
+- **Sprint / US:** Sprint 3 / VZ-25
+- **Rama / PR:** `devGaby`; cambios en working tree, sin commit ni PR todavía
+- **Commit(s):** ninguno; base `7770833` (merge de `develop` en `devGaby`)
+- **Estado:** implementado y verificado, pendiente de commit
+
+**Qué hice**
+
+- Enriquecí el snapshot del circuito en el backend: `CircuitCandidate.ProposalDetails`,
+  propagación por `ScheduledProposal`, copia en `CircuitGenerator` y persistencia en
+  `CircuitoItem` de imágenes, ciudad, localidad, dirección, recinto, coordenadas, tipo de acceso,
+  monto, arancel, sitio oficial y duración.
+- Extendí `CircuitoItemResponse` y ajusté `CircuitoService` para mapear los campos nuevos de forma
+  null-safe, sin depender de otra consulta a la propuesta.
+- Actualicé los tests de generación, servicio, controller y repositorio del circuito.
+- Reconecté el frontend mergeado al contrato real:
+  - extendí `types/api.ts`;
+  - creé `circuito-view-model.ts` como único adaptador API → UI;
+  - reescribí el paso 10, el detalle, el mapa general y el mapa de cada parada;
+  - eliminé los circuitos, paradas y alternativas hardcodeadas de `constants.ts`.
+- Rehíce el flujo del planificador: persistir el viaje, reutilizar `tripId`, completar el borrador
+  si existe, generar una sola vez y caer a `GET /circuito` si el backend responde “ya fue
+  generado”.
+- Corregí `handleSaveDraft` para que no cree un borrador duplicado después de persistir el viaje.
+- Cambié “Mis viajes” a `GET /api/viajes?usuario=` y distinguí borradores de circuitos confirmados
+  con `estado !== 'BORRADOR'`.
+- Actualicé fixtures, handlers MSW y tests del planificador, del adaptador y de “Mis viajes”.
+- Documenté el flujo y las decisiones en `docs/DECISIONES-INTEGRACION-CIRCUITOS.md`, además de
+  actualizar los documentos transversales del sprint.
+
+**Decisiones**
+
+- El circuito guarda un **snapshot denormalizado** en `CircuitoItem` en lugar de leer la propuesta
+  original en cada consulta. Así el detalle y los mapas sobreviven a ediciones o bajas de la
+  propuesta, a costa de duplicar datos.
+- `ProposalDetails` es inmutable y tiene `empty()` para tests; el motor sigue sin conocer Spring ni
+  JPA y `CircuitoService` es el único que persiste y mapea.
+- `CircuitoAlternativa.items` se ordena con `@OrderBy("orden ASC")`; no se usa `@OrderColumn` sobre
+  `orden` porque duplica la columna y rompe la recarga con elementos `null`.
+- La generación y la selección son únicas. El frontend reutiliza el viaje ya creado y, ante un
+  `400` por “ya generado”, lee el circuito existente en vez de duplicar o regenerar.
+- El viaje se persiste antes de generar. Si la generación falla, el reintento reutiliza `tripId`.
+- `handleSaveDraft` corta si `tripId !== null`: muestra “Tu viaje ya está guardado” y navega a “Mis
+  viajes”. Sin esa guarda se creaba un duplicado o se intentaba actualizar un borrador ya
+  completado.
+- “Mis viajes” usa el listado general `GET /api/viajes?usuario=` en vez de un endpoint nuevo; el
+  estado del viaje (`estado !== 'BORRADOR'`) decide si es borrador o circuito confirmado.
+- `circuito-view-model.ts` es el único adaptador API → UI: agrupa por fecha, arma días/paradas,
+  calcula duración, resuelve imagen/placeholder y alimenta los mapas. Ya no hay mocks de circuitos.
+- Sustituir y eliminar paradas quedan deshabilitados con “Próximamente” porque VZ-27 no está
+  implementado en el backend.
+- Los traslados son Haversine a 30 km/h y el copy habla de “traslado”/“auto”, no de “a pie”.
+- No se agregó `@JsonAlias` entre `intereses` (viajes) e `interesesCategoria` (borradores): el
+  planificador arma cada payload por separado.
+- Queda documentada una limitación de demo: el frontend usa `turista_demo`, mientras que los viajes
+  del seed usan emails (`turista.demo@viajesazo.com`, etc.), así que no aparecen en “Mis viajes”
+  sin alinear el seed o el usuario.
+
+**Archivos principales**
+
+- `turismo-backend/src/main/java/com/viajesazo/turismo_backend/circuit/CircuitCandidate.java`
+- `turismo-backend/src/main/java/com/viajesazo/turismo_backend/circuit/ScheduledProposal.java`
+- `turismo-backend/src/main/java/com/viajesazo/turismo_backend/circuit/CircuitGenerator.java`
+- `turismo-backend/src/main/java/com/viajesazo/turismo_backend/model/CircuitoItem.java`
+- `turismo-backend/src/main/java/com/viajesazo/turismo_backend/dto/response/CircuitoItemResponse.java`
+- `turismo-backend/src/main/java/com/viajesazo/turismo_backend/service/CircuitoService.java`
+- `turismo-backend/src/test/java/com/viajesazo/turismo_backend/{circuit/CircuitGeneratorTest,service/CircuitoServiceTest,controller/ViajeControllerTest,repository/CircuitoRepositoryTest}.java`
+- `turismo-frontend/src/types/api.ts`
+- `turismo-frontend/src/components/planificador/circuito-view-model.ts`
+- `turismo-frontend/src/components/planificador/{types,constants}.ts`
+- `turismo-frontend/src/components/planificador/{paso-10-circuito,circuito-detalle-view,circuito-mapa-general-view,parada-ubicacion-mapa-view}.tsx`
+- `turismo-frontend/src/pages/planificador-page.tsx`
+- `turismo-frontend/src/pages/borradores-page.tsx`
+- `turismo-frontend/src/components/viaje-borrador-card.tsx`
+- `turismo-frontend/src/api/{circuitos,queries,viajes}.ts`
+- `turismo-frontend/src/test/{fixtures,handlers,store}.ts`
+- `turismo-frontend/src/pages/planificador-page.test.tsx`
+- `turismo-frontend/src/components/planificador/circuito-view-model.test.ts`
+- `turismo-frontend/src/pages/borradores-page.test.tsx`
+- `docs/DECISIONES-INTEGRACION-CIRCUITOS.md`
+- `docs/CIRCUITOS-AUTOMATICOS.md`
+- `docs/CAMBIOS-Y-DECISIONES-SPRINT-3.md`
+- `docs/PRUEBAS-MANUALES-POSTMAN.md`
+- `turismo-backend/AGENTS.md`
+- `turismo-frontend/AGENTS.md`
+
+**Verificación**
+
+- Backend targeted:
+  `.\mvnw.cmd -q "-Dtest=CircuitGeneratorTest,CircuitoServiceTest,ViajeControllerTest,CircuitoRepositoryTest" test`
+  → **39/39 en verde** (`7 + 8 + 23 + 1`).
+- Frontend: **182 tests / 173 en verde / 9 fallos preexistentes** (8 de `eventos-page` y 1 de
+  `evento-editar-page`).
+- `npm run typecheck`: sin errores.
+- `npm run build`: correcto.
+- `npm run lint`: solo warnings preexistentes.
+- `git diff --check`: sin errores.
+
+**Pendientes / deuda**
+
+- Commit y PR de la integración.
+- VZ-27: edición, reordenamiento, sustitución, eliminación y regeneración de paradas.
+- Alinear `turista_demo` con los usuarios del seed si se quiere una demo con viajes precargados.
+- Autenticación real y reemplazo de `usuario` como `String`.
+- Resolver los fallos preexistentes de backend y frontend.
+- Evaluar ruteo real con OSRM si Haversine no alcanza.
 
 ## 2026-10-25 — VZ-18: agenda turística server-side
 

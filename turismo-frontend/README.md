@@ -7,8 +7,10 @@ consumiendo el backend Spring Boot que vive en `../turismo-backend` (un solo rep
 
 - Listado paginado de **eventos** y de **publicadores**.
 - Detalle de cada evento y cada publicador.
-- Agenda de la semana (de hoy al domingo, según el reloj del servidor).
+- Agenda de la semana (de hoy al domingo, según el reloj del servidor) y agenda turística filtrable.
 - **Alta, edición y baja de eventos**, y **alta de publicadores**.
+- **Planificador de viajes** con generación y selección de circuitos, detalle por día, mapas y
+  “Mis viajes” con borradores y circuitos confirmados.
 - Estados de carga, error, vacío y 404.
 
 **No hay autenticación**: cualquiera que abra la app puede crear, editar y borrar. Es la
@@ -42,7 +44,7 @@ desarrollo; en producción hay que poner un proxy inverso delante o agregar CORS
 | --- | --- |
 | `npm run dev` | Servidor de desarrollo con proxy a la API. |
 | `npm run build` | Typecheck (`tsc -b`) + build de producción. |
-| `npm test` | 151 tests (Vitest + Testing Library + MSW). |
+| `npm test` | 182 tests (Vitest + Testing Library + MSW); 9 fallos preexistentes ajenos. |
 | `npm run test:watch` | Tests en watch. |
 | `npm run lint` | oxlint. |
 | `npm run typecheck` | Solo tipos. |

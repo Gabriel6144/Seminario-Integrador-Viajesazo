@@ -2,6 +2,7 @@ package com.viajesazo.turismo_backend.exception;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -116,22 +117,27 @@ public class GlobalExceptionHandler {
 	}
 
 	/**
-	 * Violación de integridad al escribir. El único {@code UNIQUE} del esquema es
-	 * {@code publicador.email}, así que en la práctica esto es un email repetido que se coló por la
-	 * carrera de dos altas simultáneas: las dos pasan el pre-chequeo de
-	 * {@code PublicadorService} y sólo la segunda rompe la constraint.
+	 * Violación de integridad al escribir. Hoy hay dos {@code UNIQUE} relevantes:
+	 * {@code publicador.email} y {@code circuito.viaje_id}. El primero se anticipa en
+	 * {@code PublicadorService}; el segundo es la carrera de dos generaciones simultáneas del
+	 * mismo viaje. La causa se inspecciona solo para elegir el mensaje: el texto crudo de
+	 * Hibernate no sale del servidor.
 	 *
 	 * <p>Sin este handler caería en el catch-all y el cliente recibiría un 500 genérico, cuando
-	 * lo único que hay que corregir es un campo del formulario.
-	 *
-	 * <p>El mensaje es fijo a propósito. {@code ex.getMessage()} trae el SQL de la sentencia y los
-	 * valores de la fila, y eso no sale del servidor; el detalle va al log, igual que en el
-	 * catch-all.
+	 * en realidad es un conflicto de datos que se corrige reintentando o usando otro viaje.
 	 */
 	@ExceptionHandler(DataIntegrityViolationException.class)
 	public ResponseEntity<ErrorResponse> handleIntegrityViolation(DataIntegrityViolationException ex) {
-		logger.warn("Violación de integridad al escribir: probablemente email duplicado", ex);
-		return build(HttpStatus.BAD_REQUEST, "ya existe un publicador con ese email");
+		logger.warn("Violación de integridad al escribir", ex);
+		String cause = ex.getMostSpecificCause().getMessage();
+		String normalized = cause == null ? "" : cause.toLowerCase(Locale.ROOT);
+		if (normalized.contains("email") || normalized.contains("publicador")) {
+			return build(HttpStatus.BAD_REQUEST, "ya existe un publicador con ese email");
+		}
+		if (normalized.contains("circuito") || normalized.contains("viaje_id")) {
+			return build(HttpStatus.BAD_REQUEST, "el circuito del viaje ya fue generado");
+		}
+		return build(HttpStatus.BAD_REQUEST, "no se pudo guardar por un conflicto de datos");
 	}
 
 	/**

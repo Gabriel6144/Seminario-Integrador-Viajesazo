@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import 'maplibre-gl/dist/maplibre-gl.css'
 
+import { buildMapStops, firstDayWithStops } from './circuito-view-model'
 import type { CircuitoRecomendado } from './types'
 
 maplibregl.setWorkerUrl(workerUrl)
@@ -12,184 +13,7 @@ const BUILDINGS_LAYER = '3d-buildings-circuit'
 const ROUTE_SOURCE = 'circuit-route-source'
 const ROUTE_LAYER = 'circuit-route-layer'
 
-interface MapaStopItem {
-  id: string
-  number: number
-  title: string
-  category: string
-  categoryClass: string
-  time: string
-  duration: string
-  walkingDist: string
-  desc: string
-  address: string
-  recomendacion: string
-  img: string
-  lat: number
-  lng: number
-}
-
-const CIRCUIT_MAP_DAYS: Record<number, { summary: string; stops: MapaStopItem[] }> = {
-  1: {
-    summary: '3 paradas • 1.5 km • ~4 horas',
-    stops: [
-      {
-        id: 'd1_1',
-        number: 1,
-        title: 'Paseo del Buen Pastor',
-        category: 'Patrimonio & Cultura',
-        categoryClass: 'bg-rose-50 text-rose-700',
-        time: '09:30 - 11:00',
-        duration: '1h 30m',
-        walkingDist: 'Punto de partida',
-        desc: 'Comienza admirando la icónica Iglesia de los Capuchinos y recorre el centro cultural con su galería y fuentes danzantes.',
-        address: 'Hipólito Yrigoyen 325, Nueva Córdoba',
-        recomendacion: 'Entrada gratuita',
-        img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAbS0TBPv1NarUnn0nDPjrpv558PEfK4XrzKSX1hmwnJFTo2wK_cWzrju1-UYG5oUsu1v3O8GLi723nkfQKSI94AIBn3Jw3qxRG1TekAiI88KNrSo2viJStTBZ6L2NHlBZaDU5qjdaBwc33SmVSOVuCFO31E6jjQQyPMHKot35p5j7C9lk0jdE9_Hfbkxs7sQ-2VNXUFMEouv9JPZ5SRLSJjNpYDdnMk1Vyvn_ZnW59iyGIGu_CiGqj0w',
-        lat: -31.4254,
-        lng: -64.1873,
-      },
-      {
-        id: 'd1_2',
-        number: 2,
-        title: 'Museo Evita (Palacio Ferreyra)',
-        category: 'Arte & Arquitectura',
-        categoryClass: 'bg-amber-50 text-amber-700',
-        time: '11:30 - 13:00',
-        duration: '1h 30m',
-        walkingDist: '850 m · 12 min',
-        desc: 'Majestuoso palacio de estilo francés de principios del siglo XX con una valiosa colección de artes visuales y jardines.',
-        address: 'Av. Hipólito Yrigoyen 511, Nueva Córdoba',
-        recomendacion: '$800 / Estudiantes gratis',
-        img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAUYokz31jbHe2QNCrHTcMmblBfNhopXzkckHEGLNvdBPGljHflbm3yw4w_PCHbsYGg1jfA2_GiSWDa3N5LGZSlKWmINXpaEo3mNuSl4q9HHSJFK45uvx9tn5zpjpsZlo5DIqqixy3J7WTTE_H6bVO8HG5rKzkO456ZjdJNDfxK6XmokYNh7Wt3gwkkHK2CFH3NXm_BdjGEjwlKphUVDwZgEP__ueZ0aUpEOsZQewuN1gpsCHCXnNs7hw',
-        lat: -31.4278,
-        lng: -64.1865,
-      },
-      {
-        id: 'd1_3',
-        number: 3,
-        title: 'Sabores Cordobeses en Güemes',
-        category: 'Gastronomía Típica',
-        categoryClass: 'bg-emerald-50 text-emerald-700',
-        time: '13:30 - 15:30',
-        duration: '2h 00m',
-        walkingDist: '650 m · 10 min',
-        desc: 'Almuerzo criollo tradicional: empanadas de lomo cortadas a cuchillo, tabla de quesos de las sierras y aperitivos locales.',
-        address: 'Belgrano esq. Fructuoso Rivera, Güemes',
-        recomendacion: 'Reserva sugerida',
-        img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuClN4QG2n99f48rlO8Z8NfbUhTR2sS-gwQbBsjncH7Uc_LFh4I5TABh0dP83jHKP00rSjTg4FbZEo12-8p6v3EvLZBn-w_sS3C9G9_FST3sxqDgahqQQrH4SE5yGhEpYgwTK9WzRWMaEwtEuZ1mROnxKrl7RF1Z2fIqRLNs6-oU9UhLLkvaGKWpQ7-HJDBv3_CJx2WIXKxYtT0-iAhsohVfDjCyfy82lxhWo3l55S0YP07rhhUXnIT-gQ',
-        lat: -31.4234,
-        lng: -64.1924,
-      },
-    ],
-  },
-  2: {
-    summary: '3 paradas • 1.1 km • ~3.5 horas',
-    stops: [
-      {
-        id: 'd2_1',
-        number: 1,
-        title: 'Plaza San Martín y Catedral',
-        category: 'Centro Histórico',
-        categoryClass: 'bg-rose-50 text-rose-700',
-        time: '09:30 - 11:00',
-        duration: '1h 30m',
-        walkingDist: 'Punto de partida',
-        desc: 'La plaza central fundada en 1577 y la imponente Catedral colonial con su cúpula barroca y pórticos neoclásicos.',
-        address: 'Independencia 30, Centro',
-        recomendacion: 'Acceso libre',
-        img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuA5GYiCcGRqyTVkS2Hc8v-9zq-XEnc8oc48oFyn2sie4dxBa3BXNTIFXGgmv5tH0OE9iPTrj8cBeeGzIwche0PyYhDvzuaF9C-bo5-rU3cS1CV2-rqwc5HwymZiD3Fq4p6VRaTk3kAfP8pnIqr13n7A2IZB2fserC2UAbpNm5tHcz4C9JAEZPzO7REta0cAa71Sl1EGah3PGkZaek26S8FxdLmNeNjVxJxh7lUnE5uLjwXTY0FDdLTH',
-        lat: -31.4167,
-        lng: -64.1836,
-      },
-      {
-        id: 'd2_2',
-        number: 2,
-        title: 'Manzana Jesuítica',
-        category: 'Patrimonio UNESCO',
-        categoryClass: 'bg-amber-50 text-amber-700',
-        time: '11:15 - 12:45',
-        duration: '1h 30m',
-        walkingDist: '300 m · 4 min',
-        desc: 'Recorrido por el Colegio Nacional de Monserrat, la Iglesia de la Compañía de Jesús y el antiguo Rectorado.',
-        address: 'Obispo Trejo 242, Córdoba',
-        recomendacion: 'Visita guiada disponible',
-        img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCafsdo6h8bInCpaIq9Dvdf36I0aoSrVKuyF7cgqOiGrBAYvkGo5INNu5FA62cCIEGkbuRVvqmKyKMHtAlrW7NSyr6IbANA3gSxlHxZ0eGre_IYQ1Ql-mObSnkhcZQ_FQK-FcKtuHAYF4a4pYvPrIMl-bluZf4W5SFgPLiXGDgdPjspkLlXE8jWw02XlCaxTbb8b61enaUQr6dljfCSFEnJkQmC6I96OPL6Tr7QKvRpNjPh6TFuJznY7w',
-        lat: -31.4184,
-        lng: -64.1877,
-      },
-      {
-        id: 'd2_3',
-        number: 3,
-        title: 'Parque Sarmiento & Mirador',
-        category: 'Naturaleza & Aire Libre',
-        categoryClass: 'bg-sky-50 text-sky-700',
-        time: '16:30 - 18:30',
-        duration: '2h 00m',
-        walkingDist: '800 m · 11 min',
-        desc: 'Caminata al atardecer por el parque diseñado por Carlos Thays, rosedal e isla encantada.',
-        address: 'Av. Deodoro Roca s/n, Córdoba',
-        recomendacion: 'Abierto todo el día',
-        img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDYmvZucBobKuAULkOWcqDEMRRgmeP3iCCzL9c2qli-tvrh5UZ187IsI3LOqYvZ9baRja9KWYqdSIfVSTe0WkUSnkhaBKJgSQQXqHUYHgNfb5LKSu2z0cTtP92zC1z4UkRE6cqc2sffYquFVZu-mVxCET5IIkagOYI9iYV6NyGBxQh5QuCKpL0StoCN5-_v6hA8aYJfxwwKUG-VuliqNB1-A4OExnnt2OS9suAOVjxBzLR2-oaCtMYIqQ',
-        lat: -31.4307,
-        lng: -64.1782,
-      },
-    ],
-  },
-  3: {
-    summary: '3 paradas • 0.9 km • ~3 horas',
-    stops: [
-      {
-        id: 'd3_1',
-        number: 1,
-        title: 'Paseo de las Artes',
-        category: 'Diseño & Artesanías',
-        categoryClass: 'bg-emerald-50 text-emerald-700',
-        time: '10:30 - 12:00',
-        duration: '1h 30m',
-        walkingDist: 'Punto de partida',
-        desc: 'Recorrido por ferias artesanales, galerías independientes y cafés históricos de Barrio Güemes.',
-        address: 'Belgrano 750, Barrio Güemes',
-        recomendacion: 'Entrada libre',
-        img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBAlz8RjM8Npp7fEskFQB-3xI3qfXAiwJophAnEgAATaXYQGUjq3MoU2Zil_yxF3CrOKjqw-KVsRwBH2eWN5hc4cd0WWa4Qmf21dP87WymcVSyUR_V8hWXIdvV9v8ITwC2v7CF09w_iHO70KkzO3VGDiCf1DUwEeEb9_0Gt3H3U56DSHK1XfPBqMtmXmAe8-xra3PC2h395chLb4BwGgyGKwY0-_E440HkalJc4fItaj5KSh4nJCt6q',
-        lat: -31.4239,
-        lng: -64.1932,
-      },
-      {
-        id: 'd3_2',
-        number: 2,
-        title: 'Museo Emilio Caraffa',
-        category: 'Arte Contemporáneo',
-        categoryClass: 'bg-rose-50 text-rose-700',
-        time: '12:00 - 13:30',
-        duration: '1h 30m',
-        walkingDist: '500 m · 7 min',
-        desc: 'Edificio neoclásico ampliado con arquitectura vanguardista frente a Plaza España con exposiciones plásticas permanentes.',
-        address: 'Av. Poeta Lugones 411',
-        recomendacion: 'Entrada general $800',
-        img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuD6DhDURv4eQye_1HUBJepHA3axjCFUA-Ru_9a92ursqlN-yWZY7mm-2nhVZd_cY0pS1cPsndtKRQZ92NHpViO1e-gIrOUuOMCZV1uGzx3GfAC-dOB9hPmU9cYpMA4bZQEjz81dzSKneQ1l9WH1qiaYmwm0bY__zyAO0kHE2tudSDTUIZIkILwevSlRjv-XgDDIbvUFUhoh5N-2JV0cXyd7EhLvnECHUSbpAUfK7dh3NLU-fNOHbZHTGQ',
-        lat: -31.4288,
-        lng: -64.1846,
-      },
-      {
-        id: 'd3_3',
-        number: 3,
-        title: 'Mercado Norte & Sabores Criollos',
-        category: 'Gastronomía',
-        categoryClass: 'bg-amber-50 text-amber-700',
-        time: '13:45 - 15:30',
-        duration: '1h 45m',
-        walkingDist: '300 m · 4 min',
-        desc: 'Degustación de platos tradicionales cordobeses, empanadas criollas y productos regionales en los puestos históricos.',
-        address: 'Oncativo 50, Córdoba',
-        recomendacion: 'Entrada libre',
-        img: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBexIiUUcT0wFpHsLbatXxzzEBYgtgeds09-1kk7Z5-dBar-yNukb1sadmaMc0j9LCWcOy8b05fBLposnONBrIe9yGUJl9lw-A6dxlUOULhNnS17mFhAYtfg1xsYPlHpInDc9klHtYKIcqYW-hOzsRkFvjwmsuhYTxaW1Wg-Xb0qb0VVSaBbH8CgyIOab-62LNr_NgRlnB0h0AB3fB8p5sZyl2X-zqudIE3UzXM-7LPk4yTrRADMtsLQw',
-        lat: -31.4112,
-        lng: -64.1835,
-      },
-    ],
-  },
-}
+type MapaStopItem = ReturnType<typeof buildMapStops>[number]
 
 function crearGeoJsonRuta(stops: MapaStopItem[]): GeoJSON.Feature<GeoJSON.LineString> {
   return {
@@ -205,15 +29,17 @@ function crearGeoJsonRuta(stops: MapaStopItem[]): GeoJSON.Feature<GeoJSON.LineSt
 interface CircuitoMapaGeneralViewProps {
   circuito: CircuitoRecomendado
   onBack: () => void
-  onVerCircuitoDetalle?: () => void
 }
 
 export function CircuitoMapaGeneralView({
   circuito,
   onBack,
 }: CircuitoMapaGeneralViewProps) {
-  const [selectedDay, setSelectedDay] = useState<number>(1)
-  const [selectedStopId, setSelectedStopId] = useState<string>('d1_1')
+  const initialDay = firstDayWithStops(circuito)
+  const [selectedDay, setSelectedDay] = useState<number>(initialDay)
+  const [selectedStopId, setSelectedStopId] = useState<string>(
+    () => buildMapStops(circuito, initialDay)[0]?.id ?? '',
+  )
   const [modalStop, setModalStop] = useState<MapaStopItem | null>(null)
   const [showRoute, setShowRoute] = useState<boolean>(true)
 
@@ -222,8 +48,15 @@ export function CircuitoMapaGeneralView({
   const markersRef = useRef<maplibregl.Marker[]>([])
   const loadedRef = useRef<boolean>(false)
 
-  const dayData = CIRCUIT_MAP_DAYS[selectedDay] ?? CIRCUIT_MAP_DAYS[1]
-  const stops = dayData.stops
+  const initialStops = useMemo(
+    () => buildMapStops(circuito, initialDay),
+    [circuito, initialDay],
+  )
+  const stops = useMemo(
+    () => buildMapStops(circuito, selectedDay),
+    [circuito, selectedDay],
+  )
+  const dayData = circuito.days.find((day) => day.number === selectedDay)
 
   const encuadrarParadas = useCallback((paradas: MapaStopItem[], duration = 600) => {
     const map = mapRef.current
@@ -244,9 +77,9 @@ export function CircuitoMapaGeneralView({
   }, [])
 
   const handleSelectDay = (day: number) => {
+    const nextStops = buildMapStops(circuito, day)
     setSelectedDay(day)
-    const firstStop = CIRCUIT_MAP_DAYS[day]?.stops[0]
-    if (firstStop) setSelectedStopId(firstStop.id)
+    setSelectedStopId(nextStops[0]?.id ?? '')
   }
 
   // Inicializar MapLibre GL una sola vez
@@ -254,8 +87,7 @@ export function CircuitoMapaGeneralView({
     const el = containerRef.current
     if (el === null) return
 
-    const initialStops = CIRCUIT_MAP_DAYS[1].stops
-    const first = initialStops[0]
+    const first = initialStops[0] ?? { lat: -31.4254, lng: -64.1873 }
 
     const map = new maplibregl.Map({
       container: el,
@@ -327,7 +159,7 @@ export function CircuitoMapaGeneralView({
       mapRef.current = null
       loadedRef.current = false
     }
-  }, [encuadrarParadas])
+  }, [encuadrarParadas, initialStops])
 
   // Actualizar ruta y encuadre al cambiar de día
   useEffect(() => {
@@ -452,18 +284,18 @@ export function CircuitoMapaGeneralView({
         {/* FLOATING DAY FILTER TABS */}
         <div className="pointer-events-none absolute top-4 right-0 left-0 z-30 flex justify-center px-4">
           <div className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-slate-200/90 bg-white/95 p-1.5 shadow-lg backdrop-blur-md">
-            {[1, 2, 3].map((day) => (
+            {circuito.days.map((day) => (
               <button
-                key={day}
+                key={day.number}
                 type="button"
-                onClick={() => handleSelectDay(day)}
+                onClick={() => handleSelectDay(day.number)}
                 className={`rounded-full px-4 py-1.5 text-xs font-bold transition-all ${
-                  selectedDay === day
+                  selectedDay === day.number
                     ? 'bg-[#00658d] text-white shadow-xs'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-[#00658d]'
                 }`}
               >
-                Día {day}
+                Día {day.number}
               </button>
             ))}
           </div>
@@ -472,7 +304,9 @@ export function CircuitoMapaGeneralView({
         {/* FLOATING ITINERARY SUMMARY PILL */}
         <div className="absolute top-16 left-4 z-30 hidden items-center gap-2 rounded-xl border border-slate-200/80 bg-white/95 px-3 py-1.5 shadow-md backdrop-blur-md sm:flex">
           <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
-          <span className="text-[11px] font-bold text-slate-700">{dayData.summary}</span>
+          <span className="text-[11px] font-bold text-slate-700">
+            {dayData?.summary ?? 'Sin paradas asignadas'}
+          </span>
         </div>
 
         {/* FLOATING MAP UTILITY BUTTONS */}
@@ -504,12 +338,12 @@ export function CircuitoMapaGeneralView({
           <button
             type="button"
             onClick={() => setShowRoute((r) => !r)}
-            title="Mostrar/ocultar trazado a pie"
+            title="Mostrar/ocultar trazado del traslado"
             className={`flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200/80 shadow-md backdrop-blur-md active:scale-95 ${
               showRoute ? 'bg-sky-100 text-[#00658d]' : 'bg-white/95 text-slate-500'
             }`}
           >
-            <span className="material-symbols-outlined text-[20px]">directions_walk</span>
+            <span className="material-symbols-outlined text-[20px]">directions_car</span>
           </button>
         </div>
 
@@ -569,7 +403,7 @@ export function CircuitoMapaGeneralView({
                       <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-1.5">
                         <span className="flex items-center gap-0.5 text-[10px] font-medium text-slate-400">
                           <span className="material-symbols-outlined text-[12px]">
-                            directions_walk
+                            directions_car
                           </span>
                           <span>{stop.walkingDist}</span>
                         </span>

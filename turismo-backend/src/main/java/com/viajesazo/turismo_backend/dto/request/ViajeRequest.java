@@ -7,12 +7,15 @@ import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.model.TipoRitmo;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 
 public record ViajeRequest(
 
     @NotBlank(message = "El nombre del viaje no puede estar vacío")
+    @Size(max = 100, message = "El nombre del viaje no puede tener más de 100 caracteres")
     String nombre,
 
     @NotNull(message = "La ubicación de interés no puede estar vacía")
@@ -31,8 +34,9 @@ public record ViajeRequest(
     @NotNull(message = "El ritmo del viaje no puede estar vacío")
     TipoRitmo ritmo,
 
-    List<InteresCategoria> interesesCategoria,
-
+    @NotEmpty (message = "La lista de intereses de categoría no puede estar vacía")
+    List<@NotNull(message = "El interés de categoría no puede ser nulo") InteresCategoria> intereses,
+    
     @NotBlank(message = "El turista no puede estar vacío")
     String usuario
 

@@ -139,7 +139,9 @@ class ActividadServiceTest {
 	void rejectsEventOnlyType() {
 		when(publicadorRepository.findById(1L)).thenReturn(Optional.of(publisher()));
 
-		assertThatThrownBy(() -> service.create(request(60, TipoPropuesta.FESTIVAL, null, List.of())))
+		assertThatThrownBy(() -> service.create(request(60, TipoPropuesta.FESTIVAL, null,
+				List.of(new DisponibilidadRequest(java.time.DayOfWeek.MONDAY,
+						java.time.LocalTime.of(9, 0), java.time.LocalTime.of(12, 0))))))
 				.isInstanceOf(InvariantViolationException.class)
 				.hasMessageContaining("FESTIVAL");
 	}
@@ -222,6 +224,11 @@ class ActividadServiceTest {
 		actividad.setEstadoPropuesta(estado);
 		actividad.setPublicador(publisher());
 		actividad.setUbicacion(ubicacion());
+		actividad.setDisponibilidades(List.of(com.viajesazo.turismo_backend.model.Disponibilidad.builder()
+				.diaSemana(java.time.DayOfWeek.MONDAY)
+				.horaInicio(java.time.LocalTime.of(9, 0))
+				.horaFin(java.time.LocalTime.of(12, 0))
+				.build()));
 		return actividad;
 	}
 

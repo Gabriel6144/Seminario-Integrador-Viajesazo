@@ -2,7 +2,6 @@ package com.viajesazo.turismo_backend.model;
 
 import java.time.Clock;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.ArrayList;
 
@@ -42,10 +41,10 @@ public class Viaje {
     private Double rangoInteresKm;
 
     @Column
-    private LocalDateTime fechaInicio;
+    private LocalDate fechaInicio;
 
     @Column
-    private LocalDateTime fechaFin;
+    private LocalDate fechaFin;
 
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Enumerated(EnumType.STRING)
@@ -115,7 +114,7 @@ public class Viaje {
             if (fechaFin.isBefore(fechaInicio)) {
                 errores.add("la fecha de finalización no puede ser anterior a la de inicio");
             }
-            if (fechaInicio.toLocalDate().isBefore(LocalDate.now(clock))) {
+            if (fechaInicio.isBefore(LocalDate.now(clock))) {
                 errores.add("La fecha de inicio no puede ser anterior a hoy");
             }
         }
@@ -155,8 +154,8 @@ public class Viaje {
         if (fechaInicio == null || fechaFin == null) {
             return;
         }
-        LocalDate inicio = fechaInicio.toLocalDate();
-        LocalDate fin = fechaFin.toLocalDate();
+        LocalDate inicio = fechaInicio;
+        LocalDate fin = fechaFin;
         if (hoy.isAfter(fin)) {
             if (estado == EstadoViaje.PLANIFICADO) {
                 transicionarA(EstadoViaje.EN_CURSO);

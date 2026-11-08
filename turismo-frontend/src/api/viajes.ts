@@ -24,6 +24,19 @@ export function useBorradores(usuario: string, page: number) {
   })
 }
 
+export function useViajes(usuario: string, page: number) {
+  return useQuery({
+    queryKey: queryKeys.viajes(page, PAGE_SIZE),
+    queryFn: ({ signal }) =>
+      getPage<ViajeResponse>(
+        `/api/viajes${pageParams(page, PAGE_SIZE)}&usuario=${encodeURIComponent(usuario)}`,
+        signal,
+      ),
+    placeholderData: keepPreviousData,
+    enabled: usuario.trim().length > 0,
+  })
+}
+
 export function useBorrador(id: number | null) {
   return useQuery({
     queryKey: queryKeys.borrador(id ?? 0),
@@ -39,6 +52,7 @@ export function useCrearViaje() {
     mutationFn: (request: ViajeRequest) => apiPost<ViajeResponse, ViajeRequest>('/api/viajes', request),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.borradoresAll() })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.viajesAll() })
     },
   })
 }
@@ -76,6 +90,7 @@ export function useCompletarBorrador() {
       apiPost<ViajeResponse, undefined>(`/api/viajes/borradores/${id}/completar`, undefined),
     onSuccess: (_data, id) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.borradoresAll() })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.viajesAll() })
       queryClient.removeQueries({ queryKey: queryKeys.borrador(id) })
     },
   })
@@ -88,8 +103,8 @@ export function useDescartarBorrador() {
     mutationFn: (id: number) => apiDelete(`/api/viajes/borradores/${id}`),
     onSuccess: (_data, id) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.borradoresAll() })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.viajesAll() })
       queryClient.removeQueries({ queryKey: queryKeys.borrador(id) })
     },
   })
 }
-

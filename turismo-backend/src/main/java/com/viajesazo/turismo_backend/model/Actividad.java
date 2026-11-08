@@ -49,7 +49,7 @@ public class Actividad extends PropuestaTuristica {
 
 	@Override
 	public Set<TipoPropuesta> tiposPermitidos() {
-		return EnumSet.allOf(TipoPropuesta.class);
+		return EnumSet.of(TipoPropuesta.VISITA_GUIADA, TipoPropuesta.DEPORTIVO);
 	}
 
 	/**
@@ -61,6 +61,9 @@ public class Actividad extends PropuestaTuristica {
 	protected void validarInvariantesEspecificas() {
 		if (duracionMinutos <= 0) {
 			throw new InvariantViolationException("la duración de la actividad debe ser mayor a cero");
+		}
+		if (disponibilidades == null || disponibilidades.isEmpty()) {
+			throw new InvariantViolationException("la actividad debe tener al menos una disponibilidad horaria");
 		}
 		for (Disponibilidad disponibilidad : disponibilidades) {
 			if (disponibilidad == null || disponibilidad.getDiaSemana() == null) {

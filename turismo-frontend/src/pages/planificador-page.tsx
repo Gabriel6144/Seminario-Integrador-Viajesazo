@@ -1,6 +1,11 @@
 import { useEffect, useState, useId, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
+  fetchCircuito,
+  useGenerarCircuito,
+  useSeleccionarCircuito,
+} from '@/api/circuitos'
+import {
   useBorrador,
   useActualizarBorrador,
   useCompletarBorrador,
@@ -27,6 +32,8 @@ import { PlanificadorExitModal } from '@/components/planificador/planificador-ex
 import { PlanificadorHeader } from '@/components/planificador/planificador-header'
 import type { DestinoSeleccionado, LoadingStep } from '@/components/planificador/types'
 import type {
+  CircuitStrategy,
+  GeneracionCircuitoResponse,
   InteresCategoria,
   TipoRitmo,
   ViajeBorradorRequest,
@@ -42,6 +49,11 @@ const RHYTHM_REVERSE: Record<TipoRitmo, string> = {
 const INTEREST_REVERSE: Partial<Record<InteresCategoria, string>> = Object.fromEntries(
   Object.entries(INTEREST_MAP).map(([k, v]) => [v, k]),
 ) as Partial<Record<InteresCategoria, string>>
+
+function isAlreadyGenerated(error: unknown): boolean {
+  const message = error instanceof Error ? error.message.toLowerCase() : ''
+  return message.includes('ya fue generado')
+}
 
 export function PlanificadorPage() {
   const navigate = useNavigate()
@@ -63,6 +75,8 @@ export function PlanificadorPage() {
   const actualizarBorrador = useActualizarBorrador()
   const completarBorrador = useCompletarBorrador()
   const crearViaje = useCrearViaje()
+  const generarCircuito = useGenerarCircuito()
+  const seleccionarCircuito = useSeleccionarCircuito()
 
   const tripNameId = useId()
   const dateFromId = useId()
@@ -90,6 +104,10 @@ export function PlanificadorPage() {
   const [isExitModalOpen, setIsExitModalOpen] = useState<boolean>(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [activeDay, setActiveDay] = useState<number>(1)
+  const [tripId, setTripId] = useState<number | null>(null)
+  const [circuito, setCircuito] = useState<GeneracionCircuitoResponse | null>(null)
+  const [selectedStrategy, setSelectedStrategy] = useState<CircuitStrategy | null>(null)
+  const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false)
 
   // Loading animation state
   const [loadingStepIndex, setLoadingStepIndex] = useState<number>(0)
@@ -169,7 +187,9 @@ export function PlanificadorPage() {
     crearViaje.isPending ||
     guardarBorrador.isPending ||
     actualizarBorrador.isPending ||
-    completarBorrador.isPending
+    completarBorrador.isPending ||
+    generarCircuito.isPending ||
+    seleccionarCircuito.isPending
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
@@ -230,25 +250,67 @@ export function PlanificadorPage() {
   const startCircuitGeneration = () => {
     setStep(9)
     setLoadingStepIndex(0)
+    setShowSuccessModal(false)
 
     if (intervalRef.current) clearInterval(intervalRef.current)
     if (timeoutRef.current) clearTimeout(timeoutRef.current)
 
-    let idx = 0
-    intervalRef.current = setInterval(() => {
-      idx += 1
-      if (idx < loadingSteps.length) {
-        setLoadingStepIndex(idx)
-      } else {
-        if (intervalRef.current) clearInterval(intervalRef.current)
-        timeoutRef.current = setTimeout(() => {
-          setStep(10)
-        }, 500)
+    const animation = new Promise<void>((resolve) => {
+      let index = 0
+      intervalRef.current = setInterval(() => {
+        index += 1
+        if (index < loadingSteps.length) {
+          setLoadingStepIndex(index)
+        } else {
+          if (intervalRef.current) clearInterval(intervalRef.current)
+          timeoutRef.current = setTimeout(resolve, 500)
+        }
+      }, 1100)
+    })
+
+    const request = (async () => {
+      let viajeId = tripId
+      if (viajeId === null) {
+        if (borradorId !== null) {
+          await actualizarBorrador.mutateAsync({
+            id: borradorId,
+            request: buildDraftPayload(),
+          })
+          const viaje = await completarBorrador.mutateAsync(borradorId)
+          viajeId = viaje.id
+        } else {
+          const viaje = await crearViaje.mutateAsync(buildViajeRequest())
+          viajeId = viaje.id
+        }
+        setTripId(viajeId)
       }
-    }, 1100)
+
+      let generado: GeneracionCircuitoResponse
+      try {
+        generado = await generarCircuito.mutateAsync(viajeId)
+      } catch (error) {
+        if (!isAlreadyGenerated(error)) throw error
+        generado = await fetchCircuito(viajeId)
+      }
+
+      setCircuito(generado)
+      setSelectedStrategy(generado.estrategiaSeleccionada)
+      setActiveDay(1)
+    })()
+
+    void Promise.all([request, animation])
+      .then(() => setStep(10))
+      .catch((error: unknown) => {
+        if (intervalRef.current) clearInterval(intervalRef.current)
+        if (timeoutRef.current) clearTimeout(timeoutRef.current)
+        showToast(
+          error instanceof Error ? error.message : 'No pudimos generar el circuito',
+        )
+        setStep(8)
+      })
   }
 
-  const buildViajePayload = (): ViajeBorradorRequest => ({
+  const buildDraftPayload = (): ViajeBorradorRequest => ({
     nombre: tripName.trim() || 'Escapada a Córdoba',
     fechaInicio: dateFrom,
     fechaFin: dateTo,
@@ -268,35 +330,75 @@ export function PlanificadorPage() {
     usuario: 'turista_demo',
   })
 
-  const handleSaveTrip = () => {
-    if (borradorId !== null) {
-      completarBorrador.mutate(borradorId, {
-        onSuccess: (data) => {
-          showToast(`¡Viaje "${data.nombre ?? 'sin nombre'}" guardado en Mis viajes!`)
-          setBorradorId(null)
-          setTimeout(() => navigate('/borradores'), 1200)
-        },
-        onError: (error) => {
-          showToast(error instanceof Error ? error.message : 'Error al completar el viaje')
-        },
-      })
+  const buildViajeRequest = (): ViajeRequest => {
+    if (destino === null) {
+      throw new Error('Falta seleccionar la zona de destino')
+    }
+    return {
+      nombre: tripName.trim() || 'Escapada a Córdoba',
+      fechaInicio: dateFrom,
+      fechaFin: dateTo,
+      ubicacion: {
+        ciudad: destino.ciudad,
+        localidad: destino.localidad,
+        latitud: destino.latitud,
+        longitud: destino.longitud,
+      },
+      rangoInteresKm: Number(radiusKm),
+      ritmo: RHYTHM_MAP[rhythm] ?? 'EQUILIBRADO',
+      intereses: interests.map((item) => INTEREST_MAP[item] ?? 'NATURALEZA'),
+      usuario: 'turista_demo',
+    }
+  }
+
+  const handleConfirmCircuit = (strategy: CircuitStrategy) => {
+    if (tripId === null) return
+    if (selectedStrategy !== null) {
+      setShowSuccessModal(true)
       return
     }
+    seleccionarCircuito.mutate(
+      { viajeId: tripId, estrategia: strategy },
+      {
+        onSuccess: (data) => {
+          setCircuito(data)
+          setSelectedStrategy(data.estrategiaSeleccionada)
+          setShowSuccessModal(true)
+        },
+        onError: (error) => {
+          showToast(
+            error instanceof Error ? error.message : 'No pudimos guardar el circuito',
+          )
+        },
+      },
+    )
+  }
 
-    crearViaje.mutate(buildViajePayload() as ViajeRequest, {
-      onSuccess: (data) => {
-        showToast(`¡Viaje "${data.nombre ?? 'sin nombre'}" guardado en Mis viajes!`)
-        setTimeout(() => navigate('/borradores'), 1200)
-      },
-      onError: (error) => {
-        showToast(error instanceof Error ? error.message : 'Error al guardar el viaje')
-      },
-    })
+  const handleGoToTrips = () => {
+    setShowSuccessModal(false)
+    navigate('/borradores')
+  }
+
+  const handleRestart = () => {
+    setShowSuccessModal(false)
+    setStep(1)
+    setTripId(null)
+    setCircuito(null)
+    setSelectedStrategy(null)
+    setBorradorId(null)
+    setActiveDay(1)
   }
 
   const handleSaveDraft = () => {
     setIsExitModalOpen(false)
-    const payload = buildViajePayload()
+
+    if (tripId !== null) {
+      showToast('Tu viaje ya está guardado')
+      setTimeout(() => navigate('/borradores'), 1200)
+      return
+    }
+
+    const payload = buildDraftPayload()
     const onSuccess = (data: { id: number; nombre: string | null }) => {
       setBorradorId(data.id)
       showToast('Borrador guardado correctamente')
@@ -417,17 +519,19 @@ export function PlanificadorPage() {
             />
           )}
 
-          {step === 10 && (
+          {step === 10 && circuito !== null && (
             <Paso10Circuito
-              tripName={tripName}
-              daysCount={daysCount}
+              circuito={circuito}
               rhythm={rhythm}
               activeDay={activeDay}
-              isSavingTrip={isSavingTrip}
+              selectedStrategy={selectedStrategy}
+              isSelecting={seleccionarCircuito.isPending}
+              showSuccessModal={showSuccessModal}
               onChangeActiveDay={setActiveDay}
-              onSaveTrip={handleSaveTrip}
-              onExploreMap={() => setStep(5)}
-              onRestart={() => setStep(1)}
+              onConfirmCircuit={handleConfirmCircuit}
+              onCloseSuccess={() => setShowSuccessModal(false)}
+              onGoToTrips={handleGoToTrips}
+              onRestart={handleRestart}
               onBackToResumen={() => setStep(8)}
             />
           )}

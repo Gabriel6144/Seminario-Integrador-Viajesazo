@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-import { useBorradores, useDescartarBorrador } from '@/api/viajes'
+import { useDescartarBorrador, useViajes } from '@/api/viajes'
 import { ViajeBorradorCard } from '@/components/viaje-borrador-card'
 import { PaginationBar } from '@/components/pagination-bar'
 import { EmptyState, ErrorState, GridSkeleton } from '@/components/query-state'
@@ -16,12 +16,13 @@ import { usePageParam } from '@/lib/use-page-param'
 import type { ViajeResponse } from '@/types/api'
 
 const USUARIO_DEMO = 'turista_demo'
+const VIAJES_VACIOS: ViajeResponse[] = []
 
 type FiltroViaje = 'TODOS' | 'BORRADORES' | 'CONFIRMADOS'
 type OrdenViaje = 'recientes' | 'proximos' | 'avance' | 'alfabetico'
 
 function esCircuitoConfirmado(viaje: ViajeResponse): boolean {
-  return viaje.estado !== 'BORRADOR' || (viaje.pasoActual ?? 0) >= 8
+  return viaje.estado !== 'BORRADOR'
 }
 
 function normalizarTexto(texto: string): string {
@@ -34,14 +35,14 @@ function normalizarTexto(texto: string): string {
 
 export function BorradoresPage() {
   const [page, setPage] = usePageParam()
-  const query = useBorradores(USUARIO_DEMO, page)
+  const query = useViajes(USUARIO_DEMO, page)
   const descartar = useDescartarBorrador()
   const [borradorADescartarId, setBorradorADescartarId] = useState<number | null>(null)
   const [filtroEstado, setFiltroEstado] = useState<FiltroViaje>('TODOS')
   const [busqueda, setBusqueda] = useState<string>('')
   const [orden, setOrden] = useState<OrdenViaje>('recientes')
 
-  const todosLosViajes = query.data?.content ?? []
+  const todosLosViajes = query.data?.content ?? VIAJES_VACIOS
 
   const totalCount = todosLosViajes.length
   const borradoresCount = useMemo(
@@ -109,7 +110,7 @@ export function BorradoresPage() {
             Mis Viajes
           </h2>
           <p className="text-sm text-[#3f484e]">
-            Circuitos guardados como borrador para retomarlos después.
+            Tus circuitos confirmados y los borradores que todavía podés retomar.
           </p>
         </div>
 
@@ -236,8 +237,8 @@ export function BorradoresPage() {
       {query.isError ? <ErrorState error={query.error} /> : null}
       {query.data && query.data.content.length === 0 ? (
         <EmptyState
-          title="Todavía no hay borradores"
-          description="Guardá un borrador desde el planificador para verlo acá."
+          title="Todavía no hay viajes"
+          description="Planificá tu primera aventura o guardá un borrador para retomarlo después."
         />
       ) : null}
 
