@@ -15,6 +15,7 @@ import {
   deleteEvento,
   findBorrador,
   findCircuito,
+  findCircuitoSeleccionado,
   findEvento,
   findPublicador,
   findPublicadorByEmail,
@@ -231,6 +232,23 @@ export const handlers = [
     return HttpResponse.json(createViaje(body as ViajeRequest), { status: 201 })
   }),
 
+  http.get('/api/viajes/:id/circuito/seleccionado', ({ params }) => {
+    const viaje = findBorrador(Number(params.id))
+    if (viaje === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el viaje con id ${String(params.id)}`), {
+        status: 404,
+      })
+    }
+    const circuito = findCircuitoSeleccionado(viaje.id)
+    if (circuito === undefined) {
+      return HttpResponse.json(
+        errorBody(404, 'El circuito del viaje todavía no tiene una alternativa seleccionada'),
+        { status: 404 },
+      )
+    }
+    return HttpResponse.json(circuito)
+  }),
+
   http.get('/api/viajes/:id/circuito', ({ params }) => {
     const viaje = findBorrador(Number(params.id))
     if (viaje === undefined) {
@@ -247,20 +265,27 @@ export const handlers = [
     return HttpResponse.json(circuito)
   }),
 
-  http.post('/api/viajes/:id/circuito', ({ params }) => {
+  http.post('/api/viajes/:id/circuito', ({ params, request }) => {
     const viaje = findBorrador(Number(params.id))
     if (viaje === undefined) {
       return HttpResponse.json(errorBody(404, `No existe el viaje con id ${String(params.id)}`), {
         status: 404,
       })
     }
-    if (findCircuito(viaje.id) !== undefined) {
+    const existente = findCircuito(viaje.id)
+    const reemplazar = new URL(request.url).searchParams.get('reemplazar') === 'true'
+    if (existente !== undefined && !reemplazar) {
       return HttpResponse.json(
-        errorBody(400, 'el circuito del viaje ya fue generado; no se permite regenerarlo'),
-        { status: 400 },
+        errorBody(
+          409,
+          'el circuito del viaje ya fue generado; confirmá con reemplazar=true para regenerarlo',
+        ),
+        { status: 409 },
       )
     }
-    return HttpResponse.json(createCircuito(viaje.id), { status: 201 })
+    return HttpResponse.json(createCircuito(viaje.id), {
+      status: existente === undefined ? 201 : 200,
+    })
   }),
 
   http.post('/api/viajes/:id/circuito/seleccion', async ({ params, request }) => {

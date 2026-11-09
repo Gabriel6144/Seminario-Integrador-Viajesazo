@@ -94,9 +94,13 @@ export function ViajeBorradorCard({ borrador, onDescartar, descartando }: Props)
       </div>
 
       {confirmado ? (
-        <div className="mt-auto rounded-xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-center text-xs font-semibold text-emerald-800">
-          Circuito elegido y guardado
-        </div>
+        <Link
+          to={`/viajes/${borrador.id}/circuito`}
+          className="mt-auto flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-3 text-center text-xs font-bold text-white transition hover:bg-emerald-700"
+        >
+          <span className="material-symbols-outlined text-base">map</span>
+          Ver circuito
+        </Link>
       ) : (
       <footer className="mt-auto flex flex-wrap gap-2 pt-3">
         <Link

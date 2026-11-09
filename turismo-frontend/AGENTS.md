@@ -9,14 +9,15 @@ servidor ni lógica de negocio: la UI **consume** la API.
 Los dos proyectos viven en el **mismo repositorio git**, como subcarpetas. Eso no los hace
 acoplados de build: cada uno tiene su `package.json` / `pom.xml` y sus propios comandos.
 
-- Estado actual: Sprints 1–3 completos. Listados paginados de eventos y publicadores, detalle de
-  ambos, agenda (VZ-18), **CRUD de eventos y alta de publicadores**, **planificador de viajes con
-  generación y selección de circuitos (VZ-25)** y ruta 404. La agenda filtra y pagina en el
-  servidor. El alta/edición de eventos soporta **tipo de acceso y arancel** (`GRATUITO` / `DE_PAGO`
-  con monto y link al sitio oficial) y **ubicación con mapa** (Leaflet + OpenStreetMap), incluido
-  un **selector de ubicación** con buscador y pin arrastrable. **182 tests en 21 archivos (173 en
-  verde).** Los 9 que fallan son preexistentes y ajenos: 8 de `eventos-page.test.tsx` (mockea
-  `/api/eventos` y la página usa `/api/propuestas`) y 1 de `evento-editar-page.test.tsx`
+- Estado actual: Sprints 1–3 completos y **consulta del circuito seleccionado (VZ-26)**. Listados
+  paginados de eventos y publicadores, detalle de ambos, agenda (VZ-18), **CRUD de eventos y alta
+  de publicadores**, **planificador de viajes con generación y selección de circuitos (VZ-25)**,
+  **página día por día del circuito seleccionado (VZ-26)** y ruta 404. La agenda filtra y pagina en
+  el servidor. El alta/edición de eventos soporta **tipo de acceso y arancel** (`GRATUITO` /
+  `DE_PAGO` con monto y link al sitio oficial) y **ubicación con mapa** (Leaflet + OpenStreetMap),
+  incluido un **selector de ubicación** con buscador y pin arrastrable. **186 tests en 22 archivos
+  (177 en verde).** Los 9 que fallan son preexistentes y ajenos: 8 de `eventos-page.test.tsx`
+  (mockea `/api/eventos` y la página usa `/api/propuestas`) y 1 de `evento-editar-page.test.tsx`
   (validación de fecha).
 - Sigue sin autenticación: cualquiera que abra la app puede crear, editar y borrar eventos. Es
   una limitación conocida del alcance de la tesis, no una decisión de diseño closed.
@@ -114,8 +115,9 @@ animación de generación y el 10 muestra las tres alternativas reales.
 - **La animación no decide el resultado.** El paso 9 muestra cuatro mensajes cada 1100 ms, pero
   solo se pasa al 10 cuando terminó la animación **y** llegó el circuito. Un error cancela el
   intervalo, muestra toast y vuelve al paso 8.
-- **La generación es única.** Si el backend responde `400` con "ya fue generado" (por ejemplo, al
-  reintentar), el page hace un `GET` del circuito existente y lo muestra; no vuelve a generar.
+- **La generación es única.** Si el backend responde `409` con "ya fue generado" (por ejemplo, al
+  reintentar), el page hace un `GET` del circuito existente y lo muestra. Regenerar exige el modal
+  de confirmación y manda `?reemplazar=true`; descarta ediciones manuales previas.
 - **La selección también es única.** `useSeleccionarCircuito` actualiza la caché del circuito; la
   UI deshabilita el botón cuando `estrategiaSeleccionada !== null`. Cambiar de pestaña solo cambia
   la vista (`activeStrategy`), no selecciona.
@@ -144,10 +146,32 @@ animación de generación y el 10 muestra las tres alternativas reales.
   `GET /api/viajes/{id}/circuito` trae `estrategiaSeleccionada` y `alternativas` (plural). En
   `types/api.ts` son `CircuitoResponse` y `GeneracionCircuitoResponse` respectivamente.
 - **MSW replica el ciclo completo**: `POST /api/viajes`, `GET /api/viajes`, `POST/GET
-  /api/viajes/:id/circuito` y `POST .../seleccion` sobre `src/test/store.ts`. El fixture
+  /api/viajes/:id/circuito` (con `409` y `?reemplazar=true`) y `POST .../seleccion` sobre
+  `src/test/store.ts`. El fixture
   `CIRCUITO` trae las tres estrategias con paradas y el snapshot visual/de ubicación; sin ese
   estado, el test del paso 10 no podría verificar la selección. `BORRADORES` incluye un viaje
   confirmado además del borrador para cubrir “Mis viajes”.
+
+## Circuito seleccionado día por día (VZ-26)
+
+`src/pages/circuito-page.tsx` se abre en `/viajes/:id/circuito` (ruta registrada antes de
+`/viajes/:id/planificar`). La tarjeta de un viaje confirmado muestra “Ver circuito” y navega ahí.
+
+- **La página consume `GET /api/viajes/{id}/circuito/seleccionado`**, no el `GET` de alternativas:
+  `useCircuitoSeleccionado` usa la query key `['circuito', viajeId, 'seleccionado']`. Un `404`
+  (sin viaje, sin circuito o sin selección) se muestra como estado de error con “No se pudo cargar
+  la información” y botón de reintento.
+- **Los días vacíos se renderizan igual**: el backend ya devuelve todos los días del rango y la UI
+  muestra “Sin actividades programadas.” cuando `items` está vacío. No agrupar de nuevo en el
+  cliente ni descartar días sin paradas.
+- **El banner de desactualizado sale de `desactualizado` + `motivosDesactualizacion`**, que solo
+  expone este endpoint. “Regenerar” reutiliza `planificador-regenerate-modal` y
+  `useGenerarCircuito` con `?reemplazar=true`; al terminar invalida el prefijo `['circuito']`, así
+  que la página vuelve a pedir el seleccionado.
+- **MSW** agrega el handler `GET /api/viajes/:id/circuito/seleccionado` y el fixture
+  `CIRCUITO_SELECCIONADO` (viaje `2`, estrategia `INTERESES`, `desactualizado: true`, con un día
+  vacío). `resetStore()` siembra la selección del viaje `2`; los tests de la página cubren el
+  agrupado por día, la regeneración con modal y el `404`.
 
 ## Escritura: cómo está armado
 
@@ -288,9 +312,10 @@ Cuidado con los bordes de la paginación: `pointer-events-none` depende del CSS 
 
 ## Tests
 
-Vitest + Testing Library + MSW. 182 tests en 21 archivos (9 en rojo, preexistentes y ajenos a la
+Vitest + Testing Library + MSW. 186 tests en 22 archivos (9 en rojo, preexistentes y ajenos a la
 agenda y al planificador: 8 de `eventos-page` y 1 de `evento-editar-page`). `circuito-view-model`
-cubre el adaptador real y `borradores-page` el listado mixto borrador/confirmado.
+cubre el adaptador real, `borradores-page` el listado mixto borrador/confirmado y
+`circuito-page` la vista día por día del seleccionado (incluidos días vacíos y regeneración).
 
 - **Nominatim se mockea con handlers MSW** (`/nominatim/search` y `/nominatim/reverse`), igual que
   la API: `onUnhandledRequest: 'error'` no perdona una request real. El test del selector mockea

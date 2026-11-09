@@ -1,6 +1,13 @@
-import { BORRADORES, CIRCUITO, EVENTOS, PUBLICADORES } from './fixtures'
+import {
+  BORRADORES,
+  CIRCUITO,
+  CIRCUITO_SELECCIONADO,
+  EVENTOS,
+  PUBLICADORES,
+} from './fixtures'
 import type {
   CircuitStrategy,
+  CircuitoSeleccionadoResponse,
   EventoRequest,
   EventoResponse,
   GeneracionCircuitoResponse,
@@ -28,6 +35,7 @@ let eventos: EventoResponse[] = []
 let publicadores: PublicadorResponse[] = []
 let borradores: ViajeResponse[] = []
 let circuitos = new Map<number, GeneracionCircuitoResponse>()
+let circuitosSeleccionados = new Map<number, CircuitoSeleccionadoResponse>()
 let nextEventoId = 0
 let nextPublicadorId = 0
 let nextBorradorId = 0
@@ -37,6 +45,8 @@ export function resetStore(): void {
   publicadores = structuredClone(PUBLICADORES)
   borradores = structuredClone(BORRADORES)
   circuitos = new Map()
+  // El viaje confirmado del fixture ya tiene su circuito elegido, listo para VZ-26.
+  circuitosSeleccionados = new Map([[2, structuredClone(CIRCUITO_SELECCIONADO)]])
   // Los fixtures ya traen ids 1..3 y 1..7, así que los siguientes arrancan por arriba.
   nextEventoId = Math.max(0, ...EVENTOS.map((evento) => evento.id)) + 1
   nextPublicadorId = Math.max(0, ...PUBLICADORES.map((publicador) => publicador.id)) + 1
@@ -134,6 +144,12 @@ export function createViaje(request: ViajeRequest): ViajeResponse {
 
 export function findCircuito(viajeId: number): GeneracionCircuitoResponse | undefined {
   return circuitos.get(viajeId)
+}
+
+export function findCircuitoSeleccionado(
+  viajeId: number,
+): CircuitoSeleccionadoResponse | undefined {
+  return circuitosSeleccionados.get(viajeId)
 }
 
 export function createCircuito(viajeId: number): GeneracionCircuitoResponse {

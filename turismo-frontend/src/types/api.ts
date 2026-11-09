@@ -381,6 +381,8 @@ export interface ApiErrorResponse {
   detail?: string
   title?: string
   timestamp?: string
+  /** Solo en el 422 de generación de circuitos: campos que faltan en el viaje. */
+  datosFaltantes?: string[]
 }
 
 export const TIPOS_RITMO = ['TRANQUILO', 'EQUILIBRADO', 'INTENSIVO'] as const
@@ -473,6 +475,7 @@ export const CIRCUIT_STRATEGY_LABELS: Record<CircuitStrategy, string> = {
 
 /** Espejo de `dto/response/CircuitoItemResponse.java`. El snapshot no depende de la propuesta. */
 export interface CircuitoItemResponse {
+  itemId: number
   propuestaId: number
   propuestaNombre: string
   descripcion: string | null
@@ -517,6 +520,44 @@ export interface CircuitoResponse {
   alternativa: CircuitoAlternativaResponse
   distanciasEstimadas: boolean
   advertencia: string | null
+  /** `true` si el viaje cambió después de generar el circuito. */
+  desactualizado: boolean
+  /** `FECHAS`, `PREFERENCIAS`, `ZONA` y/o `RITMO`. */
+  motivosDesactualizacion: string[]
+}
+
+/** Espejo de `dto/response/AlternativaItemResponse.java` (VZ-26). */
+export interface AlternativaItemResponse {
+  itemId: number
+  propuestaId: number
+  propuestaNombre: string
+  tipo: TipoRegistro
+  categoria: InteresCategoria | null
+  ciudad: string | null
+  localidad: string | null
+  direccion: string | null
+  horaInicio: LocalTime | null
+  horaFin: LocalTime | null
+  duracionMinutos: number | null
+}
+
+/** Espejo de `dto/response/DiaCircuitoResponse.java` (VZ-26). */
+export interface DiaCircuitoResponse {
+  fecha: LocalDate
+  items: AlternativaItemResponse[]
+}
+
+/** Espejo de `dto/response/CircuitoSeleccionadoResponse.java` (VZ-26). */
+export interface CircuitoSeleccionadoResponse {
+  circuitoId: number
+  viajeId: number
+  generadoEn: string | null
+  estrategia: CircuitStrategy
+  desactualizado: boolean
+  motivosDesactualizacion: string[]
+  distanciasEstimadas: boolean
+  advertencia: string | null
+  dias: DiaCircuitoResponse[]
 }
 
 /** Espejo de `dto/response/GeneracionCircuitoResponse.java`. */

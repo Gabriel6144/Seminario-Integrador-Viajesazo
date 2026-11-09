@@ -30,6 +30,7 @@ import { Paso9Generando } from '@/components/planificador/paso-9-generando'
 import { Paso10Circuito } from '@/components/planificador/paso-10-circuito'
 import { PlanificadorExitModal } from '@/components/planificador/planificador-exit-modal'
 import { PlanificadorHeader } from '@/components/planificador/planificador-header'
+import { PlanificadorRegenerateModal } from '@/components/planificador/planificador-regenerate-modal'
 import type { DestinoSeleccionado, LoadingStep } from '@/components/planificador/types'
 import type {
   CircuitStrategy,
@@ -102,6 +103,7 @@ export function PlanificadorPage() {
 
   // Screen states
   const [isExitModalOpen, setIsExitModalOpen] = useState<boolean>(false)
+  const [isRegenerateModalOpen, setIsRegenerateModalOpen] = useState<boolean>(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [activeDay, setActiveDay] = useState<number>(1)
   const [tripId, setTripId] = useState<number | null>(null)
@@ -374,6 +376,25 @@ export function PlanificadorPage() {
     )
   }
 
+  const handleRegenerate = () => {
+    if (tripId === null) return
+    generarCircuito.mutateAsync({ viajeId: tripId, reemplazar: true }).then(
+      (data) => {
+        setCircuito(data)
+        setSelectedStrategy(data.estrategiaSeleccionada)
+        setActiveDay(1)
+        setShowSuccessModal(false)
+        setIsRegenerateModalOpen(false)
+        showToast('Circuito regenerado correctamente')
+      },
+      (error: unknown) => {
+        showToast(
+          error instanceof Error ? error.message : 'No pudimos regenerar el circuito',
+        )
+      },
+    )
+  }
+
   const handleGoToTrips = () => {
     setShowSuccessModal(false)
     navigate('/borradores')
@@ -533,6 +554,7 @@ export function PlanificadorPage() {
               onGoToTrips={handleGoToTrips}
               onRestart={handleRestart}
               onBackToResumen={() => setStep(8)}
+              onRegenerate={() => setIsRegenerateModalOpen(true)}
             />
           )}
         </main>
@@ -545,6 +567,13 @@ export function PlanificadorPage() {
         onClose={() => setIsExitModalOpen(false)}
         onSaveDraft={handleSaveDraft}
         onDiscard={handleDiscardExit}
+      />
+
+      <PlanificadorRegenerateModal
+        isOpen={isRegenerateModalOpen}
+        isRegenerating={generarCircuito.isPending}
+        onClose={() => setIsRegenerateModalOpen(false)}
+        onConfirm={handleRegenerate}
       />
 
       {/* NOTIFICACIÓN TOAST */}

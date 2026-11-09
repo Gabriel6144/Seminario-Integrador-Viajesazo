@@ -46,6 +46,7 @@ export const queryKeys = {
   viajes: (page: number, size: number) => ['viajes', { page, size }] as const,
   viajesAll: () => ['viajes'] as const,
   circuito: (viajeId: number) => ['circuito', viajeId] as const,
+  circuitoSeleccionado: (viajeId: number) => ['circuito', viajeId, 'seleccionado'] as const,
   circuitosAll: () => ['circuito'] as const,
   /**
    * Prefijo de los eventos de un publicador. No es `['publicador', id]` a propósito: eso

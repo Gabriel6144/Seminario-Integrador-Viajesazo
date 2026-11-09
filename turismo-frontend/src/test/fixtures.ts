@@ -1,4 +1,5 @@
 import type {
+  CircuitoSeleccionadoResponse,
   EventoResponse,
   GeneracionCircuitoResponse,
   Page,
@@ -283,6 +284,7 @@ export const CIRCUITO: GeneracionCircuitoResponse = {
       advertencia: null,
       propuestas: [
         {
+          itemId: 301,
           propuestaId: 3,
           propuestaNombre: 'Circuito Peatonal Histórico Córdoba Jesuítica',
           descripcion: 'Recorrido patrimonial guiado por templos y museos fundacionales.',
@@ -310,6 +312,7 @@ export const CIRCUITO: GeneracionCircuitoResponse = {
           duracionMinutos: 120,
         },
         {
+          itemId: 302,
           propuestaId: 2,
           propuestaNombre: 'Semana Gastronómica de las Sierras Chicas',
           descripcion: 'Sabores típicos y cocina criolla en el corazón de las Sierras Chicas.',
@@ -346,6 +349,7 @@ export const CIRCUITO: GeneracionCircuitoResponse = {
       advertencia: null,
       propuestas: [
         {
+          itemId: 101,
           propuestaId: 1,
           propuestaNombre: 'Festival de Doma y Folklore de Jesús María',
           descripcion: 'La mayor fiesta de la tradición gaucha y música folklórica.',
@@ -382,6 +386,7 @@ export const CIRCUITO: GeneracionCircuitoResponse = {
       advertencia: 'Hay pocas propuestas compatibles; el itinerario puede quedar corto.',
       propuestas: [
         {
+          itemId: 303,
           propuestaId: 3,
           propuestaNombre: 'Circuito Peatonal Histórico Córdoba Jesuítica',
           descripcion: 'Recorrido patrimonial guiado por templos y museos fundacionales.',
@@ -406,6 +411,59 @@ export const CIRCUITO: GeneracionCircuitoResponse = {
           montoEstimado: null,
           descripcionArancel: null,
           sitioOficial: null,
+          duracionMinutos: 120,
+        },
+      ],
+    },
+  ],
+}
+
+export const CIRCUITO_SELECCIONADO: CircuitoSeleccionadoResponse = {
+  circuitoId: 1,
+  viajeId: 2,
+  generadoEn: '2026-10-20T12:00:00',
+  estrategia: 'INTERESES',
+  desactualizado: true,
+  motivosDesactualizacion: ['FECHAS'],
+  distanciasEstimadas: true,
+  advertencia: null,
+  dias: [
+    {
+      fecha: '2026-12-05',
+      items: [
+        {
+          itemId: 101,
+          propuestaId: 1,
+          propuestaNombre: 'Festival de Doma y Folklore de Jesús María',
+          tipo: 'EVENTO',
+          categoria: 'MUSICA',
+          ciudad: 'Córdoba',
+          localidad: 'Centro',
+          direccion: 'Av. Colón 100',
+          horaInicio: '20:00:00',
+          horaFin: '23:30:00',
+          duracionMinutos: 210,
+        },
+      ],
+    },
+    {
+      fecha: '2026-12-06',
+      items: [],
+    },
+    {
+      fecha: '2026-12-07',
+      items: [
+        {
+          itemId: 301,
+          propuestaId: 3,
+          propuestaNombre: 'Circuito Peatonal Histórico Córdoba Jesuítica',
+          tipo: 'EVENTO',
+          categoria: 'CULTURA',
+          ciudad: 'Córdoba',
+          localidad: 'Centro',
+          direccion: 'Av. Colón 100',
+          horaInicio: '09:00:00',
+          horaFin: '11:00:00',
           duracionMinutos: 120,
         },
       ],

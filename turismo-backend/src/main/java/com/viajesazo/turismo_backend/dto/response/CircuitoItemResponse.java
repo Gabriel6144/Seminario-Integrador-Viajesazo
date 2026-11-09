@@ -10,6 +10,7 @@ import com.viajesazo.turismo_backend.model.TipoAcceso;
 import com.viajesazo.turismo_backend.model.TipoRegistro;
 
 public record CircuitoItemResponse(
+        Long itemId,
         Long propuestaId,
         String propuestaNombre,
         String descripcion,

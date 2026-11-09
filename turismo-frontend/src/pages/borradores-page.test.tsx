@@ -14,5 +14,9 @@ describe('BorradoresPage', () => {
     expect(screen.getByText('Borrador de ejemplo')).toBeInTheDocument()
     expect(screen.getByText('Circuito confirmado de ejemplo')).toBeInTheDocument()
     expect(screen.getByText('Circuito confirmado')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /ver circuito/i })).toHaveAttribute(
+      'href',
+      '/viajes/2/circuito',
+    )
   })
 })

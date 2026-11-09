@@ -5,6 +5,7 @@ import { ActividadDetailPage } from '@/pages/actividad-detail-page'
 import { ActividadEditarPage } from '@/pages/actividad-editar-page'
 import { AgendaPage } from '@/pages/agenda-page'
 import { BorradoresPage } from '@/pages/borradores-page'
+import { CircuitoPage } from '@/pages/circuito-page'
 import { EventoDetailPage } from '@/pages/evento-detail-page'
 import { EventoEditarPage } from '@/pages/evento-editar-page'
 import { EventoNuevoPage } from '@/pages/evento-nuevo-page'
@@ -38,6 +39,7 @@ export const router = createBrowserRouter([
       { index: true, Component: EventosPage },
       { path: 'agenda', Component: AgendaPage },
       { path: 'borradores', Component: BorradoresPage },
+      { path: 'viajes/:id/circuito', Component: CircuitoPage },
       { path: 'planificar', Component: PlanificadorPage },
       { path: 'propuestas/nueva', Component: EventoNuevoPage },
       { path: 'eventos/nuevo', Component: EventoNuevoPage },

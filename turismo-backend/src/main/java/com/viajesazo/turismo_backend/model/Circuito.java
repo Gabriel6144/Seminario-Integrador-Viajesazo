@@ -1,11 +1,18 @@
 package com.viajesazo.turismo_backend.model;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -47,6 +54,45 @@ public class Circuito {
 
     @Column(length = 500)
     private String advertencia;
+
+    @Column
+    private LocalDate fechaInicioSnapshot;
+
+    @Column
+    private LocalDate fechaFinSnapshot;
+
+    @Column
+    private Double rangoInteresKmSnapshot;
+
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Enumerated(EnumType.STRING)
+    @Column(length = 50)
+    private TipoRitmo ritmoSnapshot;
+
+    @Column(length = 120)
+    private String zonaCiudadSnapshot;
+
+    @Column(length = 120)
+    private String zonaLocalidadSnapshot;
+
+    @Column(length = 255)
+    private String zonaDireccionSnapshot;
+
+    @Column(precision = 10, scale = 7)
+    private BigDecimal zonaLatitudSnapshot;
+
+    @Column(precision = 10, scale = 7)
+    private BigDecimal zonaLongitudSnapshot;
+
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @ElementCollection
+    @Enumerated(EnumType.STRING)
+    @CollectionTable(
+        name = "circuito_intereses_categoria",
+        joinColumns = @JoinColumn(name = "circuito_id")
+    )
+    @Column(name = "categoria", nullable = false, length = 50)
+    private List<InteresCategoria> interesesCategoriaSnapshot = new ArrayList<>();
 
     @OneToMany(mappedBy = "circuito", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CircuitoAlternativa> alternativas = new ArrayList<>();

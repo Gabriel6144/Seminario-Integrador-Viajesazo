@@ -44,6 +44,20 @@ public class GlobalExceptionHandler {
 		return build(HttpStatus.BAD_REQUEST, ex.getMessage());
 	}
 
+	@ExceptionHandler(ConfirmationRequiredException.class)
+	public ResponseEntity<ErrorResponse> handleConfirmationRequired(ConfirmationRequiredException ex) {
+		return build(HttpStatus.CONFLICT, ex.getMessage());
+	}
+
+	@ExceptionHandler(CircuitoDataMissingException.class)
+	public ResponseEntity<ErrorResponseWithMissingData> handleCircuitDataMissing(
+			CircuitoDataMissingException ex) {
+		ErrorResponseWithMissingData body = new ErrorResponseWithMissingData(
+				HttpStatus.UNPROCESSABLE_ENTITY.value(), HttpStatus.UNPROCESSABLE_ENTITY.getReasonPhrase(),
+				ex.getMessage(), ex.datosFaltantes(), LocalDateTime.now(clock));
+		return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(body);
+	}
+
 	/**
 	 * El agregado quedaría en un estado inconsistente. Se responde con el formato estándar
 	 * {@code application/problem+json} (RFC 7807) porque es un error de semántica del dominio, no
@@ -135,7 +149,7 @@ public class GlobalExceptionHandler {
 			return build(HttpStatus.BAD_REQUEST, "ya existe un publicador con ese email");
 		}
 		if (normalized.contains("circuito") || normalized.contains("viaje_id")) {
-			return build(HttpStatus.BAD_REQUEST, "el circuito del viaje ya fue generado");
+			return build(HttpStatus.CONFLICT, "el circuito del viaje ya fue generado");
 		}
 		return build(HttpStatus.BAD_REQUEST, "no se pudo guardar por un conflicto de datos");
 	}

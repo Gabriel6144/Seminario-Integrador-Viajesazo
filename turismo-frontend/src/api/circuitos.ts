@@ -3,24 +3,35 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/api/queries'
 import { apiGet, apiPost } from '@/lib/http'
 import type {
+  CircuitoSeleccionadoResponse,
   GeneracionCircuitoResponse,
   SeleccionCircuitoRequest,
 } from '@/types/api'
 
+interface GenerarCircuitoVariables {
+  viajeId: number
+  reemplazar?: boolean
+}
+
 /**
- * Circuito de un viaje. La generación es **una sola vez** por viaje: el backend responde 400 si
- * ya existe, así que la mutación no se reintenta ni se vuelve a llamar tras un éxito.
+ * Circuito de un viaje. La primera generación responde 201. Si el circuito ya existe, el backend
+ * responde 409 y solo regenera cuando se manda `reemplazar=true` de forma explícita.
  */
 export function useGenerarCircuito() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (viajeId: number) =>
-      apiPost<GeneracionCircuitoResponse, undefined>(
-        `/api/viajes/${viajeId}/circuito`,
+    mutationFn: (variables: number | GenerarCircuitoVariables) => {
+      const viajeId = typeof variables === 'number' ? variables : variables.viajeId
+      const reemplazar = typeof variables === 'number' ? false : (variables.reemplazar ?? false)
+      const query = reemplazar ? '?reemplazar=true' : ''
+      return apiPost<GeneracionCircuitoResponse, undefined>(
+        `/api/viajes/${viajeId}/circuito${query}`,
         undefined,
-      ),
-    onSuccess: (data, viajeId) => {
+      )
+    },
+    onSuccess: (data, variables) => {
+      const viajeId = typeof variables === 'number' ? variables : variables.viajeId
       queryClient.setQueryData(queryKeys.circuito(viajeId), data)
       void queryClient.invalidateQueries({ queryKey: queryKeys.circuitosAll() })
     },
@@ -38,6 +49,25 @@ export function useCircuito(viajeId: number | null) {
   return useQuery({
     queryKey: queryKeys.circuito(viajeId ?? 0),
     queryFn: ({ signal }) => fetchCircuito(viajeId ?? 0, signal),
+    enabled: viajeId !== null,
+  })
+}
+
+export function fetchCircuitoSeleccionado(
+  viajeId: number,
+  signal?: AbortSignal,
+): Promise<CircuitoSeleccionadoResponse> {
+  return apiGet<CircuitoSeleccionadoResponse>(
+    `/api/viajes/${viajeId}/circuito/seleccionado`,
+    signal,
+  )
+}
+
+/** VZ-26: circuito elegido, ya agrupado por día por el backend. */
+export function useCircuitoSeleccionado(viajeId: number | null) {
+  return useQuery({
+    queryKey: queryKeys.circuitoSeleccionado(viajeId ?? 0),
+    queryFn: ({ signal }) => fetchCircuitoSeleccionado(viajeId ?? 0, signal),
     enabled: viajeId !== null,
   })
 }

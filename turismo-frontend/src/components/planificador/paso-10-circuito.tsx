@@ -22,6 +22,7 @@ interface Paso10CircuitoProps {
   onGoToTrips: () => void
   onRestart: () => void
   onBackToResumen?: () => void
+  onRegenerate?: () => void
 }
 
 export function Paso10Circuito({
@@ -37,6 +38,7 @@ export function Paso10Circuito({
   onGoToTrips,
   onRestart,
   onBackToResumen,
+  onRegenerate,
 }: Paso10CircuitoProps) {
   const [selectedCircuit, setSelectedCircuit] =
     useState<CircuitoRecomendado | null>(null)
@@ -102,6 +104,16 @@ export function Paso10Circuito({
             Circuitos Recomendados
           </h1>
         </div>
+        {onRegenerate && (
+          <button
+            type="button"
+            onClick={onRegenerate}
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900 active:scale-95"
+          >
+            <span className="material-symbols-outlined text-[18px]">refresh</span>
+            <span>Regenerar</span>
+          </button>
+        )}
       </header>
 
       <p className="mb-6 max-w-2xl text-sm leading-relaxed text-slate-600 sm:text-base">

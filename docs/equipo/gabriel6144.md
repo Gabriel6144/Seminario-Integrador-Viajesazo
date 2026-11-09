@@ -3,7 +3,7 @@
 - **Área:** Backend / integración full-stack
 - **Foco:** modelo de dominio, API REST, persistencia, filtros, integración con el frontend y documentación técnica
 - **Ramas habituales:** `Backend`, `main`, `develop`, `backend/*`, `feat/*`, `fix/*`, `docs/*`
-- **Última actualización:** 2026-10-27
+- **Última actualización:** 2026-11-09
 
 > Una entrada por PR o tarea relevante, en orden cronológico inverso. Cada entrada registra qué se hizo, por qué se tomó cada decisión y cómo se verificó. Los merges de trabajo ajeno se documentan como integración, sin atribuirse el código.
 
@@ -11,6 +11,7 @@
 
 | Fecha | Hito | Referencia |
 |---|---|---|
+| 2026-11-09 | Sprint 4: VZ-25 (generar/regenerar) y VZ-26 (consultar circuito) | `devGaby`, working tree |
 | 2026-10-27 | Integración full-stack de circuitos y “Mis viajes” | `devGaby`, working tree |
 | 2026-10-25 | VZ-18: agenda turística server-side | working tree, sin commit |
 | 2026-10-24 | Animación del mapa al cambiar el destino | `4437abd` |
@@ -24,6 +25,110 @@
 | 2026-10-10 | Planificación Sprint 2 y flujo de PR | `f958918`, `faf7bd5` · PR #2 |
 | 2026-10-08 | Integración del PR #1 de `sbrito` | `4f4dbab` |
 | 2026-09-27 | Base del repositorio y Sprint 1 | `40fc87a` |
+
+## 2026-11-09 — Sprint 4: VZ-25 (generar/regenerar) y VZ-26 (consultar circuito)
+
+- **Sprint / US:** Sprint 4 / VZ-25, VZ-26
+- **Rama / PR:** `devGaby`; cambios en working tree, sin commit ni PR todavía
+- **Commit(s):** ninguno; base `60983dd`
+- **Estado:** implementado y verificado, pendiente de commit
+
+**Qué hice**
+
+- Separé los endpoints de circuito en `CircuitoController` (`/api/viajes/{id}/circuito`);
+  `ViajeController` queda solo con el CRUD y la vista del viaje, y sus tests de circuito se
+  movieron a `CircuitoControllerTest`.
+- VZ-25:
+  - Exigí intereses no vacíos y filtré candidatos de forma estricta por `interesesCategoria`
+    además del radio de interés.
+  - Reemplacé el `400` de datos faltantes por `422` con `datosFaltantes: []`
+    (`CircuitoDataMissingException` + `ErrorResponseWithMissingData`).
+  - Si no hay candidatos elegibles, respondo `422` y no persisto un circuito vacío.
+  - Implementé la regeneración: `409` (`ConfirmationRequiredException`) sin
+    `?reemplazar=true`; con el flag reemplaza las alternativas y conserva la estrategia
+    seleccionada si sigue existiendo.
+  - Agregué un snapshot de generación en `Circuito` (fechas, zona, radio, ritmo e intereses) y
+    expuse `desactualizado` + `motivosDesactualizacion` (`FECHAS`, `PREFERENCIAS`, `ZONA`,
+    `RITMO`) en `CircuitoResponse`.
+  - Agregué `itemId` a `CircuitoItemResponse`.
+- VZ-26:
+  - Nuevo `GET /api/viajes/{id}/circuito/seleccionado` que devuelve
+    `CircuitoSeleccionadoResponse` agrupado en `dias[]`, incluye días vacíos (`items: []`),
+    ordena por `horaInicio` y usa `orden` como desempate; `404` si no hay viaje, circuito o
+    selección.
+  - Nuevos DTO `CircuitoSeleccionadoResponse`, `DiaCircuitoResponse` y
+    `AlternativaItemResponse`.
+  - En el frontend, creé la página `/viajes/:id/circuito` (`circuito-page.tsx`) con vista día
+    por día, banner de desactualizado y regeneración.
+  - La tarjeta del viaje confirmado ahora muestra “Ver circuito” y navega a la página.
+  - Agregué `useCircuitoSeleccionado` y la query key `['circuito', viajeId, 'seleccionado']`.
+  - En el planificador agregué el botón “Regenerar” y `PlanificadorRegenerateModal`; el hook
+    `useGenerarCircuito` acepta `{ viajeId, reemplazar }` y maneja `409`/`?reemplazar=true`.
+  - Actualicé tipos, fixtures, handlers MSW, store y tests (página del circuito, regeneración en
+    el planificador y enlace en “Mis viajes”).
+- Documenté el alcance y las fases en `docs/sprint4/DEFINICION-CIRCUITOS.md` y actualicé los
+  `AGENTS.md` de backend y frontend.
+
+**Decisiones**
+
+- `CircuitoController` propio y URL pública sin cambios: cohesión del recurso, tests más chicos y
+  `ViajeController` libre de la dependencia de circuitos.
+- Intereses estrictos + radio: las estrategias (`CERCANIA`, `INTERESES`, `DESCUBRIMIENTO`) solo
+  ordenan el conjunto elegible, no lo amplían.
+- Córdoba se asume por invariante de los datos cargados; no se agrega un filtro de provincia.
+- La confirmación de regeneración es mixta: el backend responde `409` y la UI reintenta con
+  `?reemplazar=true`. Cancelar no modifica nada.
+- El snapshot en `Circuito` permite detectar si el circuito quedó viejo sin regenerar
+  automáticamente; la decisión de regenerar queda en el usuario.
+- Regenerar descarta reemplazos o eliminaciones manuales previas e intenta conservar la
+  estrategia seleccionada.
+- El circuito seleccionado se consulta en un endpoint propio y no reutilizando el `GET` de
+  alternativas: la vista necesita días agrupados, incluidos los vacíos, y el estado de
+  desactualización.
+- Autenticación real diferida: no se simulan `401/403` ni se agrega `usuario` a los endpoints de
+  circuito; queda deuda para la historia de auth.
+- El frontend no reagrupa por día ni descarta días vacíos: el backend ya devuelve `dias[]`
+  ordenados.
+
+**Archivos principales**
+
+- `turismo-backend/src/main/java/com/viajesazo/turismo_backend/controller/CircuitoController.java`
+- `turismo-backend/src/main/java/com/viajesazo/turismo_backend/controller/ViajeController.java`
+- `turismo-backend/src/main/java/com/viajesazo/turismo_backend/dto/response/{CircuitoItemResponse,CircuitoResponse,CircuitoSeleccionadoResponse,DiaCircuitoResponse,AlternativaItemResponse}.java`
+- `turismo-backend/src/main/java/com/viajesazo/turismo_backend/exception/{GlobalExceptionHandler,ConfirmationRequiredException,CircuitoDataMissingException,ErrorResponseWithMissingData}.java`
+- `turismo-backend/src/main/java/com/viajesazo/turismo_backend/model/Circuito.java`
+- `turismo-backend/src/main/java/com/viajesazo/turismo_backend/service/CircuitoService.java`
+- `turismo-backend/src/test/java/com/viajesazo/turismo_backend/{controller/CircuitoControllerTest,controller/ViajeControllerTest,service/CircuitoServiceTest}.java`
+- `turismo-frontend/src/types/api.ts`
+- `turismo-frontend/src/api/{circuitos,queries}.ts`
+- `turismo-frontend/src/router.tsx`
+- `turismo-frontend/src/pages/{circuito-page,circuito-page.test,planificador-page,planificador-page.test,borradores-page.test}.tsx`
+- `turismo-frontend/src/components/planificador/{planificador-regenerate-modal,paso-10-circuito,circuito-view-model}.tsx`
+- `turismo-frontend/src/components/viaje-borrador-card.tsx`
+- `turismo-frontend/src/test/{fixtures,handlers,store}.ts`
+- `docs/sprint4/DEFINICION-CIRCUITOS.md`
+- `turismo-backend/AGENTS.md`
+- `turismo-frontend/AGENTS.md`
+
+**Verificación**
+
+- Backend: **240 tests, 238 en verde**; 2 fallos preexistentes
+  (`ViajeMapperTest.mapsRequestToEntity` y `ViajeTest.rejectsPastStartDate`).
+  `CircuitoControllerTest` (10), `CircuitoServiceTest` (15) y `ViajeControllerTest` (17) en
+  verde.
+- Frontend: `npm run typecheck` OK; `npm run lint` OK con 6 warnings preexistentes;
+  `npm test -- --run` → **186 tests, 177 en verde** y 9 fallos preexistentes (`eventos-page` ×8
+  y `evento-editar-page` ×1). `circuito-page.test.tsx` (3) en verde.
+- `git diff --check`: sin errores.
+
+**Pendientes / deuda**
+
+- Commit y PR de VZ-25/VZ-26.
+- VZ-29 (eliminar ítem) y VZ-28 (reemplazar ítem) sobre la alternativa seleccionada.
+- Autenticación y propiedad de viajes para `401/403`.
+- La provincia de Córdoba sigue siendo un invariante del dato, sin filtro geográfico.
+- Regenerar descarta ediciones manuales previas de reemplazos/eliminaciones.
+- Resolver los fallos preexistentes de backend y frontend.
 
 ## 2026-10-27 — Integración full-stack de circuitos y “Mis viajes”
 

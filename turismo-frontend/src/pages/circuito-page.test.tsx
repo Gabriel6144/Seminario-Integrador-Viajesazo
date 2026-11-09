@@ -1,0 +1,62 @@
+import { screen, waitFor } from '@testing-library/react'
+import { beforeEach, describe, expect, it } from 'vitest'
+
+import { CircuitoPage } from '@/pages/circuito-page'
+import { resetStore } from '@/test/store'
+import { renderRoute, user } from '@/test/utils'
+
+describe('CircuitoPage', () => {
+  beforeEach(() => {
+    resetStore()
+  })
+
+  it('muestra el circuito elegido día por día e incluye los días vacíos', async () => {
+    renderRoute({
+      route: '/viajes/:id/circuito',
+      initialEntry: '/viajes/2/circuito',
+      children: <CircuitoPage />,
+    })
+
+    expect(
+      await screen.findByText('Festival de Doma y Folklore de Jesús María'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Día 1')).toBeInTheDocument()
+    expect(screen.getByText('Día 2')).toBeInTheDocument()
+    expect(screen.getByText('Sin actividades programadas.')).toBeInTheDocument()
+    expect(screen.getByText(/Este circuito quedó desactualizado/i)).toBeInTheDocument()
+    expect(screen.getByText(/fechas del viaje/i)).toBeInTheDocument()
+  })
+
+  it('regenera el circuito después de confirmar el reemplazo', async () => {
+    const usuario = user()
+    renderRoute({
+      route: '/viajes/:id/circuito',
+      initialEntry: '/viajes/2/circuito',
+      children: <CircuitoPage />,
+    })
+
+    await screen.findByText('Festival de Doma y Folklore de Jesús María')
+    await usuario.click(screen.getAllByRole('button', { name: /regenerar circuito/i })[0])
+
+    expect(screen.getByText(/Se descartan las alternativas actuales/i)).toBeInTheDocument()
+
+    const confirmar = screen.getAllByRole('button', { name: /regenerar circuito/i })
+    await usuario.click(confirmar[confirmar.length - 1])
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/Se descartan las alternativas actuales/i),
+      ).not.toBeInTheDocument()
+    })
+  })
+
+  it('muestra un error cuando el viaje no tiene circuito seleccionado', async () => {
+    renderRoute({
+      route: '/viajes/:id/circuito',
+      initialEntry: '/viajes/1/circuito',
+      children: <CircuitoPage />,
+    })
+
+    expect(await screen.findByText(/No se pudo cargar la información/i)).toBeInTheDocument()
+  })
+})

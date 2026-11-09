@@ -10,6 +10,7 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -24,11 +25,17 @@ import com.viajesazo.turismo_backend.circuit.GeneratedAlternative;
 import com.viajesazo.turismo_backend.circuit.DistanceProvider;
 import com.viajesazo.turismo_backend.circuit.ScheduledProposal;
 import com.viajesazo.turismo_backend.dto.request.SeleccionCircuitoRequest;
+import com.viajesazo.turismo_backend.dto.response.AlternativaItemResponse;
 import com.viajesazo.turismo_backend.dto.response.CircuitoAlternativaResponse;
 import com.viajesazo.turismo_backend.dto.response.CircuitoItemResponse;
 import com.viajesazo.turismo_backend.dto.response.CircuitoResponse;
+import com.viajesazo.turismo_backend.dto.response.CircuitoSeleccionadoResponse;
+import com.viajesazo.turismo_backend.dto.response.DiaCircuitoResponse;
 import com.viajesazo.turismo_backend.dto.response.GeneracionCircuitoResponse;
 import com.viajesazo.turismo_backend.exception.BusinessRuleException;
+import com.viajesazo.turismo_backend.exception.CircuitoDataMissingException;
+import com.viajesazo.turismo_backend.exception.ConfirmationRequiredException;
+import com.viajesazo.turismo_backend.exception.InvariantViolationException;
 import com.viajesazo.turismo_backend.exception.ResourceNotFoundException;
 import com.viajesazo.turismo_backend.model.Actividad;
 import com.viajesazo.turismo_backend.model.CircuitStrategy;
@@ -64,35 +71,57 @@ public class CircuitoService {
     private final DistanceProvider distanceProvider;
     private final Clock clock;
 
+    public record GenerationResult(GeneracionCircuitoResponse response, boolean replaced) {
+    }
+
     @Transactional
-    public GeneracionCircuitoResponse generate(Long viajeId) {
+    public GenerationResult generate(Long viajeId, boolean reemplazar) {
         Viaje viaje = findTrip(viajeId);
         validateTrip(viaje);
-        if (circuitoRepository.findByViajeId(viajeId).isPresent()) {
-            throw new BusinessRuleException("el circuito del viaje ya fue generado; no se permite regenerarlo");
+        Circuito existing = circuitoRepository.findByViajeId(viajeId).orElse(null);
+        if (existing != null && !reemplazar) {
+            throw new ConfirmationRequiredException(
+                    "el circuito del viaje ya fue generado; confirmá con reemplazar=true para regenerarlo");
         }
 
         LocalDate start = effectiveStart(viaje);
         List<CircuitCandidate> candidates = candidates(viaje, start);
-        Set<InteresCategoria> interests = viaje.getInteresesCategoria() == null
-                ? Set.of() : new LinkedHashSet<>(viaje.getInteresesCategoria());
+        if (candidates.isEmpty()) {
+            throw new InvariantViolationException(
+                    "no hay propuestas compatibles con los intereses y el radio de interés del viaje");
+        }
+        Set<InteresCategoria> interests = new LinkedHashSet<>(viaje.getInteresesCategoria());
         List<GeneratedAlternative> generated = generator.generate(start, viaje.getFechaFin(),
                 viaje.getRitmo(), interests, candidates);
+        if (generated.stream().allMatch(alternative -> alternative.proposals().isEmpty())) {
+            throw new InvariantViolationException(
+                    "no hay propuestas compatibles con los intereses y el radio de interés del viaje");
+        }
 
-        Circuito circuito = new Circuito();
-        circuito.setViaje(viaje);
+        CircuitStrategy previousStrategy = existing == null ? null : existing.getEstrategiaSeleccionada();
+        Circuito circuito = existing == null ? new Circuito() : existing;
+        if (existing == null) {
+            circuito.setViaje(viaje);
+        } else {
+            circuito.getAlternativas().clear();
+        }
         circuito.setGeneradoEn(LocalDateTime.now(clock));
         circuito.setDistanciasEstimadas(distanceProvider.estimated());
         circuito.setAdvertencia(similarityWarning(generated));
+        circuito.setEstrategiaSeleccionada(previousStrategy != null && generated.stream()
+                .anyMatch(alternative -> alternative.strategy().name().equals(previousStrategy.name()))
+                        ? previousStrategy : null);
         for (GeneratedAlternative alternative : generated) {
             circuito.addAlternativa(toEntity(alternative));
         }
+        snapshot(circuito, viaje);
         try {
             circuitoRepository.saveAndFlush(circuito);
         } catch (DataIntegrityViolationException ex) {
-            throw new BusinessRuleException("el circuito del viaje ya fue generado");
+            throw new ConfirmationRequiredException(
+                    "el circuito del viaje ya fue generado; confirmá con reemplazar=true para regenerarlo");
         }
-        return toGenerationResponse(circuito);
+        return new GenerationResult(toGenerationResponse(circuito), existing != null);
     }
 
     @Transactional
@@ -118,7 +147,7 @@ public class CircuitoService {
     }
 
     @Transactional(readOnly = true)
-    public com.viajesazo.turismo_backend.dto.response.CircuitoResponse selected(Long viajeId) {
+    public CircuitoResponse selected(Long viajeId) {
         Circuito circuito = circuitoRepository.findByViajeId(viajeId).orElse(null);
         if (circuito == null || circuito.getEstrategiaSeleccionada() == null) {
             return null;
@@ -131,9 +160,89 @@ public class CircuitoService {
         if (alternative == null) {
             return null;
         }
-        return new com.viajesazo.turismo_backend.dto.response.CircuitoResponse(
+        List<String> motivos = staleReasons(circuito);
+        return new CircuitoResponse(
                 circuito.getGeneradoEn(), circuito.getEstrategiaSeleccionada(), toResponse(alternative),
-                circuito.isDistanciasEstimadas(), circuito.getAdvertencia());
+                circuito.isDistanciasEstimadas(), circuito.getAdvertencia(), !motivos.isEmpty(), motivos);
+    }
+
+    @Transactional(readOnly = true)
+    public CircuitoSeleccionadoResponse selectedDetail(Long viajeId) {
+        findTrip(viajeId);
+        Circuito circuito = circuitoRepository.findByViajeId(viajeId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "El viaje todavía no tiene un circuito generado"));
+        if (circuito.getEstrategiaSeleccionada() == null) {
+            throw new ResourceNotFoundException(
+                    "El circuito del viaje todavía no tiene una alternativa seleccionada");
+        }
+        CircuitoAlternativa alternative = circuito.getAlternativas().stream()
+                .filter(item -> item.getEstrategia() == circuito.getEstrategiaSeleccionada())
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "La alternativa seleccionada ya no existe en el circuito"));
+
+        LocalDate start = selectedStart(circuito, alternative);
+        LocalDate end = selectedEnd(circuito, alternative);
+        List<String> motivos = staleReasons(circuito);
+        return new CircuitoSeleccionadoResponse(
+                circuito.getId(), viajeId, circuito.getGeneradoEn(), circuito.getEstrategiaSeleccionada(),
+                !motivos.isEmpty(), motivos, circuito.isDistanciasEstimadas(), circuito.getAdvertencia(),
+                selectedDays(alternative, start, end));
+    }
+
+    private LocalDate selectedStart(Circuito circuito, CircuitoAlternativa alternative) {
+        if (circuito.getFechaInicioSnapshot() != null) {
+            return circuito.getFechaInicioSnapshot();
+        }
+        return alternative.getItems().stream()
+                .map(CircuitoItem::getFecha)
+                .filter(Objects::nonNull)
+                .min(Comparator.naturalOrder())
+                .orElseGet(() -> circuito.getViaje() == null ? null : circuito.getViaje().getFechaInicio());
+    }
+
+    private LocalDate selectedEnd(Circuito circuito, CircuitoAlternativa alternative) {
+        if (circuito.getFechaFinSnapshot() != null) {
+            return circuito.getFechaFinSnapshot();
+        }
+        return alternative.getItems().stream()
+                .map(CircuitoItem::getFecha)
+                .filter(Objects::nonNull)
+                .max(Comparator.naturalOrder())
+                .orElseGet(() -> circuito.getViaje() == null ? null : circuito.getViaje().getFechaFin());
+    }
+
+    private List<DiaCircuitoResponse> selectedDays(CircuitoAlternativa alternative, LocalDate start, LocalDate end) {
+        Map<LocalDate, List<CircuitoItem>> byDate = alternative.getItems().stream()
+                .filter(item -> item.getFecha() != null)
+                .collect(Collectors.groupingBy(CircuitoItem::getFecha));
+        List<DiaCircuitoResponse> days = new ArrayList<>();
+        if (start == null || end == null || end.isBefore(start)) {
+            byDate.keySet().stream().sorted().forEach(date -> days.add(selectedDay(date, byDate.get(date))));
+            return days;
+        }
+        for (LocalDate date = start; !date.isAfter(end); date = date.plusDays(1)) {
+            days.add(selectedDay(date, byDate.get(date)));
+        }
+        return days;
+    }
+
+    private DiaCircuitoResponse selectedDay(LocalDate date, List<CircuitoItem> items) {
+        List<AlternativaItemResponse> responses = items == null ? List.of()
+                : items.stream()
+                        .sorted(Comparator
+                                .comparing(CircuitoItem::getHoraInicio,
+                                        Comparator.nullsLast(Comparator.naturalOrder()))
+                                .thenComparingInt(CircuitoItem::getOrden))
+                        .map(item -> new AlternativaItemResponse(item.getId(), item.getPropuestaId(),
+                                item.getPropuestaNombre(), item.getTipo(), item.getCategoria(), item.getCiudad(),
+                                item.getLocalidad(), item.getDireccion(), item.getHoraInicio(), item.getHoraFin(),
+                                item.getDuracionMinutos() != null
+                                        ? item.getDuracionMinutos()
+                                        : durationMinutes(item.getHoraInicio(), item.getHoraFin())))
+                        .toList();
+        return new DiaCircuitoResponse(date, responses);
     }
 
     private Viaje findTrip(Long id) {
@@ -162,12 +271,62 @@ public class CircuitoService {
         }
         if (viaje.getRangoInteresKm() == null || viaje.getRangoInteresKm() <= 0) missing.add("radio de interés");
         if (viaje.getRitmo() == null) missing.add("ritmo del viaje");
+        if (viaje.getInteresesCategoria() == null || viaje.getInteresesCategoria().isEmpty()) {
+            missing.add("preferencias de interés");
+        }
         if (!missing.isEmpty()) {
-            throw new BusinessRuleException("faltan datos para generar el circuito: " + String.join(", ", missing));
+            throw new CircuitoDataMissingException(missing);
         }
         if (viaje.getFechaFin().isBefore(effectiveStart(viaje))) {
             throw new BusinessRuleException("el viaje no tiene días disponibles para planificar");
         }
+    }
+
+    private void snapshot(Circuito circuito, Viaje viaje) {
+        circuito.setFechaInicioSnapshot(viaje.getFechaInicio());
+        circuito.setFechaFinSnapshot(viaje.getFechaFin());
+        circuito.setRangoInteresKmSnapshot(viaje.getRangoInteresKm());
+        circuito.setRitmoSnapshot(viaje.getRitmo());
+        Ubicacion zona = viaje.getZonaInteres();
+        circuito.setZonaCiudadSnapshot(zona == null ? null : zona.getCiudad());
+        circuito.setZonaLocalidadSnapshot(zona == null ? null : zona.getLocalidad());
+        circuito.setZonaDireccionSnapshot(zona == null ? null : zona.getDireccion());
+        circuito.setZonaLatitudSnapshot(zona == null ? null : zona.getLatitud());
+        circuito.setZonaLongitudSnapshot(zona == null ? null : zona.getLongitud());
+        circuito.setInteresesCategoriaSnapshot(viaje.getInteresesCategoria() == null
+                ? new ArrayList<>() : new ArrayList<>(viaje.getInteresesCategoria()));
+    }
+
+    private List<String> staleReasons(Circuito circuito) {
+        Viaje viaje = circuito.getViaje();
+        if (viaje == null || circuito.getFechaInicioSnapshot() == null) {
+            return List.of();
+        }
+        List<String> motivos = new ArrayList<>();
+        if (!Objects.equals(circuito.getFechaInicioSnapshot(), viaje.getFechaInicio())
+                || !Objects.equals(circuito.getFechaFinSnapshot(), viaje.getFechaFin())) {
+            motivos.add("FECHAS");
+        }
+        Set<InteresCategoria> snapshotInterests = new LinkedHashSet<>(circuito.getInteresesCategoriaSnapshot()
+                == null ? List.of() : circuito.getInteresesCategoriaSnapshot());
+        Set<InteresCategoria> currentInterests = new LinkedHashSet<>(viaje.getInteresesCategoria() == null
+                ? List.of() : viaje.getInteresesCategoria());
+        if (!snapshotInterests.equals(currentInterests)) {
+            motivos.add("PREFERENCIAS");
+        }
+        Ubicacion zona = viaje.getZonaInteres();
+        if (zona == null
+                || !Objects.equals(circuito.getZonaLatitudSnapshot(), zona.getLatitud())
+                || !Objects.equals(circuito.getZonaLongitudSnapshot(), zona.getLongitud())
+                || !Objects.equals(circuito.getZonaCiudadSnapshot(), zona.getCiudad())
+                || !Objects.equals(circuito.getZonaLocalidadSnapshot(), zona.getLocalidad())
+                || !Objects.equals(circuito.getZonaDireccionSnapshot(), zona.getDireccion())) {
+            motivos.add("ZONA");
+        }
+        if (!Objects.equals(circuito.getRitmoSnapshot(), viaje.getRitmo())) {
+            motivos.add("RITMO");
+        }
+        return motivos;
     }
 
     private LocalDate effectiveStart(Viaje viaje) {
@@ -180,7 +339,9 @@ public class CircuitoService {
         for (PropuestaTuristica proposal : propuestaRepository.findAll()) {
             NombreEstado state = proposal.getNombreEstado();
             if (state == null || INACTIVE_STATES.contains(state) || proposal.getUbicacion() == null
-                    || proposal.getUbicacion().getLatitud() == null || proposal.getUbicacion().getLongitud() == null) {
+                    || proposal.getUbicacion().getLatitud() == null || proposal.getUbicacion().getLongitud() == null
+                    || proposal.getCategoria() == null
+                    || !viaje.getInteresesCategoria().contains(proposal.getCategoria())) {
                 continue;
             }
             Ubicacion location = proposal.getUbicacion();
@@ -379,7 +540,7 @@ public class CircuitoService {
 
     private CircuitoAlternativaResponse toResponse(CircuitoAlternativa alternative) {
         List<CircuitoItemResponse> items = alternative.getItems().stream()
-                .map(item -> new CircuitoItemResponse(item.getPropuestaId(), item.getPropuestaNombre(),
+                .map(item -> new CircuitoItemResponse(item.getId(), item.getPropuestaId(), item.getPropuestaNombre(),
                         item.getDescripcion(), item.getCategoria(), item.getTipo(), item.getFecha(), item.getOrden(),
                         item.getHoraInicio(), item.getHoraFin(), item.getTrasladoKm(), item.getTrasladoMinutos(),
                         item.isDisponible(), item.getMotivoNoDisponible(),
