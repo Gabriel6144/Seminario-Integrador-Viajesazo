@@ -541,6 +541,26 @@ export interface AlternativaItemResponse {
   duracionMinutos: number | null
 }
 
+/** Espejo de `dto/response/AlternativaReemplazoResponse.java` (VZ-28). */
+export interface AlternativaReemplazoResponse {
+  propuestaId: number
+  propuestaNombre: string
+  tipo: TipoRegistro
+  categoria: InteresCategoria | null
+  ciudad: string | null
+  localidad: string | null
+  direccion: string | null
+  horaInicio: LocalTime | null
+  horaFin: LocalTime | null
+  duracionMinutos: number | null
+}
+
+/** Espejo de `dto/response/AlternativasReemplazoResponse.java` (VZ-28). */
+export interface AlternativasReemplazoResponse {
+  alternativas: AlternativaReemplazoResponse[]
+  mensaje: string | null
+}
+
 /** Espejo de `dto/response/DiaCircuitoResponse.java` (VZ-26). */
 export interface DiaCircuitoResponse {
   fecha: LocalDate

@@ -2,11 +2,13 @@ package com.viajesazo.turismo_backend.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -27,6 +29,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.viajesazo.turismo_backend.config.AppConfig;
 import com.viajesazo.turismo_backend.dto.response.AlternativaItemResponse;
+import com.viajesazo.turismo_backend.dto.response.AlternativaReemplazoResponse;
+import com.viajesazo.turismo_backend.dto.response.AlternativasReemplazoResponse;
 import com.viajesazo.turismo_backend.dto.response.CircuitoAlternativaResponse;
 import com.viajesazo.turismo_backend.dto.response.CircuitoItemResponse;
 import com.viajesazo.turismo_backend.dto.response.CircuitoSeleccionadoResponse;
@@ -192,6 +196,61 @@ class CircuitoControllerTest {
                 "El circuito del viaje todavía no tiene una alternativa seleccionada"));
 
         mockMvc.perform(get("/api/viajes/7/circuito/seleccionado"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("VZ-28: lista alternativas válidas para reemplazar una parada")
+    void listsReplacementAlternatives() throws Exception {
+        AlternativaReemplazoResponse alternativa = new AlternativaReemplazoResponse(3L, "Museo Histórico",
+                TipoRegistro.EVENTO, InteresCategoria.HISTORIA, "Córdoba", "Córdoba",
+                "Av. Vélez Sarsfield 264", LocalTime.of(10, 30), LocalTime.of(11, 30), 60);
+        when(circuitoService.replacementAlternatives(7L, 15L)).thenReturn(
+                new AlternativasReemplazoResponse(List.of(alternativa), null));
+
+        mockMvc.perform(get("/api/viajes/7/circuito/seleccionado/items/15/alternativas"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.alternativas[0].propuestaId").value(3))
+                .andExpect(jsonPath("$.alternativas[0].propuestaNombre").value("Museo Histórico"))
+                .andExpect(jsonPath("$.alternativas[0].horaInicio").value("10:30:00"))
+                .andExpect(jsonPath("$.mensaje").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    @DisplayName("VZ-28: reemplaza una parada y devuelve el circuito actualizado")
+    void replacesSelectedItem() throws Exception {
+        when(circuitoService.replaceSelectedItem(eq(7L), eq(15L), any()))
+                .thenReturn(selectedCircuitResponse());
+
+        mockMvc.perform(put("/api/viajes/7/circuito/seleccionado/items/15")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"propuestaId\":3}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dias[0].items[0].itemId").value(15));
+
+        verify(circuitoService).replaceSelectedItem(eq(7L), eq(15L), any());
+    }
+
+    @Test
+    @DisplayName("VZ-28: reemplazar sin propuesta responde 400")
+    void rejectsReplacementWithoutProposal() throws Exception {
+        mockMvc.perform(put("/api/viajes/7/circuito/seleccionado/items/15")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+                .andExpect(status().isBadRequest());
+
+        verify(circuitoService, never()).replaceSelectedItem(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("VZ-28: reemplazar una parada inexistente devuelve 404")
+    void returns404WhenReplacementItemMissing() throws Exception {
+        when(circuitoService.replaceSelectedItem(eq(7L), eq(404L), any())).thenThrow(
+                new ResourceNotFoundException("No existe la parada con id 404 en el circuito seleccionado"));
+
+        mockMvc.perform(put("/api/viajes/7/circuito/seleccionado/items/404")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"propuestaId\":3}"))
                 .andExpect(status().isNotFound());
     }
 

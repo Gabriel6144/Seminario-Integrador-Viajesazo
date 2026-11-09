@@ -11,7 +11,7 @@
 
 | Fecha | Hito | Referencia |
 |---|---|---|
-| 2026-11-09 | Sprint 4: VZ-25 (generar/regenerar) y VZ-26 (consultar circuito) | `devGaby`, working tree |
+| 2026-11-09 | Sprint 4: circuitos VZ-25, VZ-26, VZ-29 y VZ-28 | `devGaby`, working tree |
 | 2026-10-27 | Integración full-stack de circuitos y “Mis viajes” | `devGaby`, working tree |
 | 2026-10-25 | VZ-18: agenda turística server-side | working tree, sin commit |
 | 2026-10-24 | Animación del mapa al cambiar el destino | `4437abd` |
@@ -26,9 +26,9 @@
 | 2026-10-08 | Integración del PR #1 de `sbrito` | `4f4dbab` |
 | 2026-09-27 | Base del repositorio y Sprint 1 | `40fc87a` |
 
-## 2026-11-09 — Sprint 4: VZ-25 (generar/regenerar) y VZ-26 (consultar circuito)
+## 2026-11-09 — Sprint 4: circuitos VZ-25, VZ-26, VZ-29 y VZ-28
 
-- **Sprint / US:** Sprint 4 / VZ-25, VZ-26
+- **Sprint / US:** Sprint 4 / VZ-25, VZ-26, VZ-29, VZ-28
 - **Rama / PR:** `devGaby`; cambios en working tree, sin commit ni PR todavía
 - **Commit(s):** ninguno; base `60983dd`
 - **Estado:** implementado y verificado, pendiente de commit
@@ -66,8 +66,36 @@
     `useGenerarCircuito` acepta `{ viajeId, reemplazar }` y maneja `409`/`?reemplazar=true`.
   - Actualicé tipos, fixtures, handlers MSW, store y tests (página del circuito, regeneración en
     el planificador y enlace en “Mis viajes”).
+- VZ-29:
+  - Nuevo `DELETE /api/viajes/{id}/circuito/seleccionado/items/{itemId}?confirmar=true`; valida
+    viaje, circuito, alternativa seleccionada y pertenencia del ítem antes de exigir la
+    confirmación, para no devolver un `409` engañoso por un ítem ajeno.
+  - La baja es física sobre la colección (`orphanRemoval`), renumera `orden` por día, recalcula
+    solo el traslado del ítem siguiente y recalcula `distanciaTotalKm`, `afinidadIntereses` y
+    `categoriasCubiertas`. Un día vacío se sigue devolviendo y el circuito no se borra.
+  - En el frontend agregué el botón de eliminar por parada con `AlertDialog` de confirmación,
+    `useEliminarParadaCircuito`, el `apiDelete` genérico que tolera cuerpo de respuesta y la
+    actualización de la caché del circuito seleccionado.
+- VZ-28:
+  - Nuevos `GET /api/viajes/{id}/circuito/seleccionado/items/{itemId}/alternativas` y
+    `PUT /api/viajes/{id}/circuito/seleccionado/items/{itemId}` con
+    `{ propuestaId }`; los DTO son `AlternativasReemplazoResponse`,
+    `AlternativaReemplazoResponse` y `ReemplazoItemCircuitoRequest`.
+  - El servicio reutiliza la elegibilidad de candidatos y filtra por bloque horario completo,
+    solapamiento con otros ítems del día, disponibilidad, intereses estrictos, radio y traslados
+    factibles desde el ítem anterior y hacia el siguiente. Excluye propuestas ya presentes en la
+    alternativa y deja una opción por propuesta, ordenada por nombre.
+  - El `PUT` revalida la propuesta, pisa la parada y recalcula el traslado siguiente y las
+    métricas. Una propuesta inválida responde `422` y no toca la parada; sin `propuestaId`
+    responde `400`. Si no hay opciones, el `GET` devuelve `200` con `alternativas: []` y un
+    `mensaje`.
+  - En el frontend agregué “Sustituir” por parada, un selector de alternativas con `AlertDialog`,
+    `useAlternativasReemplazo` y `useReemplazarParadaCircuito`, con estados de carga, error,
+    vacío y confirmación deshabilitada hasta elegir una opción.
+  - Actualicé tipos, fixtures (`ALTERNATIVAS_REEMPLAZO`), handlers MSW, store
+    (`replaceCircuitoItem`, `findCircuitoItem`) y tests de la página.
 - Documenté el alcance y las fases en `docs/sprint4/DEFINICION-CIRCUITOS.md` y actualicé los
-  `AGENTS.md` de backend y frontend.
+  `AGENTS.md` de backend y frontend con las cuatro historias y la verificación de la Fase 4.
 
 **Decisiones**
 
@@ -89,12 +117,28 @@
   circuito; queda deuda para la historia de auth.
 - El frontend no reagrupa por día ni descarta días vacíos: el backend ya devuelve `dias[]`
   ordenados.
+- En la eliminación, la validación de pertenencia va antes que el flag de confirmación: así un
+  ítem de otra alternativa da `404` y no un `409` que sugeriría que el problema es la falta de
+  confirmación.
+- La eliminación física y el recálculo de un solo traslado (el del ítem siguiente) evitan un
+  borrado lógico que obligaría a filtrar en todas las consultas y un recálculo global innecesario.
+- Para el reemplazo, una propuesta que no encaja se rechaza con `422` y la parada queda intacta:
+  es un fallo de invariante, no una confirmación pendiente.
+- Las alternativas se filtran con las mismas reglas de elegibilidad que la generación, pero con
+  el bloque del ítem como restricción adicional. La UI no decide compatibilidad: solo muestra lo
+  que el backend ya validó.
+- Se reutilizó `AlertDialog` como selector de alternativas en vez de agregar un componente
+  `dialog`/radio group de shadcn: el proyecto ya lo usa para confirmaciones y el footer con un
+  `Button` normal permite esperar el `PUT` sin cerrar el diálogo.
+- La bitácora consolida VZ-25/VZ-26/VZ-29/VZ-28 en una sola entrada porque las cuatro historias
+  comparten el mismo working tree sin commit.
 
 **Archivos principales**
 
 - `turismo-backend/src/main/java/com/viajesazo/turismo_backend/controller/CircuitoController.java`
 - `turismo-backend/src/main/java/com/viajesazo/turismo_backend/controller/ViajeController.java`
-- `turismo-backend/src/main/java/com/viajesazo/turismo_backend/dto/response/{CircuitoItemResponse,CircuitoResponse,CircuitoSeleccionadoResponse,DiaCircuitoResponse,AlternativaItemResponse}.java`
+- `turismo-backend/src/main/java/com/viajesazo/turismo_backend/dto/request/ReemplazoItemCircuitoRequest.java`
+- `turismo-backend/src/main/java/com/viajesazo/turismo_backend/dto/response/{CircuitoItemResponse,CircuitoResponse,CircuitoSeleccionadoResponse,DiaCircuitoResponse,AlternativaItemResponse,AlternativaReemplazoResponse,AlternativasReemplazoResponse}.java`
 - `turismo-backend/src/main/java/com/viajesazo/turismo_backend/exception/{GlobalExceptionHandler,ConfirmationRequiredException,CircuitoDataMissingException,ErrorResponseWithMissingData}.java`
 - `turismo-backend/src/main/java/com/viajesazo/turismo_backend/model/Circuito.java`
 - `turismo-backend/src/main/java/com/viajesazo/turismo_backend/service/CircuitoService.java`
@@ -103,6 +147,7 @@
 - `turismo-frontend/src/api/{circuitos,queries}.ts`
 - `turismo-frontend/src/router.tsx`
 - `turismo-frontend/src/pages/{circuito-page,circuito-page.test,planificador-page,planificador-page.test,borradores-page.test}.tsx`
+- `turismo-frontend/src/lib/http.ts`
 - `turismo-frontend/src/components/planificador/{planificador-regenerate-modal,paso-10-circuito,circuito-view-model}.tsx`
 - `turismo-frontend/src/components/viaje-borrador-card.tsx`
 - `turismo-frontend/src/test/{fixtures,handlers,store}.ts`
@@ -112,19 +157,18 @@
 
 **Verificación**
 
-- Backend: **240 tests, 238 en verde**; 2 fallos preexistentes
+- Backend: **257 tests, 255 en verde**; 2 fallos preexistentes
   (`ViajeMapperTest.mapsRequestToEntity` y `ViajeTest.rejectsPastStartDate`).
-  `CircuitoControllerTest` (10), `CircuitoServiceTest` (15) y `ViajeControllerTest` (17) en
-  verde.
+  `CircuitoControllerTest` (17) y `CircuitoServiceTest` (25) en verde, incluidos alternativas,
+  reemplazo, `400`/`404`/`422`, eliminación y recálculo de métricas.
 - Frontend: `npm run typecheck` OK; `npm run lint` OK con 6 warnings preexistentes;
-  `npm test -- --run` → **186 tests, 177 en verde** y 9 fallos preexistentes (`eventos-page` ×8
-  y `evento-editar-page` ×1). `circuito-page.test.tsx` (3) en verde.
+  `npm test -- --run` → **191 tests, 182 en verde** y 9 fallos preexistentes (`eventos-page` ×8
+  y `evento-editar-page` ×1). `circuito-page.test.tsx` (8) en verde.
 - `git diff --check`: sin errores.
 
 **Pendientes / deuda**
 
-- Commit y PR de VZ-25/VZ-26.
-- VZ-29 (eliminar ítem) y VZ-28 (reemplazar ítem) sobre la alternativa seleccionada.
+- Commit y PR de VZ-25/VZ-26/VZ-29/VZ-28.
 - Autenticación y propiedad de viajes para `401/403`.
 - La provincia de Córdoba sigue siendo un invariante del dato, sin filtro geográfico.
 - Regenerar descarta ediciones manuales previas de reemplazos/eliminaciones.

@@ -29,6 +29,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import com.viajesazo.turismo_backend.circuit.CircuitGenerator;
 import com.viajesazo.turismo_backend.circuit.HaversineDistanceProvider;
 import com.viajesazo.turismo_backend.circuit.TravelEstimate;
+import com.viajesazo.turismo_backend.dto.request.ReemplazoItemCircuitoRequest;
+import com.viajesazo.turismo_backend.dto.response.AlternativaReemplazoResponse;
 import com.viajesazo.turismo_backend.dto.response.GeneracionCircuitoResponse;
 import com.viajesazo.turismo_backend.exception.CircuitoDataMissingException;
 import com.viajesazo.turismo_backend.exception.ConfirmationRequiredException;
@@ -467,6 +469,171 @@ class CircuitoServiceTest {
         verify(circuitoRepository, never()).save(any());
     }
 
+    @Test
+    void listsOnlyReplacementOptionsThatFitTheBlockInterestsAndRadius() {
+        Viaje trip = validTrip();
+        Circuito circuito = selectedCircuit(trip);
+        CircuitoAlternativa alternative = circuito.getAlternativas().get(0);
+        alternative.addItem(locatedItem(1L, LocalTime.of(10, 0), LocalTime.of(12, 0), 1,
+                -31.40, -64.20, InteresCategoria.CULTURA));
+        when(viajeRepository.findByIdAndEstadoNotIn(any(), any())).thenReturn(Optional.of(trip));
+        when(circuitoRepository.findByViajeId(7L)).thenReturn(Optional.of(circuito));
+        when(propuestaRepository.findAll()).thenReturn(List.<PropuestaTuristica>of(
+                proposal(1L, "Ya en el circuito", InteresCategoria.CULTURA, LocalTime.of(10, 30),
+                        LocalTime.of(11, 30), -31.40, -64.20),
+                proposal(2L, "Evento válido", InteresCategoria.CULTURA, LocalTime.of(10, 30),
+                        LocalTime.of(11, 30), -31.41, -64.21),
+                activity(3L, "Actividad válida", InteresCategoria.CULTURA, LocalTime.of(10, 30),
+                        LocalTime.of(12, 0), 60, -31.41, -64.21),
+                proposal(4L, "Empieza antes", InteresCategoria.CULTURA, LocalTime.of(9, 0),
+                        LocalTime.of(10, 30), -31.41, -64.21),
+                proposal(5L, "Termina después", InteresCategoria.CULTURA, LocalTime.of(11, 0),
+                        LocalTime.of(12, 30), -31.41, -64.21),
+                proposal(6L, "Otro interés", InteresCategoria.GASTRONOMIA, LocalTime.of(10, 30),
+                        LocalTime.of(11, 30), -31.41, -64.21),
+                proposal(7L, "Fuera del radio", InteresCategoria.CULTURA, LocalTime.of(10, 30),
+                        LocalTime.of(11, 30), -32.50, -65.50)));
+
+        var response = service.replacementAlternatives(7L, 1L);
+
+        assertThat(response.alternativas()).extracting(AlternativaReemplazoResponse::propuestaId)
+                .containsExactlyInAnyOrder(2L, 3L);
+        assertThat(response.mensaje()).isNull();
+    }
+
+    @Test
+    void excludesReplacementsThatOverlapAnotherItemOfTheDay() {
+        Viaje trip = validTrip();
+        Circuito circuito = selectedCircuit(trip);
+        CircuitoAlternativa alternative = circuito.getAlternativas().get(0);
+        alternative.addItem(locatedItem(1L, LocalTime.of(10, 0), LocalTime.of(12, 0), 1,
+                -31.40, -64.20, InteresCategoria.CULTURA));
+        alternative.addItem(locatedItem(9L, LocalTime.of(10, 30), LocalTime.of(11, 0), 2,
+                -31.40, -64.20, InteresCategoria.CULTURA));
+        when(viajeRepository.findByIdAndEstadoNotIn(any(), any())).thenReturn(Optional.of(trip));
+        when(circuitoRepository.findByViajeId(7L)).thenReturn(Optional.of(circuito));
+        when(propuestaRepository.findAll()).thenReturn(List.<PropuestaTuristica>of(
+                proposal(4L, "Se solapa", InteresCategoria.CULTURA, LocalTime.of(10, 30),
+                        LocalTime.of(11, 30), -31.40, -64.20),
+                proposal(5L, "Entra justo", InteresCategoria.CULTURA, LocalTime.of(10, 0),
+                        LocalTime.of(10, 30), -31.40, -64.20)));
+
+        var response = service.replacementAlternatives(7L, 1L);
+
+        assertThat(response.alternativas()).extracting(AlternativaReemplazoResponse::propuestaId)
+                .containsExactly(5L);
+    }
+
+    @Test
+    void reportsNoAlternativesWhenNoneFitTheBlock() {
+        Viaje trip = validTrip();
+        Circuito circuito = selectedCircuit(trip);
+        circuito.getAlternativas().get(0).addItem(locatedItem(1L, LocalTime.of(10, 0),
+                LocalTime.of(12, 0), 1, -31.40, -64.20, InteresCategoria.CULTURA));
+        when(viajeRepository.findByIdAndEstadoNotIn(any(), any())).thenReturn(Optional.of(trip));
+        when(circuitoRepository.findByViajeId(7L)).thenReturn(Optional.of(circuito));
+        when(propuestaRepository.findAll()).thenReturn(List.<PropuestaTuristica>of(
+                proposal(4L, "Empieza antes", InteresCategoria.CULTURA, LocalTime.of(9, 0),
+                        LocalTime.of(10, 30), -31.40, -64.20),
+                proposal(5L, "Otro interés", InteresCategoria.GASTRONOMIA, LocalTime.of(10, 30),
+                        LocalTime.of(11, 30), -31.40, -64.20)));
+
+        var response = service.replacementAlternatives(7L, 1L);
+
+        assertThat(response.alternativas()).isEmpty();
+        assertThat(response.mensaje()).contains("No hay propuestas");
+    }
+
+    @Test
+    void replacesAnItemAndRecalculatesTransfersAndMetrics() {
+        Viaje trip = validTrip();
+        Circuito circuito = selectedCircuit(trip);
+        CircuitoAlternativa alternative = circuito.getAlternativas().get(0);
+        CircuitoItem previous = locatedItem(1L, LocalTime.of(8, 0), LocalTime.of(9, 0), 1,
+                -31.40, -64.20, InteresCategoria.CULTURA);
+        CircuitoItem target = locatedItem(2L, LocalTime.of(10, 0), LocalTime.of(12, 0), 2,
+                -31.40, -64.20, InteresCategoria.CULTURA);
+        CircuitoItem next = locatedItem(3L, LocalTime.of(14, 0), LocalTime.of(15, 0), 3,
+                -31.60, -64.40, InteresCategoria.GASTRONOMIA);
+        applyTransfer(previous, target);
+        applyTransfer(target, next);
+        alternative.addItem(previous);
+        alternative.addItem(target);
+        alternative.addItem(next);
+        alternative.setDistanciaTotalKm(
+                previous.getTrasladoKm() + target.getTrasladoKm() + next.getTrasladoKm());
+        when(viajeRepository.findByIdAndEstadoNotIn(any(), any())).thenReturn(Optional.of(trip));
+        when(circuitoRepository.findByViajeId(7L)).thenReturn(Optional.of(circuito));
+        when(propuestaRepository.findAll()).thenReturn(List.<PropuestaTuristica>of(
+                proposal(4L, "Museo Reemplazo", InteresCategoria.CULTURA, LocalTime.of(10, 30),
+                        LocalTime.of(11, 30), -31.50, -64.30)));
+
+        var response = service.replaceSelectedItem(7L, 2L, new ReemplazoItemCircuitoRequest(4L));
+
+        assertThat(target.getPropuestaId()).isEqualTo(4L);
+        assertThat(target.getPropuestaNombre()).isEqualTo("Museo Reemplazo");
+        assertThat(target.getHoraInicio()).isEqualTo(LocalTime.of(10, 30));
+        assertThat(target.getHoraFin()).isEqualTo(LocalTime.of(11, 30));
+        assertThat(target.getDuracionMinutos()).isEqualTo(60);
+        assertThat(target.isDisponible()).isTrue();
+        TravelEstimate previousToTarget = estimate(previous, target);
+        assertThat(target.getTrasladoKm()).isEqualTo(previousToTarget.distanceKm());
+        assertThat(target.getTrasladoMinutos()).isEqualTo(previousToTarget.durationMinutes());
+        TravelEstimate targetToNext = estimate(target, next);
+        assertThat(next.getTrasladoKm()).isEqualTo(targetToNext.distanceKm());
+        assertThat(next.getTrasladoMinutos()).isEqualTo(targetToNext.durationMinutes());
+        assertThat(alternative.getDistanciaTotalKm()).isEqualTo(
+                previous.getTrasladoKm() + target.getTrasladoKm() + next.getTrasladoKm());
+        assertThat(alternative.getAfinidadIntereses()).isEqualTo(2.0 / 3.0);
+        assertThat(alternative.getCategoriasCubiertas())
+                .containsExactly(InteresCategoria.CULTURA, InteresCategoria.GASTRONOMIA);
+        assertThat(response.dias().get(0).items()).extracting(
+                com.viajesazo.turismo_backend.dto.response.AlternativaItemResponse::propuestaNombre)
+                .containsExactly("Propuesta 1", "Museo Reemplazo", "Propuesta 3");
+        verify(circuitoRepository).save(circuito);
+    }
+
+    @Test
+    void rejectsAReplacementThatDoesNotFitAndKeepsTheItem() {
+        Viaje trip = validTrip();
+        Circuito circuito = selectedCircuit(trip);
+        CircuitoAlternativa alternative = circuito.getAlternativas().get(0);
+        CircuitoItem target = locatedItem(1L, LocalTime.of(10, 0), LocalTime.of(12, 0), 1,
+                -31.40, -64.20, InteresCategoria.CULTURA);
+        alternative.addItem(target);
+        when(viajeRepository.findByIdAndEstadoNotIn(any(), any())).thenReturn(Optional.of(trip));
+        when(circuitoRepository.findByViajeId(7L)).thenReturn(Optional.of(circuito));
+        when(propuestaRepository.findAll()).thenReturn(List.<PropuestaTuristica>of(
+                proposal(6L, "Otro interés", InteresCategoria.GASTRONOMIA, LocalTime.of(10, 30),
+                        LocalTime.of(11, 30), -31.40, -64.20)));
+
+        assertThatThrownBy(() -> service.replaceSelectedItem(7L, 1L, new ReemplazoItemCircuitoRequest(6L)))
+                .isInstanceOf(InvariantViolationException.class)
+                .hasMessageContaining("no es un reemplazo válido");
+        assertThat(target.getPropuestaId()).isEqualTo(1L);
+        assertThat(target.getPropuestaNombre()).isEqualTo("Propuesta 1");
+        assertThat(target.getHoraInicio()).isEqualTo(LocalTime.of(10, 0));
+        verify(circuitoRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectsAReplacementItemFromAnotherAlternative() {
+        Viaje trip = validTrip();
+        Circuito circuito = selectedCircuit(trip);
+        CircuitoAlternativa other = new CircuitoAlternativa();
+        other.setEstrategia(CircuitStrategy.CERCANIA);
+        other.addItem(locatedItem(99L, LocalTime.of(10, 0), LocalTime.of(12, 0), 1,
+                -31.40, -64.20, InteresCategoria.CULTURA));
+        circuito.addAlternativa(other);
+        when(viajeRepository.findByIdAndEstadoNotIn(any(), any())).thenReturn(Optional.of(trip));
+        when(circuitoRepository.findByViajeId(7L)).thenReturn(Optional.of(circuito));
+
+        assertThatThrownBy(() -> service.replaceSelectedItem(7L, 99L, new ReemplazoItemCircuitoRequest(2L)))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("No existe la parada");
+        verify(circuitoRepository, never()).save(any());
+    }
+
     private CircuitoItem locatedItem(Long id, LocalTime start, LocalTime end, int order,
             double latitude, double longitude, InteresCategoria categoria) {
         CircuitoItem item = selectedItem(id, ITEM_DATE, start, end, order);
@@ -540,6 +707,43 @@ class CircuitoServiceTest {
 
     private EstadoPropuesta estado(NombreEstado state) {
         return EstadoPropuesta.builder().nombre(state.name()).build();
+    }
+
+    private Evento proposal(long id, String name, InteresCategoria categoria, LocalTime start,
+            LocalTime end, double latitude, double longitude) {
+        Evento event = event(NombreEstado.INICIADO, ITEM_DATE, start, end);
+        event.setId(id);
+        event.setNombre(name);
+        event.setCategoria(categoria);
+        event.setUbicacion(location(latitude, longitude));
+        return event;
+    }
+
+    private Actividad activity(long id, String name, InteresCategoria categoria, LocalTime start,
+            LocalTime end, int durationMinutes, double latitude, double longitude) {
+        Actividad activity = new Actividad();
+        activity.setId(id);
+        activity.setNombre(name);
+        activity.setCategoria(categoria);
+        activity.setEstadoPropuesta(estado(NombreEstado.INICIADO));
+        activity.setUbicacion(location(latitude, longitude));
+        activity.setDuracionMinutos(durationMinutes);
+        activity.setDisponibilidades(List.of(Disponibilidad.builder()
+                .diaSemana(ITEM_DATE.getDayOfWeek())
+                .horaInicio(start)
+                .horaFin(end)
+                .build()));
+        return activity;
+    }
+
+    private Ubicacion location(double latitude, double longitude) {
+        return Ubicacion.builder()
+                .ciudad("Córdoba")
+                .localidad("Nueva Córdoba")
+                .direccion("Av. Hipólito Yrigoyen 325")
+                .latitud(BigDecimal.valueOf(latitude))
+                .longitud(BigDecimal.valueOf(longitude))
+                .build();
     }
 
     private Circuito selectedCircuit(Viaje trip) {

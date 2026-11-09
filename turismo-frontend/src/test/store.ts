@@ -6,6 +6,8 @@ import {
   PUBLICADORES,
 } from './fixtures'
 import type {
+  AlternativaItemResponse,
+  AlternativaReemplazoResponse,
   CircuitStrategy,
   CircuitoSeleccionadoResponse,
   EventoRequest,
@@ -150,6 +152,40 @@ export function findCircuitoSeleccionado(
   viajeId: number,
 ): CircuitoSeleccionadoResponse | undefined {
   return circuitosSeleccionados.get(viajeId)
+}
+
+export function findCircuitoItem(
+  viajeId: number,
+  itemId: number,
+): AlternativaItemResponse | undefined {
+  const circuito = circuitosSeleccionados.get(viajeId)
+  if (circuito === undefined) return undefined
+  for (const dia of circuito.dias) {
+    const item = dia.items.find((candidate) => candidate.itemId === itemId)
+    if (item !== undefined) return item
+  }
+  return undefined
+}
+
+/** VZ-28: pisa los datos de la parada con la propuesta elegida, como el backend. */
+export function replaceCircuitoItem(
+  viajeId: number,
+  itemId: number,
+  alternativa: AlternativaReemplazoResponse,
+): boolean {
+  const item = findCircuitoItem(viajeId, itemId)
+  if (item === undefined) return false
+  item.propuestaId = alternativa.propuestaId
+  item.propuestaNombre = alternativa.propuestaNombre
+  item.tipo = alternativa.tipo
+  item.categoria = alternativa.categoria
+  item.ciudad = alternativa.ciudad
+  item.localidad = alternativa.localidad
+  item.direccion = alternativa.direccion
+  item.horaInicio = alternativa.horaInicio
+  item.horaFin = alternativa.horaFin
+  item.duracionMinutos = alternativa.duracionMinutos
+  return true
 }
 
 /** VZ-29: quita la parada del día y renumera lo que queda, como el backend. */

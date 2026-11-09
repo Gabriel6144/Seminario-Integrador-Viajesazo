@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { queryKeys } from '@/api/queries'
-import { apiDelete, apiGet, apiPost } from '@/lib/http'
+import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/http'
 import type {
+  AlternativasReemplazoResponse,
   CircuitoSeleccionadoResponse,
   GeneracionCircuitoResponse,
   SeleccionCircuitoRequest,
@@ -87,6 +88,58 @@ export function useEliminarParadaCircuito() {
     onSuccess: (data, { viajeId }) => {
       queryClient.setQueryData(queryKeys.circuitoSeleccionado(viajeId), data)
       void queryClient.invalidateQueries({ queryKey: queryKeys.circuito(viajeId) })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.viajesAll() })
+    },
+  })
+}
+
+export function fetchAlternativasReemplazo(
+  viajeId: number,
+  itemId: number,
+  signal?: AbortSignal,
+): Promise<AlternativasReemplazoResponse> {
+  return apiGet<AlternativasReemplazoResponse>(
+    `/api/viajes/${viajeId}/circuito/seleccionado/items/${itemId}/alternativas`,
+    signal,
+  )
+}
+
+/** VZ-28: opciones que entran en el bloque horario de la parada sin romper el itinerario. */
+export function useAlternativasReemplazo(viajeId: number | null, itemId: number | null) {
+  return useQuery({
+    queryKey: queryKeys.alternativasReemplazo(viajeId ?? 0, itemId ?? 0),
+    queryFn: ({ signal }) => fetchAlternativasReemplazo(viajeId ?? 0, itemId ?? 0, signal),
+    enabled: viajeId !== null && itemId !== null,
+  })
+}
+
+/**
+ * VZ-28: reemplaza una parada del circuito seleccionado. El backend vuelve a validar la
+ * propuesta y devuelve el circuito actualizado, que se escribe en la caché.
+ */
+export function useReemplazarParadaCircuito() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      viajeId,
+      itemId,
+      propuestaId,
+    }: {
+      viajeId: number
+      itemId: number
+      propuestaId: number
+    }) =>
+      apiPut<CircuitoSeleccionadoResponse, { propuestaId: number }>(
+        `/api/viajes/${viajeId}/circuito/seleccionado/items/${itemId}`,
+        { propuestaId },
+      ),
+    onSuccess: (data, { viajeId, itemId }) => {
+      queryClient.setQueryData(queryKeys.circuitoSeleccionado(viajeId), data)
+      void queryClient.invalidateQueries({ queryKey: queryKeys.circuito(viajeId) })
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.alternativasReemplazo(viajeId, itemId),
+      })
       void queryClient.invalidateQueries({ queryKey: queryKeys.viajesAll() })
     },
   })

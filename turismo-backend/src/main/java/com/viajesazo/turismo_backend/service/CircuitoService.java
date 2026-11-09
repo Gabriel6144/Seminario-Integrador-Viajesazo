@@ -25,8 +25,11 @@ import com.viajesazo.turismo_backend.circuit.GeneratedAlternative;
 import com.viajesazo.turismo_backend.circuit.DistanceProvider;
 import com.viajesazo.turismo_backend.circuit.ScheduledProposal;
 import com.viajesazo.turismo_backend.circuit.TravelEstimate;
+import com.viajesazo.turismo_backend.dto.request.ReemplazoItemCircuitoRequest;
 import com.viajesazo.turismo_backend.dto.request.SeleccionCircuitoRequest;
 import com.viajesazo.turismo_backend.dto.response.AlternativaItemResponse;
+import com.viajesazo.turismo_backend.dto.response.AlternativaReemplazoResponse;
+import com.viajesazo.turismo_backend.dto.response.AlternativasReemplazoResponse;
 import com.viajesazo.turismo_backend.dto.response.CircuitoAlternativaResponse;
 import com.viajesazo.turismo_backend.dto.response.CircuitoItemResponse;
 import com.viajesazo.turismo_backend.dto.response.CircuitoResponse;
@@ -73,6 +76,9 @@ public class CircuitoService {
     private final Clock clock;
 
     public record GenerationResult(GeneracionCircuitoResponse response, boolean replaced) {
+    }
+
+    private record AlternativeOption(CircuitCandidate candidate, LocalTime start, LocalTime end) {
     }
 
     @Transactional
@@ -178,11 +184,7 @@ public class CircuitoService {
         findTrip(viajeId);
         Circuito circuito = findCircuit(viajeId);
         CircuitoAlternativa alternative = selectedAlternative(circuito);
-        CircuitoItem item = alternative.getItems().stream()
-                .filter(candidate -> itemId.equals(candidate.getId()))
-                .findFirst()
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "No existe la parada con id " + itemId + " en el circuito seleccionado"));
+        CircuitoItem item = selectedItem(alternative, itemId);
         if (!confirmar) {
             throw new ConfirmationRequiredException(
                     "la eliminación de la parada requiere confirmación; confirmá con confirmar=true");
@@ -196,6 +198,48 @@ public class CircuitoService {
         recalculateMetrics(circuito, alternative);
         circuitoRepository.save(circuito);
         return selectedResponse(circuito, viajeId);
+    }
+
+    @Transactional(readOnly = true)
+    public AlternativasReemplazoResponse replacementAlternatives(Long viajeId, Long itemId) {
+        Viaje viaje = findTrip(viajeId);
+        Circuito circuito = findCircuit(viajeId);
+        CircuitoAlternativa alternative = selectedAlternative(circuito);
+        CircuitoItem target = selectedItem(alternative, itemId);
+        List<AlternativaReemplazoResponse> alternativas = replacementOptions(viaje, alternative, target).stream()
+                .map(this::toReplacementResponse)
+                .toList();
+        return new AlternativasReemplazoResponse(alternativas, alternativas.isEmpty()
+                ? "No hay propuestas que entren en el bloque horario sin romper el itinerario"
+                : null);
+    }
+
+    @Transactional
+    public CircuitoSeleccionadoResponse replaceSelectedItem(Long viajeId, Long itemId,
+            ReemplazoItemCircuitoRequest request) {
+        Viaje viaje = findTrip(viajeId);
+        Circuito circuito = findCircuit(viajeId);
+        CircuitoAlternativa alternative = selectedAlternative(circuito);
+        CircuitoItem target = selectedItem(alternative, itemId);
+        AlternativeOption option = replacementOptions(viaje, alternative, target).stream()
+                .filter(candidate -> request.propuestaId().equals(candidate.candidate().id()))
+                .findFirst()
+                .orElseThrow(() -> new InvariantViolationException(
+                        "la propuesta elegida no es un reemplazo válido para esta parada"));
+
+        applyCandidate(target, option.candidate(), option.start(), option.end());
+        recalculateTransfersAround(alternative, target);
+        recalculateMetrics(circuito, alternative);
+        circuitoRepository.save(circuito);
+        return selectedResponse(circuito, viajeId);
+    }
+
+    private CircuitoItem selectedItem(CircuitoAlternativa alternative, Long itemId) {
+        return alternative.getItems().stream()
+                .filter(candidate -> itemId.equals(candidate.getId()))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No existe la parada con id " + itemId + " en el circuito seleccionado"));
     }
 
     private CircuitoSeleccionadoResponse selectedResponse(Circuito circuito, Long viajeId) {
@@ -304,17 +348,20 @@ public class CircuitoService {
             next.setTrasladoMinutos(0);
             return;
         }
-        CircuitoItem previous = items.get(removedIndex - 1);
-        if (!hasCoordinates(previous) || !hasCoordinates(next)) {
-            next.setTrasladoKm(0);
-            next.setTrasladoMinutos(0);
+        applyTransfer(items.get(removedIndex - 1), next);
+    }
+
+    private void applyTransfer(CircuitoItem from, CircuitoItem to) {
+        if (!hasCoordinates(from) || !hasCoordinates(to)) {
+            to.setTrasladoKm(0);
+            to.setTrasladoMinutos(0);
             return;
         }
         TravelEstimate transfer = distanceProvider.estimate(
-                previous.getLatitud().doubleValue(), previous.getLongitud().doubleValue(),
-                next.getLatitud().doubleValue(), next.getLongitud().doubleValue());
-        next.setTrasladoKm(transfer.distanceKm());
-        next.setTrasladoMinutos(transfer.durationMinutes());
+                from.getLatitud().doubleValue(), from.getLongitud().doubleValue(),
+                to.getLatitud().doubleValue(), to.getLongitud().doubleValue());
+        to.setTrasladoKm(transfer.distanceKm());
+        to.setTrasladoMinutos(transfer.durationMinutes());
     }
 
     private boolean hasCoordinates(CircuitoItem item) {
@@ -338,6 +385,209 @@ public class CircuitoService {
                 .distinct()
                 .toList();
         alternative.setCategoriasCubiertas(new ArrayList<>(categories));
+    }
+
+    private List<AlternativeOption> replacementOptions(Viaje viaje, CircuitoAlternativa alternative,
+            CircuitoItem target) {
+        if (target.getFecha() == null || target.getHoraInicio() == null || target.getHoraFin() == null) {
+            return List.of();
+        }
+        Set<Long> used = alternative.getItems().stream()
+                .map(CircuitoItem::getPropuestaId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        List<AlternativeOption> options = new ArrayList<>();
+        for (PropuestaTuristica proposal : propuestaRepository.findAll()) {
+            if (proposal.getId() == null || used.contains(proposal.getId()) || !isEligible(viaje, proposal)) {
+                continue;
+            }
+            for (CircuitCandidate.TimeSlot slot : proposalSlots(proposal, target.getFecha())) {
+                if (slot.start().isBefore(target.getHoraInicio()) || slot.end().isAfter(target.getHoraFin())) {
+                    continue;
+                }
+                if (overlapsAnotherItem(alternative, target, slot.start(), slot.end())) {
+                    continue;
+                }
+                if (!transfersFit(alternative, target, proposal, slot.start(), slot.end())) {
+                    continue;
+                }
+                options.add(new AlternativeOption(toCandidate(proposal, List.of(slot)), slot.start(), slot.end()));
+                break;
+            }
+        }
+        options.sort(Comparator.comparing(option -> option.candidate().name(),
+                Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)));
+        return options;
+    }
+
+    private boolean isEligible(Viaje viaje, PropuestaTuristica proposal) {
+        NombreEstado state = proposal.getNombreEstado();
+        if (state == null || INACTIVE_STATES.contains(state)) {
+            return false;
+        }
+        Ubicacion location = proposal.getUbicacion();
+        if (location == null || location.getLatitud() == null || location.getLongitud() == null) {
+            return false;
+        }
+        Ubicacion zone = viaje.getZonaInteres();
+        if (zone == null || zone.getLatitud() == null || zone.getLongitud() == null
+                || viaje.getRangoInteresKm() == null || viaje.getInteresesCategoria() == null
+                || proposal.getCategoria() == null
+                || !viaje.getInteresesCategoria().contains(proposal.getCategoria())) {
+            return false;
+        }
+        double distance = distanceProvider.estimate(
+                zone.getLatitud().doubleValue(), zone.getLongitud().doubleValue(),
+                location.getLatitud().doubleValue(), location.getLongitud().doubleValue()).distanceKm();
+        return distance <= viaje.getRangoInteresKm();
+    }
+
+    private List<CircuitCandidate.TimeSlot> proposalSlots(PropuestaTuristica proposal, LocalDate date) {
+        if (proposal instanceof Evento event) {
+            if (event.getFechaInicio() == null || event.getFechaFin() == null
+                    || date.isBefore(event.getFechaInicio()) || date.isAfter(event.getFechaFin())) {
+                return List.of();
+            }
+            LocalTime start = event.getHorarioInicio() == null || event.getHorarioFin() == null
+                    ? EVENT_START : event.getHorarioInicio();
+            LocalTime end = event.getHorarioInicio() == null || event.getHorarioFin() == null
+                    ? EVENT_END : event.getHorarioFin();
+            return List.of(new CircuitCandidate.TimeSlot(date, start, end));
+        }
+        if (proposal instanceof Actividad activity) {
+            if (activity.getDisponibilidades() == null) {
+                return List.of();
+            }
+            List<CircuitCandidate.TimeSlot> slots = new ArrayList<>();
+            for (var availability : activity.getDisponibilidades()) {
+                if (availability.getDiaSemana() != date.getDayOfWeek()) {
+                    continue;
+                }
+                LocalTime end = availability.getHoraInicio().plusMinutes(activity.getDuracionMinutos());
+                if (end.isAfter(availability.getHoraFin())) {
+                    continue;
+                }
+                slots.add(new CircuitCandidate.TimeSlot(date, availability.getHoraInicio(), end));
+            }
+            return slots;
+        }
+        return List.of();
+    }
+
+    private boolean overlapsAnotherItem(CircuitoAlternativa alternative, CircuitoItem target,
+            LocalTime start, LocalTime end) {
+        return alternative.getItems().stream()
+                .filter(item -> !Objects.equals(target.getId(), item.getId()))
+                .filter(item -> Objects.equals(target.getFecha(), item.getFecha()))
+                .filter(item -> item.getHoraInicio() != null && item.getHoraFin() != null)
+                .anyMatch(item -> start.isBefore(item.getHoraFin()) && end.isAfter(item.getHoraInicio()));
+    }
+
+    private boolean transfersFit(CircuitoAlternativa alternative, CircuitoItem target,
+            PropuestaTuristica proposal, LocalTime start, LocalTime end) {
+        List<CircuitoItem> ordered = sortedDayItems(alternative, target.getFecha());
+        int index = ordered.indexOf(target);
+        if (index < 0) {
+            return false;
+        }
+        Ubicacion location = proposal.getUbicacion();
+        if (index > 0) {
+            CircuitoItem previous = ordered.get(index - 1);
+            if (previous.getHoraFin() != null && hasCoordinates(previous)) {
+                int minutes = distanceProvider.estimate(
+                        previous.getLatitud().doubleValue(), previous.getLongitud().doubleValue(),
+                        location.getLatitud().doubleValue(), location.getLongitud().doubleValue())
+                        .durationMinutes();
+                if (start.isBefore(previous.getHoraFin().plusMinutes(minutes))) {
+                    return false;
+                }
+            }
+        }
+        if (index + 1 < ordered.size()) {
+            CircuitoItem next = ordered.get(index + 1);
+            if (next.getHoraInicio() != null && hasCoordinates(next)) {
+                int minutes = distanceProvider.estimate(
+                        location.getLatitud().doubleValue(), location.getLongitud().doubleValue(),
+                        next.getLatitud().doubleValue(), next.getLongitud().doubleValue())
+                        .durationMinutes();
+                if (next.getHoraInicio().isBefore(end.plusMinutes(minutes))) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private CircuitCandidate toCandidate(PropuestaTuristica proposal,
+            List<CircuitCandidate.TimeSlot> slots) {
+        Ubicacion location = proposal.getUbicacion();
+        Evento event = proposal instanceof Evento value ? value : null;
+        Actividad activity = proposal instanceof Actividad value ? value : null;
+        CircuitCandidate.ProposalDetails details = new CircuitCandidate.ProposalDetails(
+                proposal.getImagenes(), location.getCiudad(), location.getLocalidad(),
+                location.getDireccion(), proposal.getLugarRecinto(), location.getLatitud(),
+                location.getLongitud(), proposal.getTipoAcceso(),
+                event == null ? null : event.getMontoEstimado(),
+                event == null ? null : event.getDescripcionArancel(),
+                event == null ? null : event.getSitioOficial(),
+                activity == null ? null : activity.getDuracionMinutos());
+        return new CircuitCandidate(proposal.getId(), proposal.getNombre(), proposal.getDescripcion(),
+                proposal.getTipo(), proposal.getCategoria(), location.getLatitud().doubleValue(),
+                location.getLongitud().doubleValue(), slots, details);
+    }
+
+    private AlternativaReemplazoResponse toReplacementResponse(AlternativeOption option) {
+        CircuitCandidate candidate = option.candidate();
+        CircuitCandidate.ProposalDetails details = candidate.details();
+        return new AlternativaReemplazoResponse(candidate.id(), candidate.name(), candidate.type(),
+                candidate.category(), details.city(), details.locality(), details.address(),
+                option.start(), option.end(),
+                details.durationMinutes() != null ? details.durationMinutes()
+                        : durationMinutes(option.start(), option.end()));
+    }
+
+    private void applyCandidate(CircuitoItem item, CircuitCandidate candidate, LocalTime start, LocalTime end) {
+        CircuitCandidate.ProposalDetails details = candidate.details();
+        item.setPropuestaId(candidate.id());
+        item.setPropuestaNombre(candidate.name());
+        item.setDescripcion(candidate.description());
+        item.setCategoria(candidate.category());
+        item.setTipo(candidate.type());
+        item.setHoraInicio(start);
+        item.setHoraFin(end);
+        item.setDisponible(true);
+        item.setMotivoNoDisponible(null);
+        applyDetails(item, details);
+        item.setDuracionMinutos(details.durationMinutes() != null
+                ? details.durationMinutes() : durationMinutes(start, end));
+    }
+
+    private void recalculateTransfersAround(CircuitoAlternativa alternative, CircuitoItem item) {
+        List<CircuitoItem> ordered = sortedDayItems(alternative, item.getFecha());
+        int index = ordered.indexOf(item);
+        if (index <= 0) {
+            item.setTrasladoKm(0);
+            item.setTrasladoMinutos(0);
+        } else {
+            applyTransfer(ordered.get(index - 1), item);
+        }
+        if (index >= 0 && index + 1 < ordered.size()) {
+            applyTransfer(item, ordered.get(index + 1));
+        }
+    }
+
+    private void applyDetails(CircuitoItem item, CircuitCandidate.ProposalDetails details) {
+        item.setImagenes(new ArrayList<>(details.images()));
+        item.setCiudad(details.city());
+        item.setLocalidad(details.locality());
+        item.setDireccion(details.address());
+        item.setLugarRecinto(details.venue());
+        item.setLatitud(details.latitude());
+        item.setLongitud(details.longitude());
+        item.setTipoAcceso(details.accessType());
+        item.setMontoEstimado(details.price());
+        item.setDescripcionArancel(details.priceDescription());
+        item.setSitioOficial(details.officialSite());
     }
 
     private Viaje findTrip(Long id) {
@@ -432,38 +682,14 @@ public class CircuitoService {
     private List<CircuitCandidate> candidates(Viaje viaje, LocalDate start) {
         List<CircuitCandidate> candidates = new ArrayList<>();
         for (PropuestaTuristica proposal : propuestaRepository.findAll()) {
-            NombreEstado state = proposal.getNombreEstado();
-            if (state == null || INACTIVE_STATES.contains(state) || proposal.getUbicacion() == null
-                    || proposal.getUbicacion().getLatitud() == null || proposal.getUbicacion().getLongitud() == null
-                    || proposal.getCategoria() == null
-                    || !viaje.getInteresesCategoria().contains(proposal.getCategoria())) {
-                continue;
-            }
-            Ubicacion location = proposal.getUbicacion();
-            double distance = distanceProvider.estimate(
-                    viaje.getZonaInteres().getLatitud().doubleValue(),
-                    viaje.getZonaInteres().getLongitud().doubleValue(),
-                    location.getLatitud().doubleValue(), location.getLongitud().doubleValue()).distanceKm();
-            if (distance > viaje.getRangoInteresKm()) {
+            if (!isEligible(viaje, proposal)) {
                 continue;
             }
             List<CircuitCandidate.TimeSlot> slots = proposal instanceof Evento event
                     ? eventSlots(event, start, viaje.getFechaFin())
                     : activitySlots((Actividad) proposal, start, viaje.getFechaFin());
             if (!slots.isEmpty()) {
-                Evento event = proposal instanceof Evento value ? value : null;
-                Actividad activity = proposal instanceof Actividad value ? value : null;
-                CircuitCandidate.ProposalDetails details = new CircuitCandidate.ProposalDetails(
-                        proposal.getImagenes(), location.getCiudad(), location.getLocalidad(),
-                        location.getDireccion(), proposal.getLugarRecinto(), location.getLatitud(),
-                        location.getLongitud(), proposal.getTipoAcceso(),
-                        event == null ? null : event.getMontoEstimado(),
-                        event == null ? null : event.getDescripcionArancel(),
-                        event == null ? null : event.getSitioOficial(),
-                        activity == null ? null : activity.getDuracionMinutos());
-                candidates.add(new CircuitCandidate(proposal.getId(), proposal.getNombre(), proposal.getDescripcion(),
-                        proposal.getTipo(), proposal.getCategoria(), location.getLatitud().doubleValue(),
-                        location.getLongitud().doubleValue(), slots, details));
+                candidates.add(toCandidate(proposal, slots));
             }
         }
         return candidates;
@@ -529,17 +755,7 @@ public class CircuitoService {
             item.setDisponible(proposal.available());
             item.setMotivoNoDisponible(proposal.unavailableReason());
             CircuitCandidate.ProposalDetails details = proposal.details();
-            item.setImagenes(new ArrayList<>(details.images()));
-            item.setCiudad(details.city());
-            item.setLocalidad(details.locality());
-            item.setDireccion(details.address());
-            item.setLugarRecinto(details.venue());
-            item.setLatitud(details.latitude());
-            item.setLongitud(details.longitude());
-            item.setTipoAcceso(details.accessType());
-            item.setMontoEstimado(details.price());
-            item.setDescripcionArancel(details.priceDescription());
-            item.setSitioOficial(details.officialSite());
+            applyDetails(item, details);
             item.setDuracionMinutos(details.durationMinutes() != null
                     ? details.durationMinutes()
                     : durationMinutes(proposal.start(), proposal.end()));

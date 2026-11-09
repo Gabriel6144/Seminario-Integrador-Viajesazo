@@ -1,4 +1,5 @@
 import type {
+  AlternativasReemplazoResponse,
   CircuitoSeleccionadoResponse,
   EventoResponse,
   GeneracionCircuitoResponse,
@@ -416,6 +417,25 @@ export const CIRCUITO: GeneracionCircuitoResponse = {
       ],
     },
   ],
+}
+
+/** VZ-28: opciones que el backend considera válidas para la parada 101 del circuito seleccionado. */
+export const ALTERNATIVAS_REEMPLAZO: AlternativasReemplazoResponse = {
+  alternativas: [
+    {
+      propuestaId: 2,
+      propuestaNombre: 'Feria de Artesanos',
+      tipo: 'EVENTO',
+      categoria: 'CULTURA',
+      ciudad: 'Córdoba',
+      localidad: 'Centro',
+      direccion: 'Av. Colón 200',
+      horaInicio: '20:30:00',
+      horaFin: '22:30:00',
+      duracionMinutos: 120,
+    },
+  ],
+  mensaje: null,
 }
 
 export const CIRCUITO_SELECCIONADO: CircuitoSeleccionadoResponse = {

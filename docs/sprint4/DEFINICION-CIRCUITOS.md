@@ -406,3 +406,16 @@ Verificación de la Fase 3:
 - Frontend lint: OK con 6 warnings preexistentes.
 - Frontend tests: 188 tests, 9 fallos preexistentes en los mismos dos archivos; los 5 tests de
   `circuito-page.test.tsx` en verde (incluye confirmar y cancelar la eliminación).
+
+Verificación de la Fase 4:
+
+- Backend: 257 tests, 2 fallos preexistentes. `CircuitoControllerTest` (17) y
+  `CircuitoServiceTest` (25) en verde, incluidos el listado de alternativas filtradas por bloque,
+  solapamiento, intereses, radio y traslados, el reemplazo con recálculo de métricas, el `400`
+  sin `propuestaId`, el `404` de ítem ajeno y el `422` de una propuesta inválida sin tocar la
+  parada.
+- Frontend typecheck: OK.
+- Frontend lint: OK con 6 warnings preexistentes.
+- Frontend tests: 191 tests, 9 fallos preexistentes en los mismos dos archivos; los 8 tests de
+  `circuito-page.test.tsx` en verde (incluye alternativas, reemplazo, ausencia de opciones y
+  cancelación).

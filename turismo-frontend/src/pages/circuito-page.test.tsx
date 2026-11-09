@@ -94,6 +94,71 @@ describe('CircuitoPage', () => {
     expect(screen.getByText('Festival de Doma y Folklore de Jesús María')).toBeInTheDocument()
   })
 
+  it('reemplaza una parada con una alternativa compatible', async () => {
+    const usuario = user()
+    renderRoute({
+      route: '/viajes/:id/circuito',
+      initialEntry: '/viajes/2/circuito',
+      children: <CircuitoPage />,
+    })
+
+    await screen.findByText('Festival de Doma y Folklore de Jesús María')
+    await usuario.click(
+      screen.getByRole('button', { name: /sustituir festival de doma y folklore/i }),
+    )
+
+    expect(await screen.findByText('Sustituir parada')).toBeInTheDocument()
+    await usuario.click(await screen.findByRole('button', { name: /Feria de Artesanos/i }))
+    await usuario.click(screen.getByRole('button', { name: 'Reemplazar' }))
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText('Festival de Doma y Folklore de Jesús María'),
+      ).not.toBeInTheDocument()
+    })
+    expect(screen.getByText('Feria de Artesanos')).toBeInTheDocument()
+  })
+
+  it('explica cuando no hay alternativas para sustituir la parada', async () => {
+    const usuario = user()
+    renderRoute({
+      route: '/viajes/:id/circuito',
+      initialEntry: '/viajes/2/circuito',
+      children: <CircuitoPage />,
+    })
+
+    await screen.findByText('Circuito Peatonal Histórico Córdoba Jesuítica')
+    await usuario.click(
+      screen.getByRole('button', { name: /sustituir circuito peatonal histórico/i }),
+    )
+
+    expect(
+      await screen.findByText('No hay propuestas disponibles para reemplazar esta parada.'),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reemplazar' })).toBeDisabled()
+  })
+
+  it('conserva la parada si se cancela el reemplazo', async () => {
+    const usuario = user()
+    renderRoute({
+      route: '/viajes/:id/circuito',
+      initialEntry: '/viajes/2/circuito',
+      children: <CircuitoPage />,
+    })
+
+    await screen.findByText('Festival de Doma y Folklore de Jesús María')
+    await usuario.click(
+      screen.getByRole('button', { name: /sustituir festival de doma y folklore/i }),
+    )
+    await screen.findByRole('button', { name: /Feria de Artesanos/i })
+    await usuario.click(screen.getByRole('button', { name: /cancelar/i }))
+
+    await waitFor(() => {
+      expect(screen.queryByText('Sustituir parada')).not.toBeInTheDocument()
+    })
+    expect(screen.getByText('Festival de Doma y Folklore de Jesús María')).toBeInTheDocument()
+  })
+
   it('muestra un error cuando el viaje no tiene circuito seleccionado', async () => {
     renderRoute({
       route: '/viajes/:id/circuito',

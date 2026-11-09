@@ -1,12 +1,21 @@
-import { ArrowLeftIcon, CalendarDaysIcon, ClockIcon, MapPinIcon, Trash2Icon } from 'lucide-react'
+import {
+  ArrowLeftIcon,
+  ArrowRightLeftIcon,
+  CalendarDaysIcon,
+  ClockIcon,
+  MapPinIcon,
+  Trash2Icon,
+} from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import {
+  useAlternativasReemplazo,
   useCircuitoSeleccionado,
   useEliminarParadaCircuito,
   useGenerarCircuito,
+  useReemplazarParadaCircuito,
 } from '@/api/circuitos'
 import { CategoriaBadge } from '@/components/categoria-badge'
 import { PlanificadorRegenerateModal } from '@/components/planificador/planificador-regenerate-modal'
@@ -24,6 +33,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDateRange, formatLocalDate, formatTimeRange } from '@/lib/dates'
+import { toUserMessage } from '@/lib/http'
 import { parseId } from '@/lib/parse-id'
 import {
   CIRCUIT_STRATEGY_LABELS,
@@ -38,7 +48,9 @@ const MOTIVO_LABELS: Record<string, string> = {
   RITMO: 'ritmo',
 }
 
-function locationLabel(item: AlternativaItemResponse): string {
+function locationLabel(
+  item: Pick<AlternativaItemResponse, 'direccion' | 'localidad' | 'ciudad'>,
+): string {
   const parts = [item.direccion, item.localidad, item.ciudad]
     .filter((part): part is string => Boolean(part && part.trim()))
     .filter((part, index, all) => all.indexOf(part) === index)
@@ -84,8 +96,12 @@ export function CircuitoPage() {
   const query = useCircuitoSeleccionado(viajeId)
   const regenerar = useGenerarCircuito()
   const eliminar = useEliminarParadaCircuito()
+  const reemplazar = useReemplazarParadaCircuito()
   const [isRegenerateModalOpen, setIsRegenerateModalOpen] = useState(false)
   const [itemToDelete, setItemToDelete] = useState<AlternativaItemResponse | null>(null)
+  const [itemToReplace, setItemToReplace] = useState<AlternativaItemResponse | null>(null)
+  const [selectedPropuestaId, setSelectedPropuestaId] = useState<number | null>(null)
+  const alternativas = useAlternativasReemplazo(viajeId, itemToReplace?.itemId ?? null)
 
   if (viajeId === null) return <IdInvalido />
 
@@ -132,6 +148,32 @@ export function CircuitoPage() {
       (error: unknown) => {
         toast.error(
           error instanceof Error ? error.message : 'No pudimos eliminar la parada',
+        )
+      },
+    )
+  }
+
+  const closeReplace = () => {
+    setItemToReplace(null)
+    setSelectedPropuestaId(null)
+  }
+
+  const openReplace = (item: AlternativaItemResponse) => {
+    setSelectedPropuestaId(null)
+    setItemToReplace(item)
+  }
+
+  const handleReplace = () => {
+    const target = itemToReplace
+    if (target === null || selectedPropuestaId === null) return
+    reemplazar.mutateAsync({ viajeId, itemId: target.itemId, propuestaId: selectedPropuestaId }).then(
+      () => {
+        closeReplace()
+        toast.success('Parada reemplazada correctamente')
+      },
+      (error: unknown) => {
+        toast.error(
+          error instanceof Error ? error.message : 'No pudimos reemplazar la parada',
         )
       },
     )
@@ -236,16 +278,28 @@ export function CircuitoPage() {
                           {locationLabel(item)}
                         </p>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => setItemToDelete(item)}
-                        aria-label={`Eliminar ${item.propuestaNombre}`}
-                        className="ml-auto shrink-0 text-slate-400 hover:bg-red-50 hover:text-red-600"
-                      >
-                        <Trash2Icon aria-hidden />
-                      </Button>
+                      <div className="ml-auto flex shrink-0 items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => openReplace(item)}
+                          aria-label={`Sustituir ${item.propuestaNombre}`}
+                          className="text-slate-400 hover:bg-sky-50 hover:text-sky-700"
+                        >
+                          <ArrowRightLeftIcon aria-hidden />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => setItemToDelete(item)}
+                          aria-label={`Eliminar ${item.propuestaNombre}`}
+                          className="text-slate-400 hover:bg-red-50 hover:text-red-600"
+                        >
+                          <Trash2Icon aria-hidden />
+                        </Button>
+                      </div>
                     </li>
                   ))}
                 </ol>
@@ -280,6 +334,89 @@ export function CircuitoPage() {
             >
               Eliminar
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={itemToReplace !== null}
+        onOpenChange={(open) => {
+          if (!open) closeReplace()
+        }}
+      >
+        <AlertDialogContent className="max-w-lg rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-heading text-lg font-bold">
+              Sustituir parada
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Elegí una propuesta para reemplazar “{itemToReplace?.propuestaNombre}”. Solo se
+              muestran opciones que entran en el mismo bloque horario y respetan los traslados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="flex max-h-72 flex-col gap-2 overflow-y-auto py-2">
+            {alternativas.isPending && (
+              <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">
+                Buscando alternativas...
+              </p>
+            )}
+            {alternativas.isError && (
+              <p className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                {toUserMessage(alternativas.error)}
+              </p>
+            )}
+            {alternativas.isSuccess && alternativas.data.alternativas.length === 0 && (
+              <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">
+                {alternativas.data.mensaje ??
+                  'No hay propuestas disponibles para reemplazar esta parada.'}
+              </p>
+            )}
+            {alternativas.isSuccess &&
+              alternativas.data.alternativas.map((alternativa) => (
+                <button
+                  key={alternativa.propuestaId}
+                  type="button"
+                  onClick={() => setSelectedPropuestaId(alternativa.propuestaId)}
+                  aria-pressed={selectedPropuestaId === alternativa.propuestaId}
+                  className={`flex w-full flex-col gap-1 rounded-xl border p-3 text-left transition-colors ${
+                    selectedPropuestaId === alternativa.propuestaId
+                      ? 'border-sky-600 bg-sky-50'
+                      : 'border-slate-200 hover:border-sky-300 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="font-heading text-sm font-bold text-slate-900">
+                      {alternativa.propuestaNombre}
+                    </span>
+                    <CategoriaBadge categoria={alternativa.categoria} />
+                  </span>
+                  <span className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
+                    <span className="flex items-center gap-1">
+                      <ClockIcon className="size-3.5" aria-hidden />
+                      {formatTimeRange(alternativa.horaInicio, alternativa.horaFin) ??
+                        'A confirmar'}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <MapPinIcon className="size-3.5" aria-hidden />
+                      {locationLabel(alternativa)}
+                    </span>
+                  </span>
+                </button>
+              ))}
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={reemplazar.isPending} onClick={closeReplace}>
+              Cancelar
+            </AlertDialogCancel>
+            <Button
+              type="button"
+              onClick={handleReplace}
+              disabled={selectedPropuestaId === null || reemplazar.isPending}
+            >
+              {reemplazar.isPending ? 'Reemplazando...' : 'Reemplazar'}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
