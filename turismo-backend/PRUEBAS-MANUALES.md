@@ -514,6 +514,48 @@ curl.exe -s http://localhost:8080/api/viajes/abc
 
 Qué esperar: **400** `el parámetro 'id' tiene un formato inválido` (lo maneja `handleTypeMismatch`).
 
+### 8.23 Circuito seleccionado, eliminación y reemplazo (VZ-26/VZ-28/VZ-29)
+
+Requiere un viaje con circuito generado y una alternativa seleccionada (secciones 8.13–8.15).
+
+```powershell
+# alternativa elegida agrupada por día (incluye días vacíos)
+curl.exe -s http://localhost:8080/api/viajes/2/circuito/seleccionado
+
+# reemplazos compatibles para una parada (usar el itemId de la respuesta anterior)
+curl.exe -s http://localhost:8080/api/viajes/2/circuito/seleccionado/items/5/alternativas
+
+# eliminar sin confirmar -> 409; con confirmar=true -> 200
+curl.exe -s -i -X DELETE http://localhost:8080/api/viajes/2/circuito/seleccionado/items/6
+curl.exe -s -X DELETE "http://localhost:8080/api/viajes/2/circuito/seleccionado/items/6?confirmar=true"
+
+# reemplazar la parada 5 por la propuesta 26 -> 200; una propuesta inválida -> 422
+curl.exe -s -X PUT http://localhost:8080/api/viajes/2/circuito/seleccionado/items/5 `
+  -H "Content-Type: application/json" -d '{\"propuestaId\":26}'
+
+# regenerar sin flag -> 409; con reemplazar=true -> 200 (conserva la estrategia)
+curl.exe -s -i -X POST http://localhost:8080/api/viajes/2/circuito
+curl.exe -s -X POST "http://localhost:8080/api/viajes/2/circuito?reemplazar=true"
+```
+
+Qué esperar:
+
+- `GET /seleccionado` → **200** con `dias[]`; cada ítem trae `itemId` y `propuestaId`. Si el viaje,
+  el circuito o la selección no existen → **404**.
+- Un segundo `POST /seleccion` → **400** `el circuito del viaje ya tiene una alternativa
+  seleccionada`.
+- `DELETE` sin `confirmar=true` → **409**; con el flag → **200** y el circuito actualizado (la
+  parada se borra, se renumeran `orden` y se recalculan traslados/métricas).
+- `PUT` sin `propuestaId` → **400** `propuestaId: La propuesta de reemplazo es obligatoria`; con
+  una propuesta que no encaja en el bloque/solapamiento/traslados → **422** y la parada queda
+  intacta; un `itemId` de otra alternativa → **404**.
+- `GET .../alternativas` sin candidatos → **200** con `alternativas: []` y `mensaje`.
+- `POST /circuito` sin flag con circuito existente → **409** `el circuito del viaje ya fue
+  generado; confirmá con reemplazar=true para regenerarlo`; con `?reemplazar=true` → **200**.
+- `desactualizado` y `motivosDesactualizacion` (`FECHAS`, `PREFERENCIAS`, `ZONA`, `RITMO`)
+  comparan el snapshot contra el viaje; las coordenadas se comparan por valor, no por escala
+  decimal.
+
 ## 9. Bordes conocidos — probar a mano
 
 Estos no los verifiqué y no están cubiertos por los tests, así que conviene comprobarlos:
@@ -603,7 +645,7 @@ curl.exe -s -X POST http://localhost:8080/api/viajes -H "Content-Type: applicati
 curl.exe -s -X PUT  http://localhost:8080/api/viajes/1 -H "Content-Type: application/json" -d '...'
 curl.exe -s -i -X DELETE http://localhost:8080/api/viajes/1   # 204 sin cuerpo (baja LOGICA -> CANCELADO)
 
-# tests automatizados (117, incluye lo de arriba salvo los bordes de la seccion 9)
+# tests automatizados (258; 256 en verde y 2 fallos preexistentes por fechas fijas)
 .\mvnw.cmd clean test
 ```
 

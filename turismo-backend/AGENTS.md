@@ -11,9 +11,9 @@ Tesis de facultad: API REST que centraliza la información turística de la prov
   son subcarpetas del mismo repo git, no repos separados. Se puede tocar el backend y el frontend
   en el mismo commit, y es lo normal: la API y el cliente se cambian juntos. El `.gitignore` de la
   raíz es el que manda.
-- Estado actual: Sprints 1–3 completos (eventos, viajes, agenda VZ-18, circuitos VZ-25, consulta
-  seleccionada VZ-26, eliminación de paradas VZ-29 y reemplazo de paradas VZ-28), con **257
-  tests: 255 en verde y 2 fallos preexistentes por fechas fijas ya vencidas (`ViajeMapperTest`,
+- Estado actual: Sprints 1–4 completos (eventos, viajes, agenda VZ-18, circuitos VZ-25, consulta
+  seleccionada VZ-26, eliminación de paradas VZ-29 y reemplazo de paradas VZ-28), con **258
+  tests: 256 en verde y 2 fallos preexistentes por fechas fijas ya vencidas (`ViajeMapperTest`,
   `ViajeTest`)**. Incluye
   paginación, CRUD de eventos, alta de publicadores, CRUD de viajes con baja lógica, listado
   unificado de propuestas (eventos + actividades), **agenda filtrable por
@@ -410,6 +410,10 @@ Decisiones y trampas:
 - **Snapshot de generación**: `Circuito` guarda fechas, zona, radio, ritmo e intereses. El cálculo
   de `desactualizado` y `motivosDesactualizacion` (`FECHAS`, `PREFERENCIAS`, `ZONA`, `RITMO`) usa
   ese snapshot contra el viaje actual; no regenera automáticamente.
+- **Las coordenadas del snapshot se comparan con `compareTo`, no con `Objects.equals`.** Las
+  columnas de `Circuito` usan `scale=8` (igual que `Ubicacion`); aun así, `BigDecimal.equals`
+  compara la escala y marcaba `ZONA` como desactualizada al instante. Lo cubre
+  `CircuitoServiceTest.doesNotMarkZoneAsOutdatedWhenOnlyTheDecimalScaleDiffers`.
 - **`selectedDetail` (VZ-26) exige viaje, circuito y alternativa seleccionada**: primero valida con
   `findTrip` (mismo `404` para inexistente/cancelado), luego circuito, estrategia y alternativa. Los
   días salen del snapshot `fechaInicio/fechaFin` (fallback al mínimo/máximo de los ítems y, si no
@@ -583,7 +587,7 @@ Las anotaciones de test **cambiaron de package**. Importar desde el package viej
 `@MockBean` ya no existe. Para tests unitarios con Mockito alcanza con
 `@ExtendWith(MockitoExtension.class)` + `@Mock`, sin contexto de Spring.
 
-Reparto actual (257 tests; 2 fallos preexistentes por fechas fijas ya vencidas en `ViajeMapperTest`
+Reparto actual (258 tests; 2 fallos preexistentes por fechas fijas ya vencidas en `ViajeMapperTest`
 y `ViajeTest`):
 
 | Archivo | Tests | Cubre |
@@ -603,7 +607,7 @@ y `ViajeTest`):
 | `AgendaControllerTest` | 7 | `/api/agenda` (filtros, orden fijo, 400) y `/api/agenda/semanal` (paginación, tope de `size`) |
 | `AgendaSemanalTest` | 7 | límites de la semana ISO, paginación |
 | `CircuitGeneratorTest` | 7 | **VZ-25: ventana 06:00–23:59, agenda, ritmo, estrategias y traslados** |
-| `CircuitoServiceTest` | 25 | **VZ-25/VZ-26/VZ-28/VZ-29: generación, snapshot, regeneración/desactualizado, intereses estrictos, selección única, agrupación por días, eliminación con renumeración/recálculo, alternativas filtradas, reemplazo y errores** |
+| `CircuitoServiceTest` | 26 | **VZ-25/VZ-26/VZ-28/VZ-29: generación, snapshot, regeneración/desactualizado, intereses estrictos, selección única, agrupación por días, eliminación con renumeración/recálculo, alternativas filtradas, reemplazo y errores; incluye la regresión de escala decimal** |
 | `PublicadorServiceTest` | 7 | alta, consulta, 404, US7, **pre-chequeo de email** |
 | `ImagenServiceTest` | 6 | **guardar/borrar, magic bytes, tope 5 MB, anti path traversal (`@TempDir`)** |
 | `GeocodingServiceTest` | 5 | **dedup de la query de Nominatim, campos vacíos, provincia** |

@@ -78,10 +78,10 @@ public class Circuito {
     @Column(length = 255)
     private String zonaDireccionSnapshot;
 
-    @Column(precision = 10, scale = 7)
+    @Column(precision = 10, scale = 8)
     private BigDecimal zonaLatitudSnapshot;
 
-    @Column(precision = 10, scale = 7)
+    @Column(precision = 11, scale = 8)
     private BigDecimal zonaLongitudSnapshot;
 
     @JdbcTypeCode(SqlTypes.VARCHAR)

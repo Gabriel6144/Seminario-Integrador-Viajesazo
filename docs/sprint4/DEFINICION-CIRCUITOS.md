@@ -419,3 +419,26 @@ Verificación de la Fase 4:
 - Frontend tests: 191 tests, 9 fallos preexistentes en los mismos dos archivos; los 8 tests de
   `circuito-page.test.tsx` en verde (incluye alternativas, reemplazo, ausencia de opciones y
   cancelación).
+
+Verificación de la Fase 5:
+
+- **Prueba manual del flujo completo** contra el backend con H2 reseteada: generar viaje 2
+  (`201`), seleccionar `INTERESES` (`200`), consultar `seleccionado`, listar alternativas,
+  reemplazar por una propuesta creada a mano, eliminar con y sin confirmación (`200`/`409`),
+  forzar `400`/`404`/`422`, regenerar sin flag (`409`) y con `?reemplazar=true` (`200`). El
+  circuito regenerado conservó la estrategia y recalculó días, traslados y métricas.
+- **Bug corregido:** `desactualizado` marcaba `ZONA` inmediatamente después de generar porque las
+  columnas `zonaLatitudSnapshot`/`zonaLongitudSnapshot` tenían `scale=7` y `Ubicacion` `scale=8`;
+  `Objects.equals(BigDecimal)` compara la escala. Se alineó el mapeo a `scale=8` y se reemplazó
+  la comparación por `compareTo` mediante `sameDecimal()`. Regresión cubierta por
+  `CircuitoServiceTest.doesNotMarkZoneAsOutdatedWhenOnlyTheDecimalScaleDiffers`.
+- **Backend:** 258 tests, 256 en verde y los mismos 2 fallos preexistentes.
+  `CircuitoControllerTest` (17) y `CircuitoServiceTest` (26) en verde.
+- **Frontend:** typecheck OK; lint OK con los mismos 6 warnings; 191 tests, 182 en verde y los
+  mismos 9 fallos preexistentes.
+- **Documentación actualizada:** `docs/CIRCUITOS-AUTOMATICOS.md`,
+  `docs/PRUEBAS-MANUALES-POSTMAN.md`, `turismo-backend/PRUEBAS-MANUALES.md`,
+  `turismo-backend/AGENTS.md` y esta verificación.
+
+Salida de la Fase 5: sprint integrado, verificado y documentado; sin commit (queda para revisión
+del equipo).

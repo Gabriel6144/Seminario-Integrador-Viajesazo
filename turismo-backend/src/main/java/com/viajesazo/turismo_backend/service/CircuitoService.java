@@ -1,5 +1,6 @@
 package com.viajesazo.turismo_backend.service;
 
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -661,8 +662,8 @@ public class CircuitoService {
         }
         Ubicacion zona = viaje.getZonaInteres();
         if (zona == null
-                || !Objects.equals(circuito.getZonaLatitudSnapshot(), zona.getLatitud())
-                || !Objects.equals(circuito.getZonaLongitudSnapshot(), zona.getLongitud())
+                || !sameDecimal(circuito.getZonaLatitudSnapshot(), zona.getLatitud())
+                || !sameDecimal(circuito.getZonaLongitudSnapshot(), zona.getLongitud())
                 || !Objects.equals(circuito.getZonaCiudadSnapshot(), zona.getCiudad())
                 || !Objects.equals(circuito.getZonaLocalidadSnapshot(), zona.getLocalidad())
                 || !Objects.equals(circuito.getZonaDireccionSnapshot(), zona.getDireccion())) {
@@ -672,6 +673,10 @@ public class CircuitoService {
             motivos.add("RITMO");
         }
         return motivos;
+    }
+
+    private static boolean sameDecimal(BigDecimal left, BigDecimal right) {
+        return left == null ? right == null : right != null && left.compareTo(right) == 0;
     }
 
     private LocalDate effectiveStart(Viaje viaje) {

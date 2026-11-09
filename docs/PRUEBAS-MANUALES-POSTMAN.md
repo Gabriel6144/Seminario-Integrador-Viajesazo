@@ -1,8 +1,9 @@
 # Pruebas manuales en Postman — Viajes y circuitos
 
-> **Estado:** vigente para el Sprint 3.
-> **Alcance:** viajes, borradores y circuitos. Todos los ejemplos están pensados para
-> ejecutarse desde Postman, sin `curl`.
+> **Estado:** vigente para el Sprint 4 (VZ-25/VZ-26/VZ-28/VZ-29).
+> **Alcance:** viajes, borradores, generación de circuitos, circuito seleccionado, eliminación y
+> reemplazo de paradas. Todos los ejemplos están pensados para ejecutarse desde Postman, sin
+> `curl`.
 > **Requisito:** la aplicación levantada en `http://localhost:8080`.
 
 ## 1. Antes de empezar
@@ -38,8 +39,9 @@ Crear un environment llamado `Viajesazo local` con estas variables:
 | `usuario` | `turista.demo@viajesazo.com` |
 | `viajeId` | *(vacío)* |
 | `borradorId` | *(vacío)* |
+| `itemId` | *(vacío)* |
 
-`viajeId` y `borradorId` se completan solos con los scripts de la sección 2.3.
+`viajeId`, `borradorId` e `itemId` se completan solos con los scripts de la sección 2.3.
 
 ### 2.2 Headers
 
@@ -67,6 +69,13 @@ En el request `POST /api/viajes/borradores`, pestaña **Tests**:
 ```js
 pm.test("201 Created", () => pm.response.to.have.status(201));
 pm.environment.set("borradorId", pm.response.json().id);
+```
+
+En el request `GET /api/viajes/{{viajeId}}/circuito/seleccionado`, pestaña **Tests**:
+
+```js
+pm.test("200 OK", () => pm.response.to.have.status(200));
+pm.environment.set("itemId", pm.response.json().dias.flatMap((dia) => dia.items)[0]?.itemId);
 ```
 
 ### 2.4 Fechas futuras sin hardcodear
@@ -121,8 +130,14 @@ Córdoba` y un radio amplio, como se muestra en la sección 5.1.
 4. `POST /api/viajes/{{viajeId}}/circuito` para generar las alternativas.
 5. `GET /api/viajes/{{viajeId}}/circuito` para consultarlas.
 6. `POST /api/viajes/{{viajeId}}/circuito/seleccion` para elegir una.
-7. `GET /api/viajes/{{viajeId}}` para comprobar que el campo `circuito` ya trae la seleccionada.
-8. Probar los errores: regenerar y volver a seleccionar deben responder `400`.
+7. `GET /api/viajes/{{viajeId}}/circuito/seleccionado` para ver la alternativa agrupada por día
+   y guardar `itemId` con el script de la sección 2.3.
+8. `GET .../seleccionado/items/{{itemId}}/alternativas` para ver los reemplazos compatibles.
+9. `PUT .../seleccionado/items/{{itemId}}` con `{ "propuestaId": ... }` para sustituir una parada.
+10. `DELETE .../seleccionado/items/{{itemId}}` sin `confirmar` (debe dar `409`) y con
+    `?confirmar=true` (debe dar `200`).
+11. Probar los errores: regenerar sin flag debe dar `409`, con `?reemplazar=true` debe dar `200`,
+    y una segunda selección debe dar `400`.
 
 El flujo de borradores va por separado:
 
@@ -362,9 +377,10 @@ El flujo de borradores va por separado:
 - **Body:** no lleva.
 - **Status esperado:** `201 Created`
 - **Nota:** genera tres alternativas (`CERCANIA`, `INTERESES`, `DESCUBRIMIENTO`) y las guarda
-  como instantánea. **Solo se puede generar una vez por viaje**; si ya existe, responde `400`.
-  El viaje debe tener fechas, zona con coordenadas, radio mayor a cero y ritmo. Si no hay
-  propuestas compatibles devuelve `201` con alternativas vacías, no un error.
+  como instantánea. Si ya existe un circuito, responde `409`; repetir con
+  `?reemplazar=true` reemplaza las alternativas y responde `200` conservando la estrategia
+  seleccionada si sigue existiendo. El viaje debe tener fechas, zona con coordenadas, radio mayor
+  a cero y ritmo. Si no hay propuestas compatibles responde `422` con `datosFaltantes`.
 
 ### 7.2 `GET /api/viajes/{id}/circuito` — consultar circuito
 
@@ -374,12 +390,12 @@ El flujo de borradores va por separado:
 - **Status esperado:** `200 OK`
 - **Nota:** devuelve las tres alternativas con sus ítems, distancias y métricas. Si el viaje
   todavía no tiene circuito generado, responde `404`.
-- **Campos de cada ítem:** además de `propuestaId`, `nombre`, `descripcion`, `categoria`, `fecha`,
-  `orden`, `horaInicio`, `horaFin`, `trasladoDesdeAnteriorMinutos` y `disponible`, la respuesta
-  trae el snapshot visual y de ubicación: `imagenes`, `ciudad`, `localidad`, `direccion`,
-  `lugarRecinto`, `latitud`, `longitud`, `tipoAcceso`, `montoEstimado`, `descripcionArancel`,
-  `sitioOficial` y `duracionMinutos`. Verificar que `latitud`/`longitud` no sean nulos cuando la
-  propuesta tenía ubicación.
+- **Campos de cada ítem:** `itemId`, `propuestaId`, `propuestaNombre`, `tipo`, `categoria`, `fecha`,
+  `orden`, `horaInicio`, `horaFin`, `trasladoKm`, `trasladoMinutos`, `disponible` y el snapshot
+  visual y de ubicación: `imagenes`, `ciudad`, `localidad`, `direccion`, `lugarRecinto`,
+  `latitud`, `longitud`, `tipoAcceso`, `montoEstimado`, `descripcionArancel`, `sitioOficial` y
+  `duracionMinutos`. Verificar que `latitud`/`longitud` no sean nulos cuando la propuesta tenía
+  ubicación.
 
 ### 7.3 `POST /api/viajes/{id}/circuito/seleccion` — seleccionar alternativa
 
@@ -430,6 +446,67 @@ El flujo de borradores va por separado:
   Los valores de `propuestas`, distancias y advertencia dependen de las propuestas cargadas
   y de las fechas del viaje.
 
+### 7.5 `GET /api/viajes/{id}/circuito/seleccionado` — ver la alternativa elegida
+
+- **Método:** `GET`
+- **URL:** `{{baseUrl}}/api/viajes/{{viajeId}}/circuito/seleccionado`
+- **Body:** no lleva.
+- **Status esperado:** `200 OK`
+- **Nota:** devuelve `dias[]` (incluye días vacíos) con `fecha` e `items[]`; cada ítem trae
+  `itemId`, `propuestaId`, `propuestaNombre`, `tipo`, `categoria`, `horaInicio`, `horaFin` y
+  `duracionMinutos`. También informa `desactualizado` y `motivosDesactualizacion` (`FECHAS`,
+  `PREFERENCIAS`, `ZONA`, `RITMO`). Responde `404` si no existe el viaje, el circuito o
+  la selección. Ejecutar el script de la sección 2.3 para guardar `itemId`.
+
+### 7.6 `DELETE /api/viajes/{id}/circuito/seleccionado/items/{itemId}` — eliminar parada
+
+- **Método:** `DELETE`
+- **URL:** `{{baseUrl}}/api/viajes/{{viajeId}}/circuito/seleccionado/items/{{itemId}}`
+- **Body:** no lleva.
+- **Status esperado:** `200 OK`
+- **Nota:** sin `?confirmar=true` responde `409` con
+  `la eliminación de la parada requiere confirmación; confirmá con confirmar=true`. Con el flag,
+  elimina la parada físicamente, renumera `orden` por día y recalcula traslados y métricas; el día
+  puede quedar vacío. Si el ítem no pertenece a la alternativa seleccionada, `404`.
+
+### 7.7 `GET /api/viajes/{id}/circuito/seleccionado/items/{itemId}/alternativas` — reemplazos
+
+- **Método:** `GET`
+- **URL:** `{{baseUrl}}/api/viajes/{{viajeId}}/circuito/seleccionado/items/{{itemId}}/alternativas`
+- **Body:** no lleva.
+- **Status esperado:** `200 OK`
+- **Nota:** devuelve `alternativas[]` con las propuestas compatibles; si no hay, responde `200`
+  con `alternativas: []` y un `mensaje`. Aplica las mismas reglas que la generación: bloque,
+  solapamiento, intereses, radio y traslados.
+
+### 7.8 `PUT /api/viajes/{id}/circuito/seleccionado/items/{itemId}` — reemplazar parada
+
+- **Método:** `PUT`
+- **URL:** `{{baseUrl}}/api/viajes/{{viajeId}}/circuito/seleccionado/items/{{itemId}}`
+- **Body:** raw JSON
+
+```json
+{
+  "propuestaId": 15
+}
+```
+
+- **Status esperado:** `200 OK`
+- **Nota:** `propuestaId` es obligatorio. Si la propuesta no es un reemplazo válido para esa
+  parada, responde `422` `la propuesta elegida no es un reemplazo válido para esta parada` y deja
+  el circuito intacto. Si el ítem no pertenece a la selección, `404`.
+
+### 7.9 Regenerar y volver a seleccionar
+
+- **Método:** `POST`
+- **URL:** `{{baseUrl}}/api/viajes/{{viajeId}}/circuito?reemplazar=true`
+- **Body:** no lleva.
+- **Status esperado:** `200 OK`
+- **Nota:** sin el flag, un circuito existente responde `409`; con `?reemplazar=true` regenera las
+  tres alternativas, conserva la estrategia seleccionada si sigue existiendo y responde `200`.
+  Después, `POST .../circuito/seleccion` responde `400`
+  `el circuito del viaje ya tiene una alternativa seleccionada`.
+
 ## 8. Checklist rápido
 
 - [ ] `POST /api/viajes` responde `201` y guarda `viajeId`.
@@ -441,7 +518,11 @@ El flujo de borradores va por separado:
 - [ ] `GET /api/viajes/{{viajeId}}/circuito` responde `200` con tres alternativas.
 - [ ] `POST /api/viajes/{{viajeId}}/circuito/seleccion` responde `200`.
 - [ ] `GET /api/viajes/{{viajeId}}` incluye la alternativa seleccionada.
-- [ ] Regenerar el circuito responde `400`.
+- [ ] `GET .../circuito/seleccionado` responde `200` y guarda `itemId`.
+- [ ] `GET .../items/{{itemId}}/alternativas` responde `200` (aunque sea con lista vacía).
+- [ ] `PUT .../items/{{itemId}}` con un `propuestaId` válido responde `200`; con uno inválido, `422`.
+- [ ] `DELETE .../items/{{itemId}}` sin confirmar responde `409`; con `?confirmar=true`, `200`.
+- [ ] Regenerar el circuito sin flag responde `409`; con `?reemplazar=true`, `200`.
 - [ ] Volver a seleccionar responde `400`.
 - [ ] `POST /api/viajes/borradores` responde `201` y guarda `borradorId`.
 - [ ] `GET /api/viajes/borradores?usuario=...` lista el borrador.
@@ -457,8 +538,15 @@ El flujo de borradores va por separado:
   **`ViajeBorradorRequest` usa `interesesCategoria`** y exige `pasoActual`.
 - **Un viaje `BORRADOR` no se consulta con `GET /api/viajes/{id}`**: responde `404`. Usar
   `GET /api/viajes/borradores/{id}`.
-- **El circuito no se regenera.** Para repetir la prueba, reiniciar la app o crear otro viaje.
-- **La alternativa se selecciona una sola vez.** Para volver a probar, reiniciar o crear otro viaje.
+- **El circuito se regenera solo con `?reemplazar=true`.** Sin el flag responde `409`. Conserva la
+  estrategia seleccionada si sigue existiendo; para volver a probar desde cero, reiniciar la app o
+  crear otro viaje.
+- **La alternativa se selecciona una sola vez.** Para volver a probar, regenerar con
+  `?reemplazar=true`, reiniciar o crear otro viaje.
+- **`itemId` identifica la parada dentro de la alternativa elegida**; `propuestaId` identifica la
+  propuesta de origen. Usar `itemId` en las rutas de reemplazo/eliminación.
+- **`desactualizado`** no invalida la instantánea: solo informa qué cambió en el viaje desde la
+  generación. Las coordenadas se comparan por valor, no por escala decimal.
 - **Las fechas del viaje deben ser futuras.** El alta rechaza `fechaInicio` anterior a hoy.
 - **Un viaje cancelado no puede generar circuito** (`404`), porque la búsqueda excluye
   `CANCELADO`.

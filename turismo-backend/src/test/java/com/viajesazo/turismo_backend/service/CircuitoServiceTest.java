@@ -19,6 +19,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -321,6 +322,21 @@ class CircuitoServiceTest {
 
         assertThat(response.desactualizado()).isTrue();
         assertThat(response.motivosDesactualizacion()).containsExactly("PREFERENCIAS", "RITMO");
+    }
+
+    @Test
+    @DisplayName("No marca la zona como desactualizada cuando solo cambia la escala decimal")
+    void doesNotMarkZoneAsOutdatedWhenOnlyTheDecimalScaleDiffers() {
+        Viaje trip = validTrip();
+        Circuito circuito = selectedCircuit(trip);
+        circuito.setZonaLatitudSnapshot(trip.getZonaInteres().getLatitud().setScale(8));
+        circuito.setZonaLongitudSnapshot(trip.getZonaInteres().getLongitud().setScale(8));
+        when(circuitoRepository.findByViajeId(7L)).thenReturn(Optional.of(circuito));
+
+        var response = service.selected(7L);
+
+        assertThat(response.desactualizado()).isFalse();
+        assertThat(response.motivosDesactualizacion()).isEmpty();
     }
 
     @Test

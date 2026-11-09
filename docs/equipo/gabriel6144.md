@@ -11,7 +11,7 @@
 
 | Fecha | Hito | Referencia |
 |---|---|---|
-| 2026-11-09 | Sprint 4: circuitos VZ-25, VZ-26, VZ-29 y VZ-28 | `devGaby`, working tree |
+| 2026-11-09 | Sprint 4: circuitos VZ-25, VZ-26, VZ-29, VZ-28 y cierre | `devGaby`, working tree |
 | 2026-10-27 | Integración full-stack de circuitos y “Mis viajes” | `devGaby`, working tree |
 | 2026-10-25 | VZ-18: agenda turística server-side | working tree, sin commit |
 | 2026-10-24 | Animación del mapa al cambiar el destino | `4437abd` |
@@ -26,12 +26,12 @@
 | 2026-10-08 | Integración del PR #1 de `sbrito` | `4f4dbab` |
 | 2026-09-27 | Base del repositorio y Sprint 1 | `40fc87a` |
 
-## 2026-11-09 — Sprint 4: circuitos VZ-25, VZ-26, VZ-29 y VZ-28
+## 2026-11-09 — Sprint 4: circuitos VZ-25, VZ-26, VZ-29, VZ-28 y cierre
 
 - **Sprint / US:** Sprint 4 / VZ-25, VZ-26, VZ-29, VZ-28
 - **Rama / PR:** `devGaby`; cambios en working tree, sin commit ni PR todavía
 - **Commit(s):** ninguno; base `60983dd`
-- **Estado:** implementado y verificado, pendiente de commit
+- **Estado:** implementado, probado a mano y documentado; pendiente de commit
 
 **Qué hice**
 
@@ -96,6 +96,18 @@
     (`replaceCircuitoItem`, `findCircuitoItem`) y tests de la página.
 - Documenté el alcance y las fases en `docs/sprint4/DEFINICION-CIRCUITOS.md` y actualicé los
   `AGENTS.md` de backend y frontend con las cuatro historias y la verificación de la Fase 4.
+- Fase 5 (cierre):
+  - Corrí el flujo manual completo en Postman (generar, seleccionar, consultar seleccionado,
+    listar alternativas, reemplazar, eliminar con/sin confirmación, errores `400`/`404`/`409`/`422`
+    y regeneración con `?reemplazar=true`) y verifiqué que el circuito regenerado conserva la
+    estrategia y recalcula días, traslados y métricas.
+  - Encontré y corregí un falso positivo de `desactualizado` por escala de `BigDecimal`: las
+    columnas de snapshot tenían `scale=7` y `Ubicacion` `scale=8`, así que `Objects.equals` marcaba
+    `ZONA` al instante. Alineé el mapeo a `scale=8` y comparé con `compareTo` (`sameDecimal()`),
+    con regresión en `CircuitoServiceTest`.
+  - Actualicé `CIRCUITOS-AUTOMATICOS.md`, `PRUEBAS-MANUALES-POSTMAN.md`,
+    `turismo-backend/PRUEBAS-MANUALES.md`, `turismo-backend/AGENTS.md` y la verificación de la
+    Fase 5.
 
 **Decisiones**
 
@@ -132,6 +144,8 @@
   `Button` normal permite esperar el `PUT` sin cerrar el diálogo.
 - La bitácora consolida VZ-25/VZ-26/VZ-29/VZ-28 en una sola entrada porque las cuatro historias
   comparten el mismo working tree sin commit.
+- Las coordenadas del snapshot se comparan por valor y no con `Objects.equals`: `BigDecimal.equals`
+  incluye la escala, y una diferencia de representación no es un cambio real de zona.
 
 **Archivos principales**
 
@@ -157,10 +171,13 @@
 
 **Verificación**
 
-- Backend: **257 tests, 255 en verde**; 2 fallos preexistentes
+- Backend: **258 tests, 256 en verde**; 2 fallos preexistentes
   (`ViajeMapperTest.mapsRequestToEntity` y `ViajeTest.rejectsPastStartDate`).
-  `CircuitoControllerTest` (17) y `CircuitoServiceTest` (25) en verde, incluidos alternativas,
-  reemplazo, `400`/`404`/`422`, eliminación y recálculo de métricas.
+  `CircuitoControllerTest` (17) y `CircuitoServiceTest` (26) en verde, incluidos alternativas,
+  reemplazo, `400`/`404`/`422`, eliminación, recálculo de métricas y la regresión de escala
+  decimal de `desactualizado`.
+- Prueba manual en Postman: flujo completo en verde, incluido `409` sin confirmación/regeneración y
+  `422` de reemplazo inválido sin tocar la parada.
 - Frontend: `npm run typecheck` OK; `npm run lint` OK con 6 warnings preexistentes;
   `npm test -- --run` → **191 tests, 182 en verde** y 9 fallos preexistentes (`eventos-page` ×8
   y `evento-editar-page` ×1). `circuito-page.test.tsx` (8) en verde.
@@ -168,7 +185,7 @@
 
 **Pendientes / deuda**
 
-- Commit y PR de VZ-25/VZ-26/VZ-29/VZ-28.
+- Commit y PR de VZ-25/VZ-26/VZ-29/VZ-28 (working tree verificado, sin commit).
 - Autenticación y propiedad de viajes para `401/403`.
 - La provincia de Córdoba sigue siendo un invariante del dato, sin filtro geográfico.
 - Regenerar descarta ediciones manuales previas de reemplazos/eliminaciones.
