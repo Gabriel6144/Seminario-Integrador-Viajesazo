@@ -395,3 +395,14 @@ Verificación de la Fase 2:
 - Frontend lint: OK con 6 warnings preexistentes.
 - Frontend tests: 186 tests, 9 fallos preexistentes en los mismos dos archivos; los 3 tests de
   `circuito-page.test.tsx` en verde.
+
+Verificación de la Fase 3:
+
+- Backend: 247 tests, 2 fallos preexistentes. `CircuitoControllerTest` (13) y
+  `CircuitoServiceTest` (19) en verde, incluidos `409` sin confirmación, `404` de ítem ajeno o
+  inexistente, renumeración por día, recálculo del traslado siguiente y de las métricas, y día
+  vacío sin eliminar el circuito.
+- Frontend typecheck: OK.
+- Frontend lint: OK con 6 warnings preexistentes.
+- Frontend tests: 188 tests, 9 fallos preexistentes en los mismos dos archivos; los 5 tests de
+  `circuito-page.test.tsx` en verde (incluye confirmar y cancelar la eliminación).

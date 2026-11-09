@@ -11,13 +11,15 @@ Tesis de facultad: API REST que centraliza la información turística de la prov
   son subcarpetas del mismo repo git, no repos separados. Se puede tocar el backend y el frontend
   en el mismo commit, y es lo normal: la API y el cliente se cambian juntos. El `.gitignore` de la
   raíz es el que manda.
-- Estado actual: Sprints 1–3 completos (eventos, viajes, agenda VZ-18, circuitos VZ-25 y consulta
-  seleccionada VZ-26), con **240 tests: 238 en verde y 2 fallos preexistentes por fechas fijas ya
-  vencidas (`ViajeMapperTest`, `ViajeTest`)**. Incluye paginación, CRUD de eventos, alta de
-  publicadores, CRUD de viajes con baja lógica, listado unificado de propuestas (eventos +
-  actividades), **agenda filtrable por fecha/tipo/categoría/ubicación/acceso**, **generación y
-  selección única de tres alternativas de circuito con distancias estimadas**, **consulta del
-  circuito seleccionado agrupado por día**, seed de datos, mapeo con MapStruct,
+- Estado actual: Sprints 1–3 completos (eventos, viajes, agenda VZ-18, circuitos VZ-25, consulta
+  seleccionada VZ-26 y eliminación de paradas VZ-29), con **247 tests: 245 en verde y 2 fallos
+  preexistentes por fechas fijas ya vencidas (`ViajeMapperTest`, `ViajeTest`)**. Incluye
+  paginación, CRUD de eventos, alta de publicadores, CRUD de viajes con baja lógica, listado
+  unificado de propuestas (eventos + actividades), **agenda filtrable por
+  fecha/tipo/categoría/ubicación/acceso**, **generación y selección única de tres alternativas de
+  circuito con distancias estimadas**, **consulta del circuito seleccionado agrupado por día**,
+  **eliminación de paradas con confirmación y recálculo de métricas**, seed de datos, mapeo con
+  MapStruct,
   **geocodificación de la ubicación del evento con OpenStreetMap (Nominatim)** y **subida de
   imágenes a disco con servido estático**. Pendientes: `Itinerario` editable (VZ-27), `Usuario`,
   `Preferencia` y ruteo real (OSRM).
@@ -359,7 +361,7 @@ Decisiones que no son obvias:
 - **`/api/propuestas` también acepta `ubicacion`** (mismo criterio), además de los filtros que ya
   tenía.
 
-## API del Sprint 3/4 – Circuitos automáticos (VZ-25/VZ-26)
+## API del Sprint 3/4 – Circuitos automáticos (VZ-25/VZ-26/VZ-29)
 
 | Método | Ruta | Caso de uso |
 | --- | --- | --- |
@@ -367,6 +369,7 @@ Decisiones que no son obvias:
 | GET | `/api/viajes/{id}/circuito` | Devuelve el circuito guardado (404 si no existe) |
 | POST | `/api/viajes/{id}/circuito/seleccion` | Selecciona una alternativa (200) |
 | GET | `/api/viajes/{id}/circuito/seleccionado` | Devuelve el circuito seleccionado agrupado por día (**200**); **404** si no hay viaje, circuito o selección |
+| DELETE | `/api/viajes/{id}/circuito/seleccionado/items/{itemId}?confirmar=true` | Elimina la parada y devuelve el circuito actualizado (**200**); **409** sin confirmar; **404** si el ítem no pertenece a la alternativa seleccionada |
 
 Las alternativas son `CERCANIA`, `INTERESES` y `DESCUBRIMIENTO`. Se guardan como instantánea:
 regenerar sin `?reemplazar=true` devuelve **409** y no modifica nada; con el flag reemplaza las
@@ -409,6 +412,13 @@ Decisiones y trampas:
   hay, a las fechas del viaje) e incluyen **días vacíos** con `items: []`. Los ítems se ordenan por
   `horaInicio` ascendente (sin hora al final) y luego por `orden`; el DTO expone `itemId` y
   `propuestaId` para las acciones de VZ-27/VZ-28.
+- **La eliminación (VZ-29) valida primero y confirma después**: viaje, circuito y pertenencia del
+  `itemId` a la alternativa seleccionada se resuelven antes del flag, así un ítem de otra
+  alternativa da **404** y no un `409` engañoso. La baja es física sobre la colección
+  (`orphanRemoval`), renumera `orden` por día, recalcula solo el traslado del ítem siguiente (o lo
+  deja en 0 si pasa a ser el primero) y vuelve a calcular `distanciaTotalKm` (suma de traslados),
+  `afinidadIntereses` (ítems con categoría del snapshot de intereses / total) y
+  `categoriasCubiertas`. Un día vacío se devuelve igual y el circuito no se borra.
 
 ## Servicios
 
@@ -557,7 +567,7 @@ Las anotaciones de test **cambiaron de package**. Importar desde el package viej
 `@MockBean` ya no existe. Para tests unitarios con Mockito alcanza con
 `@ExtendWith(MockitoExtension.class)` + `@Mock`, sin contexto de Spring.
 
-Reparto actual (240 tests; 2 fallos preexistentes por fechas fijas ya vencidas en `ViajeMapperTest`
+Reparto actual (247 tests; 2 fallos preexistentes por fechas fijas ya vencidas en `ViajeMapperTest`
 y `ViajeTest`):
 
 | Archivo | Tests | Cubre |
@@ -565,7 +575,7 @@ y `ViajeTest`):
 | `PropuestaServiceTest` | 23 | US1–US5, US7, reglas de negocio, arancel, estado, geocoding |
 | `PropuestaRepositoryTest` | 18 | listado unificado, filtros, orden, **agenda VZ-18 (orden, solapamiento, cancelados, ubicación sin tildes)** |
 | `ViajeControllerTest` | 17 | VZ-19/VZ-21/VZ-22/VZ-23, 400/404, `?usuario` obligatorio |
-| `CircuitoControllerTest` | 10 | **VZ-25/VZ-26: 201/200/409/422, consulta, selección y `seleccionado` con 404** |
+| `CircuitoControllerTest` | 13 | **VZ-25/VZ-26/VZ-29: 201/200/409/422, consulta, selección, `seleccionado` y `DELETE` con confirmación/404** |
 | `EventoRepositoryTest` | 16 | solapamiento, bordes, orden, paginación, filtro por publicador, listado completo |
 | `EventoControllerTest` | 15 | US1–US4, US7, errores 400/404, cuerpo inválido |
 | `PropuestaTuristicaTest` | 11 | invariantes del modelo base |
@@ -577,7 +587,7 @@ y `ViajeTest`):
 | `AgendaControllerTest` | 7 | `/api/agenda` (filtros, orden fijo, 400) y `/api/agenda/semanal` (paginación, tope de `size`) |
 | `AgendaSemanalTest` | 7 | límites de la semana ISO, paginación |
 | `CircuitGeneratorTest` | 7 | **VZ-25: ventana 06:00–23:59, agenda, ritmo, estrategias y traslados** |
-| `CircuitoServiceTest` | 15 | **VZ-25/VZ-26: generación, snapshot, regeneración/desactualizado, intereses estrictos, selección única, agrupación por días y errores** |
+| `CircuitoServiceTest` | 19 | **VZ-25/VZ-26/VZ-29: generación, snapshot, regeneración/desactualizado, intereses estrictos, selección única, agrupación por días, eliminación con renumeración/recálculo y errores** |
 | `PublicadorServiceTest` | 7 | alta, consulta, 404, US7, **pre-chequeo de email** |
 | `ImagenServiceTest` | 6 | **guardar/borrar, magic bytes, tope 5 MB, anti path traversal (`@TempDir`)** |
 | `GeocodingServiceTest` | 5 | **dedup de la query de Nominatim, campos vacíos, provincia** |

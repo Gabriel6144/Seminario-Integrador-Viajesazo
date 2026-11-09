@@ -152,6 +152,19 @@ export function findCircuitoSeleccionado(
   return circuitosSeleccionados.get(viajeId)
 }
 
+/** VZ-29: quita la parada del día y renumera lo que queda, como el backend. */
+export function removeCircuitoItem(viajeId: number, itemId: number): boolean {
+  const circuito = circuitosSeleccionados.get(viajeId)
+  if (circuito === undefined) return false
+  for (const dia of circuito.dias) {
+    const index = dia.items.findIndex((item) => item.itemId === itemId)
+    if (index === -1) continue
+    dia.items.splice(index, 1)
+    return true
+  }
+  return false
+}
+
 export function createCircuito(viajeId: number): GeneracionCircuitoResponse {
   const created = structuredClone(CIRCUITO)
   circuitos.set(viajeId, created)

@@ -1,12 +1,26 @@
-import { ArrowLeftIcon, CalendarDaysIcon, ClockIcon, MapPinIcon } from 'lucide-react'
+import { ArrowLeftIcon, CalendarDaysIcon, ClockIcon, MapPinIcon, Trash2Icon } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
-import { useCircuitoSeleccionado, useGenerarCircuito } from '@/api/circuitos'
+import {
+  useCircuitoSeleccionado,
+  useEliminarParadaCircuito,
+  useGenerarCircuito,
+} from '@/api/circuitos'
 import { CategoriaBadge } from '@/components/categoria-badge'
 import { PlanificadorRegenerateModal } from '@/components/planificador/planificador-regenerate-modal'
 import { ErrorState } from '@/components/query-state'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDateRange, formatLocalDate, formatTimeRange } from '@/lib/dates'
@@ -69,7 +83,9 @@ export function CircuitoPage() {
   const viajeId = parseId(rawId)
   const query = useCircuitoSeleccionado(viajeId)
   const regenerar = useGenerarCircuito()
+  const eliminar = useEliminarParadaCircuito()
   const [isRegenerateModalOpen, setIsRegenerateModalOpen] = useState(false)
+  const [itemToDelete, setItemToDelete] = useState<AlternativaItemResponse | null>(null)
 
   if (viajeId === null) return <IdInvalido />
 
@@ -100,6 +116,22 @@ export function CircuitoPage() {
       (error: unknown) => {
         toast.error(
           error instanceof Error ? error.message : 'No pudimos regenerar el circuito',
+        )
+      },
+    )
+  }
+
+  const handleDelete = () => {
+    const target = itemToDelete
+    if (target === null) return
+    eliminar.mutateAsync({ viajeId, itemId: target.itemId }).then(
+      () => {
+        setItemToDelete(null)
+        toast.success('Parada eliminada correctamente')
+      },
+      (error: unknown) => {
+        toast.error(
+          error instanceof Error ? error.message : 'No pudimos eliminar la parada',
         )
       },
     )
@@ -204,6 +236,16 @@ export function CircuitoPage() {
                           {locationLabel(item)}
                         </p>
                       </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => setItemToDelete(item)}
+                        aria-label={`Eliminar ${item.propuestaNombre}`}
+                        className="ml-auto shrink-0 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                      >
+                        <Trash2Icon aria-hidden />
+                      </Button>
                     </li>
                   ))}
                 </ol>
@@ -212,6 +254,35 @@ export function CircuitoPage() {
           ))}
         </section>
       )}
+
+      <AlertDialog
+        open={itemToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setItemToDelete(null)
+        }}
+      >
+        <AlertDialogContent className="max-w-lg rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-heading text-lg font-bold">
+              Eliminar parada
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Querés eliminar “{itemToDelete?.propuestaNombre}” del circuito? Se
+              recalcularán los traslados y las métricas del recorrido.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={eliminar.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={eliminar.isPending}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <PlanificadorRegenerateModal
         isOpen={isRegenerateModalOpen}

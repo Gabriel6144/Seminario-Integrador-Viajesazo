@@ -2,7 +2,9 @@ package com.viajesazo.turismo_backend.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -190,6 +192,44 @@ class CircuitoControllerTest {
                 "El circuito del viaje todavía no tiene una alternativa seleccionada"));
 
         mockMvc.perform(get("/api/viajes/7/circuito/seleccionado"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("VZ-29: elimina una parada confirmada y devuelve el circuito actualizado")
+    void deletesSelectedItemWhenConfirmed() throws Exception {
+        when(circuitoService.deleteSelectedItem(7L, 15L, true)).thenReturn(selectedCircuitResponse());
+
+        mockMvc.perform(delete("/api/viajes/7/circuito/seleccionado/items/15")
+                .param("confirmar", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dias[0].items[0].itemId").value(15))
+                .andExpect(jsonPath("$.dias[1].items").isEmpty());
+
+        verify(circuitoService).deleteSelectedItem(7L, 15L, true);
+    }
+
+    @Test
+    @DisplayName("VZ-29: eliminar sin confirmar responde 409 y conserva la parada")
+    void requiresConfirmationToDeleteItem() throws Exception {
+        when(circuitoService.deleteSelectedItem(7L, 15L, false)).thenThrow(
+                new ConfirmationRequiredException(
+                        "la eliminación de la parada requiere confirmación; confirmá con confirmar=true"));
+
+        mockMvc.perform(delete("/api/viajes/7/circuito/seleccionado/items/15"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message")
+                        .value(org.hamcrest.Matchers.containsString("confirmar=true")));
+    }
+
+    @Test
+    @DisplayName("VZ-29: eliminar una parada inexistente devuelve 404")
+    void returns404WhenItemMissing() throws Exception {
+        when(circuitoService.deleteSelectedItem(7L, 404L, true)).thenThrow(new ResourceNotFoundException(
+                "No existe la parada con id 404 en el circuito seleccionado"));
+
+        mockMvc.perform(delete("/api/viajes/7/circuito/seleccionado/items/404")
+                .param("confirmar", "true"))
                 .andExpect(status().isNotFound());
     }
 

@@ -2,6 +2,7 @@ package com.viajesazo.turismo_backend.controller;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -42,6 +43,13 @@ public class CircuitoController {
     @GetMapping("/seleccionado")
     public CircuitoSeleccionadoResponse selected(@PathVariable Long viajeId) {
         return circuitoService.selectedDetail(viajeId);
+    }
+
+    @DeleteMapping("/seleccionado/items/{itemId}")
+    public CircuitoSeleccionadoResponse deleteSelectedItem(@PathVariable Long viajeId,
+            @PathVariable Long itemId,
+            @RequestParam(defaultValue = "false") boolean confirmar) {
+        return circuitoService.deleteSelectedItem(viajeId, itemId, confirmar);
     }
 
     @PostMapping("/seleccion")

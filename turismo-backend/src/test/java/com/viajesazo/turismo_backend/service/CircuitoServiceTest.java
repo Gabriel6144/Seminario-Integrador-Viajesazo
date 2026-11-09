@@ -28,6 +28,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 
 import com.viajesazo.turismo_backend.circuit.CircuitGenerator;
 import com.viajesazo.turismo_backend.circuit.HaversineDistanceProvider;
+import com.viajesazo.turismo_backend.circuit.TravelEstimate;
 import com.viajesazo.turismo_backend.dto.response.GeneracionCircuitoResponse;
 import com.viajesazo.turismo_backend.exception.CircuitoDataMissingException;
 import com.viajesazo.turismo_backend.exception.ConfirmationRequiredException;
@@ -371,6 +372,122 @@ class CircuitoServiceTest {
         assertThatThrownBy(() -> service.selectedDetail(7L))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("No existe el viaje");
+    }
+
+    @Test
+    void deletesAnItemResequencesAndRecalculatesTransfersAndMetrics() {
+        Viaje trip = validTrip();
+        Circuito circuito = selectedCircuit(trip);
+        CircuitoAlternativa alternative = circuito.getAlternativas().get(0);
+        CircuitoItem first = locatedItem(1L, LocalTime.of(9, 0), LocalTime.of(10, 0), 1,
+                -31.40, -64.20, InteresCategoria.CULTURA);
+        CircuitoItem removed = locatedItem(2L, LocalTime.of(10, 30), LocalTime.of(11, 30), 2,
+                -31.41, -64.21, InteresCategoria.GASTRONOMIA);
+        CircuitoItem third = locatedItem(3L, LocalTime.of(13, 0), LocalTime.of(14, 0), 3,
+                -31.42, -64.22, InteresCategoria.HISTORIA);
+        applyTransfer(first, removed);
+        applyTransfer(removed, third);
+        alternative.addItem(first);
+        alternative.addItem(removed);
+        alternative.addItem(third);
+        alternative.setDistanciaTotalKm(first.getTrasladoKm() + removed.getTrasladoKm() + third.getTrasladoKm());
+        when(viajeRepository.findByIdAndEstadoNotIn(any(), any())).thenReturn(Optional.of(trip));
+        when(circuitoRepository.findByViajeId(7L)).thenReturn(Optional.of(circuito));
+
+        var response = service.deleteSelectedItem(7L, 2L, true);
+
+        assertThat(alternative.getItems()).extracting(CircuitoItem::getId).containsExactly(1L, 3L);
+        assertThat(alternative.getItems()).extracting(CircuitoItem::getOrden).containsExactly(1, 2);
+        TravelEstimate firstToThird = estimate(first, third);
+        assertThat(third.getTrasladoKm()).isEqualTo(firstToThird.distanceKm());
+        assertThat(third.getTrasladoMinutos()).isEqualTo(firstToThird.durationMinutes());
+        assertThat(alternative.getDistanciaTotalKm()).isEqualTo(firstToThird.distanceKm());
+        assertThat(alternative.getAfinidadIntereses()).isEqualTo(0.5);
+        assertThat(alternative.getCategoriasCubiertas())
+                .containsExactly(InteresCategoria.CULTURA, InteresCategoria.HISTORIA);
+        assertThat(response.dias()).hasSize(1);
+        assertThat(response.dias().get(0).items()).extracting(
+                com.viajesazo.turismo_backend.dto.response.AlternativaItemResponse::itemId)
+                .containsExactly(1L, 3L);
+        verify(circuitoRepository).save(circuito);
+    }
+
+    @Test
+    void keepsTheCircuitAndReturnsAnEmptyDayAfterDeletingTheOnlyItem() {
+        Viaje trip = validTrip();
+        Circuito circuito = selectedCircuit(trip);
+        CircuitoAlternativa alternative = circuito.getAlternativas().get(0);
+        alternative.addItem(locatedItem(1L, LocalTime.of(9, 0), LocalTime.of(10, 0), 1,
+                -31.40, -64.20, InteresCategoria.CULTURA));
+        when(viajeRepository.findByIdAndEstadoNotIn(any(), any())).thenReturn(Optional.of(trip));
+        when(circuitoRepository.findByViajeId(7L)).thenReturn(Optional.of(circuito));
+
+        var response = service.deleteSelectedItem(7L, 1L, true);
+
+        assertThat(alternative.getItems()).isEmpty();
+        assertThat(alternative.getDistanciaTotalKm()).isZero();
+        assertThat(alternative.getAfinidadIntereses()).isZero();
+        assertThat(alternative.getCategoriasCubiertas()).isEmpty();
+        assertThat(response.dias()).hasSize(1);
+        assertThat(response.dias().get(0).items()).isEmpty();
+    }
+
+    @Test
+    void requiresConfirmationAndKeepsTheItem() {
+        Viaje trip = validTrip();
+        Circuito circuito = selectedCircuit(trip);
+        CircuitoAlternativa alternative = circuito.getAlternativas().get(0);
+        alternative.addItem(locatedItem(1L, LocalTime.of(9, 0), LocalTime.of(10, 0), 1,
+                -31.40, -64.20, InteresCategoria.CULTURA));
+        when(viajeRepository.findByIdAndEstadoNotIn(any(), any())).thenReturn(Optional.of(trip));
+        when(circuitoRepository.findByViajeId(7L)).thenReturn(Optional.of(circuito));
+
+        assertThatThrownBy(() -> service.deleteSelectedItem(7L, 1L, false))
+                .isInstanceOf(ConfirmationRequiredException.class)
+                .hasMessageContaining("confirmar=true");
+        assertThat(alternative.getItems()).hasSize(1);
+        verify(circuitoRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectsAnItemThatIsNotInTheSelectedAlternative() {
+        Viaje trip = validTrip();
+        Circuito circuito = selectedCircuit(trip);
+        CircuitoAlternativa other = new CircuitoAlternativa();
+        other.setEstrategia(CircuitStrategy.CERCANIA);
+        other.addItem(locatedItem(99L, LocalTime.of(9, 0), LocalTime.of(10, 0), 1,
+                -31.40, -64.20, InteresCategoria.CULTURA));
+        circuito.addAlternativa(other);
+        when(viajeRepository.findByIdAndEstadoNotIn(any(), any())).thenReturn(Optional.of(trip));
+        when(circuitoRepository.findByViajeId(7L)).thenReturn(Optional.of(circuito));
+
+        assertThatThrownBy(() -> service.deleteSelectedItem(7L, 99L, true))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("No existe la parada");
+        verify(circuitoRepository, never()).save(any());
+    }
+
+    private CircuitoItem locatedItem(Long id, LocalTime start, LocalTime end, int order,
+            double latitude, double longitude, InteresCategoria categoria) {
+        CircuitoItem item = selectedItem(id, ITEM_DATE, start, end, order);
+        item.setCategoria(categoria);
+        item.setLatitud(BigDecimal.valueOf(latitude));
+        item.setLongitud(BigDecimal.valueOf(longitude));
+        item.setTrasladoKm(0);
+        item.setTrasladoMinutos(0);
+        return item;
+    }
+
+    private void applyTransfer(CircuitoItem from, CircuitoItem to) {
+        TravelEstimate estimate = estimate(from, to);
+        to.setTrasladoKm(estimate.distanceKm());
+        to.setTrasladoMinutos(estimate.durationMinutes());
+    }
+
+    private TravelEstimate estimate(CircuitoItem from, CircuitoItem to) {
+        return new HaversineDistanceProvider().estimate(
+                from.getLatitud().doubleValue(), from.getLongitud().doubleValue(),
+                to.getLatitud().doubleValue(), to.getLongitud().doubleValue());
     }
 
     private CircuitoService realService() {

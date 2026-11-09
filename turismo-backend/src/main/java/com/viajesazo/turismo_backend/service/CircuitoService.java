@@ -24,6 +24,7 @@ import com.viajesazo.turismo_backend.circuit.CircuitGenerator;
 import com.viajesazo.turismo_backend.circuit.GeneratedAlternative;
 import com.viajesazo.turismo_backend.circuit.DistanceProvider;
 import com.viajesazo.turismo_backend.circuit.ScheduledProposal;
+import com.viajesazo.turismo_backend.circuit.TravelEstimate;
 import com.viajesazo.turismo_backend.dto.request.SeleccionCircuitoRequest;
 import com.viajesazo.turismo_backend.dto.response.AlternativaItemResponse;
 import com.viajesazo.turismo_backend.dto.response.CircuitoAlternativaResponse;
@@ -169,19 +170,36 @@ public class CircuitoService {
     @Transactional(readOnly = true)
     public CircuitoSeleccionadoResponse selectedDetail(Long viajeId) {
         findTrip(viajeId);
-        Circuito circuito = circuitoRepository.findByViajeId(viajeId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "El viaje todavía no tiene un circuito generado"));
-        if (circuito.getEstrategiaSeleccionada() == null) {
-            throw new ResourceNotFoundException(
-                    "El circuito del viaje todavía no tiene una alternativa seleccionada");
-        }
-        CircuitoAlternativa alternative = circuito.getAlternativas().stream()
-                .filter(item -> item.getEstrategia() == circuito.getEstrategiaSeleccionada())
+        return selectedResponse(findCircuit(viajeId), viajeId);
+    }
+
+    @Transactional
+    public CircuitoSeleccionadoResponse deleteSelectedItem(Long viajeId, Long itemId, boolean confirmar) {
+        findTrip(viajeId);
+        Circuito circuito = findCircuit(viajeId);
+        CircuitoAlternativa alternative = selectedAlternative(circuito);
+        CircuitoItem item = alternative.getItems().stream()
+                .filter(candidate -> itemId.equals(candidate.getId()))
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "La alternativa seleccionada ya no existe en el circuito"));
+                        "No existe la parada con id " + itemId + " en el circuito seleccionado"));
+        if (!confirmar) {
+            throw new ConfirmationRequiredException(
+                    "la eliminación de la parada requiere confirmación; confirmá con confirmar=true");
+        }
 
+        LocalDate date = item.getFecha();
+        int removedIndex = sortedDayItems(alternative, date).indexOf(item);
+        alternative.getItems().remove(item);
+        renumberDay(alternative, date);
+        recalculateTransferAfterRemoval(alternative, date, removedIndex);
+        recalculateMetrics(circuito, alternative);
+        circuitoRepository.save(circuito);
+        return selectedResponse(circuito, viajeId);
+    }
+
+    private CircuitoSeleccionadoResponse selectedResponse(Circuito circuito, Long viajeId) {
+        CircuitoAlternativa alternative = selectedAlternative(circuito);
         LocalDate start = selectedStart(circuito, alternative);
         LocalDate end = selectedEnd(circuito, alternative);
         List<String> motivos = staleReasons(circuito);
@@ -189,6 +207,18 @@ public class CircuitoService {
                 circuito.getId(), viajeId, circuito.getGeneradoEn(), circuito.getEstrategiaSeleccionada(),
                 !motivos.isEmpty(), motivos, circuito.isDistanciasEstimadas(), circuito.getAdvertencia(),
                 selectedDays(alternative, start, end));
+    }
+
+    private CircuitoAlternativa selectedAlternative(Circuito circuito) {
+        if (circuito.getEstrategiaSeleccionada() == null) {
+            throw new ResourceNotFoundException(
+                    "El circuito del viaje todavía no tiene una alternativa seleccionada");
+        }
+        return circuito.getAlternativas().stream()
+                .filter(item -> item.getEstrategia() == circuito.getEstrategiaSeleccionada())
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "La alternativa seleccionada ya no existe en el circuito"));
     }
 
     private LocalDate selectedStart(Circuito circuito, CircuitoAlternativa alternative) {
@@ -231,10 +261,7 @@ public class CircuitoService {
     private DiaCircuitoResponse selectedDay(LocalDate date, List<CircuitoItem> items) {
         List<AlternativaItemResponse> responses = items == null ? List.of()
                 : items.stream()
-                        .sorted(Comparator
-                                .comparing(CircuitoItem::getHoraInicio,
-                                        Comparator.nullsLast(Comparator.naturalOrder()))
-                                .thenComparingInt(CircuitoItem::getOrden))
+                        .sorted(itemOrder())
                         .map(item -> new AlternativaItemResponse(item.getId(), item.getPropuestaId(),
                                 item.getPropuestaNombre(), item.getTipo(), item.getCategoria(), item.getCiudad(),
                                 item.getLocalidad(), item.getDireccion(), item.getHoraInicio(), item.getHoraFin(),
@@ -243,6 +270,74 @@ public class CircuitoService {
                                         : durationMinutes(item.getHoraInicio(), item.getHoraFin())))
                         .toList();
         return new DiaCircuitoResponse(date, responses);
+    }
+
+    private Comparator<CircuitoItem> itemOrder() {
+        return Comparator
+                .<CircuitoItem, LocalTime>comparing(CircuitoItem::getHoraInicio,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparingInt(CircuitoItem::getOrden);
+    }
+
+    private List<CircuitoItem> sortedDayItems(CircuitoAlternativa alternative, LocalDate date) {
+        return alternative.getItems().stream()
+                .filter(item -> date.equals(item.getFecha()))
+                .sorted(itemOrder())
+                .toList();
+    }
+
+    private void renumberDay(CircuitoAlternativa alternative, LocalDate date) {
+        List<CircuitoItem> items = sortedDayItems(alternative, date);
+        for (int index = 0; index < items.size(); index++) {
+            items.get(index).setOrden(index + 1);
+        }
+    }
+
+    private void recalculateTransferAfterRemoval(CircuitoAlternativa alternative, LocalDate date, int removedIndex) {
+        List<CircuitoItem> items = sortedDayItems(alternative, date);
+        if (removedIndex < 0 || removedIndex >= items.size()) {
+            return;
+        }
+        CircuitoItem next = items.get(removedIndex);
+        if (removedIndex == 0) {
+            next.setTrasladoKm(0);
+            next.setTrasladoMinutos(0);
+            return;
+        }
+        CircuitoItem previous = items.get(removedIndex - 1);
+        if (!hasCoordinates(previous) || !hasCoordinates(next)) {
+            next.setTrasladoKm(0);
+            next.setTrasladoMinutos(0);
+            return;
+        }
+        TravelEstimate transfer = distanceProvider.estimate(
+                previous.getLatitud().doubleValue(), previous.getLongitud().doubleValue(),
+                next.getLatitud().doubleValue(), next.getLongitud().doubleValue());
+        next.setTrasladoKm(transfer.distanceKm());
+        next.setTrasladoMinutos(transfer.durationMinutes());
+    }
+
+    private boolean hasCoordinates(CircuitoItem item) {
+        return item.getLatitud() != null && item.getLongitud() != null;
+    }
+
+    private void recalculateMetrics(Circuito circuito, CircuitoAlternativa alternative) {
+        List<CircuitoItem> items = alternative.getItems();
+        alternative.setDistanciaTotalKm(items.stream().mapToDouble(CircuitoItem::getTrasladoKm).sum());
+
+        Set<InteresCategoria> interests = new LinkedHashSet<>(circuito.getInteresesCategoriaSnapshot() == null
+                ? List.of() : circuito.getInteresesCategoriaSnapshot());
+        long matching = items.stream()
+                .filter(item -> item.getCategoria() != null && interests.contains(item.getCategoria()))
+                .count();
+        alternative.setAfinidadIntereses(items.isEmpty() ? 0 : (double) matching / items.size());
+
+        List<InteresCategoria> categories = items.stream()
+                .map(CircuitoItem::getCategoria)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        alternative.setCategoriasCubiertas(new ArrayList<>(categories));
     }
 
     private Viaje findTrip(Long id) {

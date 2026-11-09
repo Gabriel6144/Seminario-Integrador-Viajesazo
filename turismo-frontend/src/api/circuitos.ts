@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { queryKeys } from '@/api/queries'
-import { apiGet, apiPost } from '@/lib/http'
+import { apiDelete, apiGet, apiPost } from '@/lib/http'
 import type {
   CircuitoSeleccionadoResponse,
   GeneracionCircuitoResponse,
@@ -69,6 +69,26 @@ export function useCircuitoSeleccionado(viajeId: number | null) {
     queryKey: queryKeys.circuitoSeleccionado(viajeId ?? 0),
     queryFn: ({ signal }) => fetchCircuitoSeleccionado(viajeId ?? 0, signal),
     enabled: viajeId !== null,
+  })
+}
+
+/**
+ * VZ-29: elimina una parada del circuito seleccionado. El backend exige `confirmar=true` y
+ * devuelve el circuito actualizado, que se escribe en la caché para que la página no parpadee.
+ */
+export function useEliminarParadaCircuito() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ viajeId, itemId }: { viajeId: number; itemId: number }) =>
+      apiDelete<CircuitoSeleccionadoResponse>(
+        `/api/viajes/${viajeId}/circuito/seleccionado/items/${itemId}?confirmar=true`,
+      ),
+    onSuccess: (data, { viajeId }) => {
+      queryClient.setQueryData(queryKeys.circuitoSeleccionado(viajeId), data)
+      void queryClient.invalidateQueries({ queryKey: queryKeys.circuito(viajeId) })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.viajesAll() })
+    },
   })
 }
 

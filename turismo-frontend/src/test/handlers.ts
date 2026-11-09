@@ -19,6 +19,7 @@ import {
   findEvento,
   findPublicador,
   findPublicadorByEmail,
+  removeCircuitoItem,
   selectCircuito,
   updateBorrador,
   updateEvento,
@@ -246,6 +247,42 @@ export const handlers = [
         { status: 404 },
       )
     }
+    return HttpResponse.json(circuito)
+  }),
+
+  http.delete('/api/viajes/:id/circuito/seleccionado/items/:itemId', ({ params, request }) => {
+    const viaje = findBorrador(Number(params.id))
+    if (viaje === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el viaje con id ${String(params.id)}`), {
+        status: 404,
+      })
+    }
+    const circuito = findCircuitoSeleccionado(viaje.id)
+    if (circuito === undefined) {
+      return HttpResponse.json(
+        errorBody(404, 'El circuito del viaje todavía no tiene una alternativa seleccionada'),
+        { status: 404 },
+      )
+    }
+    const itemId = Number(params.itemId)
+    const exists = circuito.dias.some((dia) => dia.items.some((item) => item.itemId === itemId))
+    if (!exists) {
+      return HttpResponse.json(
+        errorBody(404, `No existe la parada con id ${String(params.itemId)} en el circuito seleccionado`),
+        { status: 404 },
+      )
+    }
+    const confirmar = new URL(request.url).searchParams.get('confirmar') === 'true'
+    if (!confirmar) {
+      return HttpResponse.json(
+        errorBody(
+          409,
+          'la eliminación de la parada requiere confirmación; confirmá con confirmar=true',
+        ),
+        { status: 409 },
+      )
+    }
+    removeCircuitoItem(viaje.id, itemId)
     return HttpResponse.json(circuito)
   }),
 

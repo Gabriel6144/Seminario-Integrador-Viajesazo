@@ -83,11 +83,13 @@ export function apiPut<TResponse, TRequest>(
 }
 
 /**
- * Baja. El backend responde **204 sin cuerpo**, así que no se espera ningún valor: el
- * `null` de la firma está explícito para que no se intente leer nada de la respuesta.
+ * Baja. Por defecto el backend responde **204 sin cuerpo**, así que no se espera ningún valor: el
+ * `null` de la firma está explícito para que no se intente leer nada de la respuesta. Algunas
+ * bajas sí devuelven el recurso actualizado (por ejemplo, eliminar una parada del circuito), y
+ * para esos casos se pasa el tipo de respuesta.
  */
-export function apiDelete(path: string, signal?: AbortSignal): Promise<null> {
-  return write<null>('DELETE', path, undefined, signal)
+export function apiDelete<TResponse = null>(path: string, signal?: AbortSignal): Promise<TResponse> {
+  return write<TResponse>('DELETE', path, undefined, signal)
 }
 
 /**

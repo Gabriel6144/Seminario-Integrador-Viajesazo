@@ -50,6 +50,50 @@ describe('CircuitoPage', () => {
     })
   })
 
+  it('elimina una parada después de confirmar y actualiza el día', async () => {
+    const usuario = user()
+    renderRoute({
+      route: '/viajes/:id/circuito',
+      initialEntry: '/viajes/2/circuito',
+      children: <CircuitoPage />,
+    })
+
+    await screen.findByText('Festival de Doma y Folklore de Jesús María')
+    await usuario.click(
+      screen.getByRole('button', { name: /eliminar festival de doma y folklore/i }),
+    )
+
+    expect(screen.getByText(/Se recalcularán los traslados/i)).toBeInTheDocument()
+    await usuario.click(screen.getByRole('button', { name: 'Eliminar' }))
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText('Festival de Doma y Folklore de Jesús María'),
+      ).not.toBeInTheDocument()
+    })
+    expect(screen.getAllByText('Sin actividades programadas.')).toHaveLength(2)
+  })
+
+  it('conserva la parada si se cancela la eliminación', async () => {
+    const usuario = user()
+    renderRoute({
+      route: '/viajes/:id/circuito',
+      initialEntry: '/viajes/2/circuito',
+      children: <CircuitoPage />,
+    })
+
+    await screen.findByText('Festival de Doma y Folklore de Jesús María')
+    await usuario.click(
+      screen.getByRole('button', { name: /eliminar festival de doma y folklore/i }),
+    )
+    await usuario.click(screen.getByRole('button', { name: /cancelar/i }))
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Se recalcularán los traslados/i)).not.toBeInTheDocument()
+    })
+    expect(screen.getByText('Festival de Doma y Folklore de Jesús María')).toBeInTheDocument()
+  })
+
   it('muestra un error cuando el viaje no tiene circuito seleccionado', async () => {
     renderRoute({
       route: '/viajes/:id/circuito',
