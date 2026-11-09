@@ -27,7 +27,8 @@ Haversine y una velocidad media fija de 30 km/h; la respuesta informa
 - El ritmo limita a 2, 3 o 4 propuestas por día (`TRANQUILO`, `EQUILIBRADO`, `INTENSIVO`).
 - Cada propuesta aparece como máximo una vez por alternativa, sin solapamientos y respetando el
   tiempo estimado de traslado.
-- Si no hay propuestas compatibles se devuelve una alternativa vacía con advertencia, no un error.
+- Si no hay propuestas compatibles la generación responde `422` con `datosFaltantes` explicando qué
+  falta para poder armar el circuito.
 - Las tres alternativas se guardan como instantánea de generación para permitir que el turista
   compare y seleccione una. Solo la alternativa seleccionada se expone dentro de la consulta
   normal del viaje (`GET /api/viajes/{id}`), en el campo `circuito`.
@@ -37,9 +38,11 @@ Haversine y una velocidad media fija de 30 km/h; la respuesta informa
 { "estrategia": "INTERESES" }
 ```
 
-- Una vez generado no se permite regenerar. Si una propuesta incluida se da de baja, el ítem se
-  conserva y se marca `disponible=false`; no se reubican los demás ítems. Si se edita el viaje,
-  la instantánea se conserva sin recalcular.
+- Regenerar sin `?reemplazar=true` responde `409`; con el flag reemplaza las alternativas y
+  conserva la estrategia seleccionada si sigue existiendo. Si una propuesta incluida se da de baja,
+  el ítem se conserva y se marca `disponible=false`; no se reubican los demás ítems. Si se edita el
+  viaje, la instantánea se conserva sin recalcular y se informa en `desactualizado` +
+  `motivosDesactualizacion`.
 
 ## Consulta
 
@@ -50,6 +53,22 @@ visual y de ubicación: `imagenes`, `ciudad`, `localidad`, `direccion`, `lugarRe
 `longitud`, `tipoAcceso`, `montoEstimado`, `descripcionArancel`, `sitioOficial` y
 `duracionMinutos`. `GET /api/viajes/{id}` devuelve además la alternativa seleccionada, sin
 regenerarla.
+
+`GET /api/viajes/{id}/circuito/seleccionado` devuelve solo la alternativa elegida, agrupada en
+`dias[]` (incluye días vacíos) y con `itemId`/`propuestaId` por parada. Responde `404` si no
+existe el viaje, el circuito o la selección. La respuesta informa `desactualizado` y
+`motivosDesactualizacion` comparando la instantánea contra el viaje; las coordenadas se comparan
+por valor (`compareTo`), no por escala de `BigDecimal`.
+
+| Método | Ruta | Resultado |
+| --- | --- | --- |
+| GET | `/seleccionado/items/{itemId}/alternativas` | `200` con reemplazos compatibles o `alternativas: []` + `mensaje` |
+| PUT | `/seleccionado/items/{itemId}` | `200` con el circuito actualizado; body `{ "propuestaId": 123 }`; `422` si no encaja |
+| DELETE | `/seleccionado/items/{itemId}?confirmar=true` | `200` con el circuito actualizado; `409` sin confirmar; `404` si no pertenece a la selección |
+
+Eliminar es físico, renumera `orden` por día y recalcula el traslado siguiente y las métricas.
+Reemplazar revalida bloque, solapamiento, intereses, radio y traslados; si falla, responde `422` y
+deja la parada intacta. Un día vacío se sigue devolviendo.
 
 `GET /api/viajes?usuario=` es el listado que alimenta “Mis viajes”: devuelve tanto borradores
 como viajes confirmados; el frontend usa `estado !== 'BORRADOR'` para distinguir un circuito ya
@@ -87,8 +106,10 @@ sola alternativa y guardar el viaje en “Mis viajes”.
 El adaptador `circuito-view-model.ts` transforma la respuesta de la API en el modelo de la UI:
 agrupa los ítems por `fecha`, arma los días y `stopsByDay`, calcula la duración de cada día y
 resuelve la imagen o el placeholder. El detalle, el mapa general y el mapa de cada parada consumen
-ese modelo; ya no hay circuitos, paradas ni alternativas hardcodeadas en `constants.ts`. Las
-acciones de sustituir y eliminar paradas quedan deshabilitadas con “Próximamente” hasta VZ-27.
+ese modelo; ya no hay circuitos, paradas ni alternativas hardcodeadas en `constants.ts`. En
+`/viajes/:id/circuito`, una vez seleccionada la alternativa, cada parada ofrece **Sustituir** y
+**Eliminar**; el planificador inicial mantiene esas acciones deshabilitadas porque su vista no
+persiste `itemId`.
 
 “Mis viajes” (`/borradores`) usa `GET /api/viajes?usuario=` y muestra juntos borradores y viajes
 confirmados. Los confirmados no ofrecen descartar ni “continuar planificando”; las tarjetas de

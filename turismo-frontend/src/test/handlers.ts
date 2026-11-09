@@ -1,6 +1,12 @@
 import { http, HttpResponse } from 'msw'
 
-import { errorBody, NOMINATIM_REVERSE, NOMINATIM_SEARCH, page } from './fixtures'
+import {
+  ALTERNATIVAS_REEMPLAZO,
+  errorBody,
+  NOMINATIM_REVERSE,
+  NOMINATIM_SEARCH,
+  page,
+} from './fixtures'
 import {
   allBorradores,
   allEventos,
@@ -15,9 +21,13 @@ import {
   deleteEvento,
   findBorrador,
   findCircuito,
+  findCircuitoItem,
+  findCircuitoSeleccionado,
   findEvento,
   findPublicador,
   findPublicadorByEmail,
+  removeCircuitoItem,
+  replaceCircuitoItem,
   selectCircuito,
   updateBorrador,
   updateEvento,
@@ -231,6 +241,134 @@ export const handlers = [
     return HttpResponse.json(createViaje(body as ViajeRequest), { status: 201 })
   }),
 
+  http.get('/api/viajes/:id/circuito/seleccionado', ({ params }) => {
+    const viaje = findBorrador(Number(params.id))
+    if (viaje === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el viaje con id ${String(params.id)}`), {
+        status: 404,
+      })
+    }
+    const circuito = findCircuitoSeleccionado(viaje.id)
+    if (circuito === undefined) {
+      return HttpResponse.json(
+        errorBody(404, 'El circuito del viaje todavía no tiene una alternativa seleccionada'),
+        { status: 404 },
+      )
+    }
+    return HttpResponse.json(circuito)
+  }),
+
+  http.delete('/api/viajes/:id/circuito/seleccionado/items/:itemId', ({ params, request }) => {
+    const viaje = findBorrador(Number(params.id))
+    if (viaje === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el viaje con id ${String(params.id)}`), {
+        status: 404,
+      })
+    }
+    const circuito = findCircuitoSeleccionado(viaje.id)
+    if (circuito === undefined) {
+      return HttpResponse.json(
+        errorBody(404, 'El circuito del viaje todavía no tiene una alternativa seleccionada'),
+        { status: 404 },
+      )
+    }
+    const itemId = Number(params.itemId)
+    const exists = circuito.dias.some((dia) => dia.items.some((item) => item.itemId === itemId))
+    if (!exists) {
+      return HttpResponse.json(
+        errorBody(404, `No existe la parada con id ${String(params.itemId)} en el circuito seleccionado`),
+        { status: 404 },
+      )
+    }
+    const confirmar = new URL(request.url).searchParams.get('confirmar') === 'true'
+    if (!confirmar) {
+      return HttpResponse.json(
+        errorBody(
+          409,
+          'la eliminación de la parada requiere confirmación; confirmá con confirmar=true',
+        ),
+        { status: 409 },
+      )
+    }
+    removeCircuitoItem(viaje.id, itemId)
+    return HttpResponse.json(circuito)
+  }),
+
+  http.get('/api/viajes/:id/circuito/seleccionado/items/:itemId/alternativas', ({ params }) => {
+    const viaje = findBorrador(Number(params.id))
+    if (viaje === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el viaje con id ${String(params.id)}`), {
+        status: 404,
+      })
+    }
+    const circuito = findCircuitoSeleccionado(viaje.id)
+    if (circuito === undefined) {
+      return HttpResponse.json(
+        errorBody(404, 'El circuito del viaje todavía no tiene una alternativa seleccionada'),
+        { status: 404 },
+      )
+    }
+    const itemId = Number(params.itemId)
+    const item = findCircuitoItem(viaje.id, itemId)
+    if (item === undefined) {
+      return HttpResponse.json(
+        errorBody(
+          404,
+          `No existe la parada con id ${String(params.itemId)} en el circuito seleccionado`,
+        ),
+        { status: 404 },
+      )
+    }
+    if (itemId === 101) return HttpResponse.json(ALTERNATIVAS_REEMPLAZO)
+    return HttpResponse.json({
+      alternativas: [],
+      mensaje: 'No hay propuestas disponibles para reemplazar esta parada.',
+    })
+  }),
+
+  http.put('/api/viajes/:id/circuito/seleccionado/items/:itemId', async ({ params, request }) => {
+    const viaje = findBorrador(Number(params.id))
+    if (viaje === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el viaje con id ${String(params.id)}`), {
+        status: 404,
+      })
+    }
+    const circuito = findCircuitoSeleccionado(viaje.id)
+    if (circuito === undefined) {
+      return HttpResponse.json(
+        errorBody(404, 'El circuito del viaje todavía no tiene una alternativa seleccionada'),
+        { status: 404 },
+      )
+    }
+    const item = findCircuitoItem(viaje.id, Number(params.itemId))
+    if (item === undefined) {
+      return HttpResponse.json(
+        errorBody(
+          404,
+          `No existe la parada con id ${String(params.itemId)} en el circuito seleccionado`,
+        ),
+        { status: 404 },
+      )
+    }
+    const body = await readJson<Partial<{ propuestaId: number }>>(request)
+    if (typeof body.propuestaId !== 'number') {
+      return HttpResponse.json(errorBody(400, 'La propuesta de reemplazo es obligatoria'), {
+        status: 400,
+      })
+    }
+    const alternativa = ALTERNATIVAS_REEMPLAZO.alternativas.find(
+      (candidate) => candidate.propuestaId === body.propuestaId,
+    )
+    if (alternativa === undefined) {
+      return HttpResponse.json(
+        errorBody(422, 'La propuesta elegida no puede reemplazar a esta parada'),
+        { status: 422 },
+      )
+    }
+    replaceCircuitoItem(viaje.id, item.itemId, alternativa)
+    return HttpResponse.json(circuito)
+  }),
+
   http.get('/api/viajes/:id/circuito', ({ params }) => {
     const viaje = findBorrador(Number(params.id))
     if (viaje === undefined) {
@@ -247,20 +385,27 @@ export const handlers = [
     return HttpResponse.json(circuito)
   }),
 
-  http.post('/api/viajes/:id/circuito', ({ params }) => {
+  http.post('/api/viajes/:id/circuito', ({ params, request }) => {
     const viaje = findBorrador(Number(params.id))
     if (viaje === undefined) {
       return HttpResponse.json(errorBody(404, `No existe el viaje con id ${String(params.id)}`), {
         status: 404,
       })
     }
-    if (findCircuito(viaje.id) !== undefined) {
+    const existente = findCircuito(viaje.id)
+    const reemplazar = new URL(request.url).searchParams.get('reemplazar') === 'true'
+    if (existente !== undefined && !reemplazar) {
       return HttpResponse.json(
-        errorBody(400, 'el circuito del viaje ya fue generado; no se permite regenerarlo'),
-        { status: 400 },
+        errorBody(
+          409,
+          'el circuito del viaje ya fue generado; confirmá con reemplazar=true para regenerarlo',
+        ),
+        { status: 409 },
       )
     }
-    return HttpResponse.json(createCircuito(viaje.id), { status: 201 })
+    return HttpResponse.json(createCircuito(viaje.id), {
+      status: existente === undefined ? 201 : 200,
+    })
   }),
 
   http.post('/api/viajes/:id/circuito/seleccion', async ({ params, request }) => {

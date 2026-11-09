@@ -143,7 +143,7 @@ function toStop(
       : undefined
 
   return {
-    id: `${item.propuestaId}-${item.fecha}-${item.orden}`,
+    id: String(item.itemId),
     number,
     time: start,
     title: item.propuestaNombre,

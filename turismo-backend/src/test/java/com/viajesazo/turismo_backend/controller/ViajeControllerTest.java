@@ -12,11 +12,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.List;
-import java.util.Set;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,19 +29,14 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.viajesazo.turismo_backend.config.AppConfig;
 import com.viajesazo.turismo_backend.dto.request.ViajeRequest;
-import com.viajesazo.turismo_backend.dto.response.CircuitoAlternativaResponse;
-import com.viajesazo.turismo_backend.dto.response.CircuitoItemResponse;
 import com.viajesazo.turismo_backend.dto.response.UbicacionResponse;
 import com.viajesazo.turismo_backend.dto.response.ViajeResponse;
-import com.viajesazo.turismo_backend.dto.response.GeneracionCircuitoResponse;
 import com.viajesazo.turismo_backend.exception.BusinessRuleException;
 import com.viajesazo.turismo_backend.exception.ResourceNotFoundException;
 import com.viajesazo.turismo_backend.model.EstadoViaje;
 import com.viajesazo.turismo_backend.model.InteresCategoria;
-import com.viajesazo.turismo_backend.model.TipoAcceso;
 import com.viajesazo.turismo_backend.model.TipoRitmo;
 import com.viajesazo.turismo_backend.service.ViajeService;
-import com.viajesazo.turismo_backend.service.CircuitoService;
 
 @WebMvcTest(ViajeController.class)
 // @WebMvcTest es un slice: sin el import, el Clock que usa GlobalExceptionHandler no existiría.
@@ -76,9 +68,6 @@ class ViajeControllerTest {
 
 	@MockitoBean
 	private ViajeService viajeService;
-
-	@MockitoBean
-	private CircuitoService circuitoService;
 
 	@Test
 	@DisplayName("VZ-19: registra el viaje y responde 201 con el viaje creado")
@@ -276,102 +265,6 @@ class ViajeControllerTest {
 	void rejectsNonNumericId() throws Exception {
 		mockMvc.perform(get("/api/viajes/abc"))
 				.andExpect(status().isBadRequest());
-	}
-
-	@Test
-	@DisplayName("genera el circuito y devuelve las alternativas")
-	void generatesCircuit() throws Exception {
-		when(circuitoService.generate(7L)).thenReturn(
-				new GeneracionCircuitoResponse(null, null, List.of(), true, "sin propuestas compatibles"));
-
-		mockMvc.perform(post("/api/viajes/7/circuito"))
-				.andExpect(status().isCreated())
-				.andExpect(jsonPath("$.distanciasEstimadas").value(true))
-				.andExpect(jsonPath("$.alternativas").isArray());
-	}
-
-	@Test
-	@DisplayName("consulta el circuito generado con el snapshot y la disponibilidad actual")
-	void findsCircuit() throws Exception {
-		when(circuitoService.find(7L)).thenReturn(circuitResponse());
-
-		mockMvc.perform(get("/api/viajes/7/circuito"))
-				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.alternativas[0].propuestas[0].descripcion").value("Descripción"))
-				.andExpect(jsonPath("$.alternativas[0].propuestas[0].categoria").value("CULTURA"))
-				.andExpect(jsonPath("$.alternativas[0].propuestas[0].disponible").value(false))
-				.andExpect(jsonPath("$.alternativas[0].propuestas[0].motivoNoDisponible")
-						.value("la propuesta está cancelada"))
-				.andExpect(jsonPath("$.alternativas[0].propuestas[0].imagenes[0]").value("https://imagen.test/evento.jpg"))
-				.andExpect(jsonPath("$.alternativas[0].propuestas[0].ciudad").value("Córdoba"))
-				.andExpect(jsonPath("$.alternativas[0].propuestas[0].localidad").value("Nueva Córdoba"))
-				.andExpect(jsonPath("$.alternativas[0].propuestas[0].direccion").value("Av. Hipólito Yrigoyen 325"))
-				.andExpect(jsonPath("$.alternativas[0].propuestas[0].lugarRecinto").value("Paseo del Buen Pastor"))
-				.andExpect(jsonPath("$.alternativas[0].propuestas[0].latitud").value(-31.4))
-				.andExpect(jsonPath("$.alternativas[0].propuestas[0].longitud").value(-64.2))
-				.andExpect(jsonPath("$.alternativas[0].propuestas[0].tipoAcceso").value("DE_PAGO"))
-				.andExpect(jsonPath("$.alternativas[0].propuestas[0].montoEstimado").value(1500.0))
-				.andExpect(jsonPath("$.alternativas[0].propuestas[0].descripcionArancel").value("Entrada general"))
-				.andExpect(jsonPath("$.alternativas[0].propuestas[0].sitioOficial").value("https://evento.test"))
-				.andExpect(jsonPath("$.alternativas[0].propuestas[0].duracionMinutos").value(60));
-	}
-
-	@Test
-	@DisplayName("consultar un circuito inexistente devuelve 404")
-	void returns404WhenCircuitMissing() throws Exception {
-		when(circuitoService.find(404L))
-				.thenThrow(new ResourceNotFoundException("El viaje todavía no tiene un circuito generado"));
-
-		mockMvc.perform(get("/api/viajes/404/circuito"))
-				.andExpect(status().isNotFound());
-	}
-
-	@Test
-	@DisplayName("regenerar un circuito existente devuelve 400")
-	void returns400WhenCircuitAlreadyGenerated() throws Exception {
-		when(circuitoService.generate(7L)).thenThrow(
-				new BusinessRuleException("el circuito del viaje ya fue generado; no se permite regenerarlo"));
-
-		mockMvc.perform(post("/api/viajes/7/circuito"))
-				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("ya fue generado")));
-	}
-
-	@Test
-	@DisplayName("una estrategia de selección inexistente se rechaza con 400")
-	void rejectsUnknownStrategy() throws Exception {
-		mockMvc.perform(post("/api/viajes/7/circuito/seleccion")
-				.contentType(MediaType.APPLICATION_JSON)
-				.content("{\"estrategia\":\"NO_EXISTE\"}"))
-				.andExpect(status().isBadRequest());
-	}
-
-	@Test
-	@DisplayName("selecciona una alternativa del circuito")
-	void selectsCircuitAlternative() throws Exception {
-		when(circuitoService.select(eq(7L), any())).thenReturn(
-				new GeneracionCircuitoResponse(null, com.viajesazo.turismo_backend.model.CircuitStrategy.INTERESES,
-						List.of(), true, null));
-
-		mockMvc.perform(post("/api/viajes/7/circuito/seleccion")
-				.contentType(MediaType.APPLICATION_JSON)
-				.content("{\"estrategia\":\"INTERESES\"}"))
-				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.estrategiaSeleccionada").value("INTERESES"));
-	}
-
-	private GeneracionCircuitoResponse circuitResponse() {
-		CircuitoItemResponse item = new CircuitoItemResponse(1L, "Evento", "Descripción", InteresCategoria.CULTURA,
-				com.viajesazo.turismo_backend.model.TipoRegistro.EVENTO, LocalDate.parse("2026-10-20"), 1,
-				LocalTime.of(10, 0), LocalTime.of(11, 0), 2.5, 5, false, "la propuesta está cancelada",
-				List.of("https://imagen.test/evento.jpg"), "Córdoba", "Nueva Córdoba",
-				"Av. Hipólito Yrigoyen 325", "Paseo del Buen Pastor", BigDecimal.valueOf(-31.4),
-				BigDecimal.valueOf(-64.2), TipoAcceso.DE_PAGO, BigDecimal.valueOf(1500),
-				"Entrada general", "https://evento.test", 60);
-		CircuitoAlternativaResponse alternative = new CircuitoAlternativaResponse(
-				com.viajesazo.turismo_backend.model.CircuitStrategy.CERCANIA, List.of(item), 2.5, 1.0,
-				Set.of(InteresCategoria.CULTURA), null);
-		return new GeneracionCircuitoResponse(null, null, List.of(alternative), false, null);
 	}
 
 	private ViajeResponse response() {

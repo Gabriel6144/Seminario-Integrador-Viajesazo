@@ -16,6 +16,36 @@ function isoDate(offsetDays: number): string {
   return date.toISOString().slice(0, 10)
 }
 
+type User = ReturnType<typeof userEvent.setup>
+
+async function reachCircuitStep(user: User): Promise<void> {
+  await user.click(screen.getByRole('button', { name: /empecemos/i }))
+  await user.click(screen.getByRole('button', { name: 'Aventura cordobesa' }))
+  await user.click(screen.getByRole('button', { name: /continuar/i }))
+
+  await user.type(screen.getByLabelText(/fecha de llegada/i), isoDate(30))
+  await user.type(screen.getByLabelText(/fecha de partida/i), isoDate(32))
+  await user.click(screen.getByRole('button', { name: /continuar/i }))
+
+  await user.click(
+    screen.getByRole('button', { name: /Villa Carlos Paz \(Valle de Punilla\)/i }),
+  )
+  await user.click(screen.getByRole('button', { name: /continuar/i }))
+
+  await user.click(screen.getByRole('button', { name: /continuar/i }))
+  await user.click(screen.getByRole('button', { name: /Cultura/i }))
+  await user.click(screen.getByRole('button', { name: /continuar/i }))
+
+  await user.click(screen.getByRole('button', { name: /EQUILIBRADO/i }))
+  await user.click(screen.getByRole('button', { name: /continuar/i }))
+
+  await user.click(screen.getByRole('button', { name: /generar opciones de circuitos/i }))
+  // La animación dura 4 pasos x 1100 ms; el circuito llega antes y la pantalla espera a las dos.
+  expect(
+    await screen.findByText('Circuitos Recomendados', {}, { timeout: 8000 }),
+  ).toBeInTheDocument()
+}
+
 describe('PlanificadorPage', () => {
   it('renderiza la bienvenida (paso 1) y avanza al paso 2 al clickear Empecemos', async () => {
     const user = userEvent.setup()
@@ -150,31 +180,8 @@ describe('PlanificadorPage', () => {
     const user = userEvent.setup()
     renderWithProviders(<PlanificadorPage />)
 
-    await user.click(screen.getByRole('button', { name: /empecemos/i }))
-    await user.click(screen.getByRole('button', { name: 'Aventura cordobesa' }))
-    await user.click(screen.getByRole('button', { name: /continuar/i }))
+    await reachCircuitStep(user)
 
-    await user.type(screen.getByLabelText(/fecha de llegada/i), isoDate(30))
-    await user.type(screen.getByLabelText(/fecha de partida/i), isoDate(32))
-    await user.click(screen.getByRole('button', { name: /continuar/i }))
-
-    await user.click(
-      screen.getByRole('button', { name: /Villa Carlos Paz \(Valle de Punilla\)/i }),
-    )
-    await user.click(screen.getByRole('button', { name: /continuar/i }))
-
-    await user.click(screen.getByRole('button', { name: /continuar/i }))
-    await user.click(screen.getByRole('button', { name: /Cultura/i }))
-    await user.click(screen.getByRole('button', { name: /continuar/i }))
-
-    await user.click(screen.getByRole('button', { name: /EQUILIBRADO/i }))
-    await user.click(screen.getByRole('button', { name: /continuar/i }))
-
-    await user.click(screen.getByRole('button', { name: /generar opciones de circuitos/i }))
-    // La animación dura 4 pasos x 1100 ms; el circuito llega antes y la pantalla espera a las dos.
-    expect(
-      await screen.findByText('Circuitos Recomendados', {}, { timeout: 8000 }),
-    ).toBeInTheDocument()
     expect(screen.getAllByText(/cerca de todo/i).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/según tus intereses/i).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/para descubrir/i).length).toBeGreaterThan(0)
@@ -190,5 +197,23 @@ describe('PlanificadorPage', () => {
       await screen.findByText(/circuito guardado con éxito/i),
     ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /ver en mis viajes/i })).toBeInTheDocument()
+  }, 15000)
+
+  it('regenera el circuito después de confirmar el reemplazo', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<PlanificadorPage />)
+
+    await reachCircuitStep(user)
+
+    await user.click(screen.getByRole('button', { name: /regenerar/i }))
+    expect(screen.getByText(/¿Regenerar el circuito\?/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /regenerar circuito/i }))
+
+    expect(
+      await screen.findByText(/circuito regenerado correctamente/i),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Circuitos Recomendados')).toBeInTheDocument()
+    expect(screen.queryByText(/¿Regenerar el circuito\?/i)).not.toBeInTheDocument()
   }, 15000)
 })
