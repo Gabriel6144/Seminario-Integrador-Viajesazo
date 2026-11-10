@@ -12,8 +12,8 @@ Tesis de facultad: API REST que centraliza la información turística de la prov
   en el mismo commit, y es lo normal: la API y el cliente se cambian juntos. El `.gitignore` de la
   raíz es el que manda.
 - Estado actual: Sprints 1–4 completos (eventos, viajes, agenda VZ-18, circuitos VZ-25, consulta
-  seleccionada VZ-26, eliminación de paradas VZ-29 y reemplazo de paradas VZ-28), con **258
-  tests: 256 en verde y 2 fallos preexistentes por fechas fijas ya vencidas (`ViajeMapperTest`,
+  seleccionada VZ-26, eliminación de paradas VZ-29 y reemplazo de paradas VZ-28), con **263
+  tests: 261 en verde y 2 fallos preexistentes por fechas fijas ya vencidas (`ViajeMapperTest`,
   `ViajeTest`)**. Incluye
   paginación, CRUD de eventos, alta de publicadores, CRUD de viajes con baja lógica, listado
   unificado de propuestas (eventos + actividades), **agenda filtrable por
@@ -138,12 +138,13 @@ Consecuencias que hay que tener presentes:
 
 ### Seed: `data.sql`
 
-`src/main/resources/data.sql` siembra 3 publicadores, 23 eventos (8 con imagen), 2 actividades,
-30 ubicaciones y 5 viajes. Como `ddl-auto=create-drop` borra todo en cada arranque, sin el script
-la app levanta vacía. Los eventos del seed traen `tipo_acceso`, `estado_propuesta` y
-`latitud`/`longitud` de ejemplo (ya calculadas, sin pasar por Nominatim en el arranque). El bloque
-VZ-25 agrega 15 eventos futuros (tres por zona, incluida una propuesta nocturna) con fechas
-relativas para que el demo de circuitos funcione cualquier día.
+`src/main/resources/data.sql` siembra 3 publicadores, 57 eventos (todos con imagen), 7 actividades
+(todas con imagen), 55 ubicaciones y 5 viajes. Como `ddl-auto=create-drop` borra todo en cada
+arranque, sin el script la app levanta vacía. Los eventos del seed traen `tipo_acceso`,
+`estado_propuesta` y `latitud`/`longitud` de ejemplo (ya calculadas, sin pasar por Nominatim en el
+arranque). El bloque VZ-25 agrega 15 eventos futuros (tres por zona, incluida una propuesta
+nocturna) y el bloque de propuestas ampliadas agrega 34 eventos y 5 actividades más, todos con
+fechas relativas para que el demo de circuitos llene el tope diario en cualquier momento.
 
 Nota de Sprint 2: los viajes se siembran **después** de las ubicaciones, porque `zonaInteres` es
 una FK a `ubicacion`. Todos van con `estado='PLANIFICADO'` a propósito: VZ-22 lista con
@@ -387,6 +388,10 @@ Decisiones y trampas:
   intereses, y devuelve alternativas. `CircuitoService` arma los candidatos y persiste el snapshot.
 - **Ventana diaria `06:00–23:59`.** Las actividades se agendan en el horario exacto de su franja;
   el traslado tiene que caber antes del inicio. Un evento sin horario ocupa `09:00–18:00`.
+- **Compactación por día.** Después de la pasada por estrategia, si el día no llegó al tope, se
+  insertan propuestas no usadas en los huecos respetando solapamientos y traslados; luego se
+  reordena por horario, se renumera `orden` y se recalculan traslados y `distanciaTotalKm`. Así el
+  seed llena el tope aunque la estrategia elija primero una propuesta nocturna.
 - **Las distancias son Haversine** (`HaversineDistanceProvider`, 30 km/h), no OSRM. La respuesta
   trae `distanciasEstimadas=true`.
 - **El snapshot guarda `descripcion` y `categoria`**, no solo el id: si la propuesta cambia o se
@@ -587,7 +592,7 @@ Las anotaciones de test **cambiaron de package**. Importar desde el package viej
 `@MockBean` ya no existe. Para tests unitarios con Mockito alcanza con
 `@ExtendWith(MockitoExtension.class)` + `@Mock`, sin contexto de Spring.
 
-Reparto actual (258 tests; 2 fallos preexistentes por fechas fijas ya vencidas en `ViajeMapperTest`
+Reparto actual (263 tests; 2 fallos preexistentes por fechas fijas ya vencidas en `ViajeMapperTest`
 y `ViajeTest`):
 
 | Archivo | Tests | Cubre |
@@ -606,7 +611,7 @@ y `ViajeTest`):
 | `ActividadControllerTest` | 8 | CRUD de `/api/actividades`, validación, 400/404 |
 | `AgendaControllerTest` | 7 | `/api/agenda` (filtros, orden fijo, 400) y `/api/agenda/semanal` (paginación, tope de `size`) |
 | `AgendaSemanalTest` | 7 | límites de la semana ISO, paginación |
-| `CircuitGeneratorTest` | 7 | **VZ-25: ventana 06:00–23:59, agenda, ritmo, estrategias y traslados** |
+| `CircuitGeneratorTest` | 12 | **VZ-25: ventana 06:00–23:59, agenda, ritmo, estrategias, traslados, compactación y borde de medianoche** |
 | `CircuitoServiceTest` | 26 | **VZ-25/VZ-26/VZ-28/VZ-29: generación, snapshot, regeneración/desactualizado, intereses estrictos, selección única, agrupación por días, eliminación con renumeración/recálculo, alternativas filtradas, reemplazo y errores; incluye la regresión de escala decimal** |
 | `PublicadorServiceTest` | 7 | alta, consulta, 404, US7, **pre-chequeo de email** |
 | `ImagenServiceTest` | 6 | **guardar/borrar, magic bytes, tope 5 MB, anti path traversal (`@TempDir`)** |

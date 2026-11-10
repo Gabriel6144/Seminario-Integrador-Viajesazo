@@ -82,6 +82,11 @@ traslado desde la parada anterior tiene que caber antes del inicio. Un evento si
 `09:00–18:00`. El ritmo fija el máximo de paradas por día: 2 (`TRANQUILO`), 3 (`EQUILIBRADO`) o 4
 (`INTENSIVO`).
 
+Si la pasada por estrategia deja un día por debajo del tope, una compactación inserta propuestas no
+usadas en los huecos libres, respetando solapamientos y traslados, y luego reordena y recalcula las
+distancias. Los cálculos de tiempo se hacen en minutos desde medianoche: así un evento que termina a
+las `23:59` no “envuelve” a `00:xx` al sumarle el traslado y no se acepta una parada solapada.
+
 ## Persistencia
 
 - El circuito se guarda como snapshot completo: nombre, descripción y categoría de cada propuesta,
