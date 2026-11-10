@@ -3,7 +3,7 @@
 - **Área:** Backend / integración full-stack
 - **Foco:** modelo de dominio, API REST, persistencia, filtros, integración con el frontend y documentación técnica
 - **Ramas habituales:** `Backend`, `main`, `develop`, `backend/*`, `feat/*`, `fix/*`, `docs/*`
-- **Última actualización:** 2026-11-09
+- **Última actualización:** 2026-11-10
 
 > Una entrada por PR o tarea relevante, en orden cronológico inverso. Cada entrada registra qué se hizo, por qué se tomó cada decisión y cómo se verificó. Los merges de trabajo ajeno se documentan como integración, sin atribuirse el código.
 
@@ -11,7 +11,8 @@
 
 | Fecha | Hito | Referencia |
 |---|---|---|
-| 2026-11-09 | Sprint 4: circuitos VZ-25, VZ-26, VZ-29, VZ-28 y cierre | `devGaby`, working tree |
+| 2026-11-10 | Ajustes del generador de circuitos y seed ampliado | `8686ab0` |
+| 2026-11-09 | Sprint 4: circuitos VZ-25, VZ-26, VZ-29, VZ-28 y cierre | `542f4a3` |
 | 2026-10-27 | Integración full-stack de circuitos y “Mis viajes” | `devGaby`, working tree |
 | 2026-10-25 | VZ-18: agenda turística server-side | working tree, sin commit |
 | 2026-10-24 | Animación del mapa al cambiar el destino | `4437abd` |
@@ -26,12 +27,45 @@
 | 2026-10-08 | Integración del PR #1 de `sbrito` | `4f4dbab` |
 | 2026-09-27 | Base del repositorio y Sprint 1 | `40fc87a` |
 
+## 2026-11-10 — Ajustes del generador y seed ampliado
+
+- **Sprint / US:** Sprint 4 / VZ-25
+- **Rama / PR:** `devGaby`; commit local `8686ab0`, sin push ni PR
+- **Estado:** implementado, verificado y documentado
+
+**Qué hice**
+
+- Agregué compactación diaria en `CircuitGenerator`: si la estrategia deja un día bajo
+  el tope, inserta propuestas no usadas en los huecos, reordena, renumera `orden` y
+  recalcula traslados y `distanciaTotalKm`.
+- Corregí el borde de medianoche: los cálculos pasan a minutos desde medianoche
+  (`minuteOfDay`) para que `23:59 + traslado` no envuelva a `00:xx`; regresión en
+  `CircuitGeneratorTest`.
+- Amplié el seed a 57 eventos y 7 actividades (todas con imagen), 55 ubicaciones y
+  5 viajes; ajusté horarios de Oktoberfest, Teleférico, Museo Estancia Jesuítica,
+  Trekking y Museo Manuel de Falla para que entren en el circuito.
+- Actualicé `AGENTS.md` y `CIRCUITOS-AUTOMATICOS.md` con la compactación, el cálculo
+  en minutos y los nuevos conteos.
+
+**Verificación**
+
+- Los 5 viajes del seed llenan su tope diario, sin solapamientos y con imágenes.
+- Backend: **263 tests, 261 en verde**; siguen los 2 fallos preexistentes
+  (`ViajeMapperTest`, `ViajeTest`).
+- Frontend: **191 tests, 182 en verde**; los 9 fallos de `eventos-page` y
+  `evento-editar-page` son preexistentes y ajenos a este cambio.
+
+**Pendientes / deuda**
+
+- Push y PR del commit.
+- Resolver los fallos preexistentes de backend y frontend.
+
 ## 2026-11-09 — Sprint 4: circuitos VZ-25, VZ-26, VZ-29, VZ-28 y cierre
 
 - **Sprint / US:** Sprint 4 / VZ-25, VZ-26, VZ-29, VZ-28
-- **Rama / PR:** `devGaby`; cambios en working tree, sin commit ni PR todavía
-- **Commit(s):** ninguno; base `60983dd`
-- **Estado:** implementado, probado a mano y documentado; pendiente de commit
+- **Rama / PR:** `devGaby`; commit local, sin push ni PR
+- **Commit(s):** `542f4a3`
+- **Estado:** implementado, probado a mano, documentado y commiteado
 
 **Qué hice**
 
@@ -185,7 +219,7 @@
 
 **Pendientes / deuda**
 
-- Commit y PR de VZ-25/VZ-26/VZ-29/VZ-28 (working tree verificado, sin commit).
+- Push y PR de VZ-25/VZ-26/VZ-29/VZ-28.
 - Autenticación y propiedad de viajes para `401/403`.
 - La provincia de Córdoba sigue siendo un invariante del dato, sin filtro geográfico.
 - Regenerar descarta ediciones manuales previas de reemplazos/eliminaciones.
