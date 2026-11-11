@@ -4,6 +4,7 @@ import type {
   CircuitStrategy,
   GeneracionCircuitoResponse,
 } from '@/types/api'
+import { RHYTHM_MAP } from './constants'
 import { CircuitoDetalleView } from './circuito-detalle-view'
 import { CircuitoMapaGeneralView } from './circuito-mapa-general-view'
 import { firstDayWithStops, toCircuitoRecomendado } from './circuito-view-model'
@@ -12,6 +13,8 @@ import type { CircuitoRecomendado } from './types'
 interface Paso10CircuitoProps {
   circuito: GeneracionCircuitoResponse
   rhythm: string
+  dateFrom: string
+  dateTo: string
   activeDay: number
   selectedStrategy: CircuitStrategy | null
   isSelecting: boolean
@@ -28,6 +31,8 @@ interface Paso10CircuitoProps {
 export function Paso10Circuito({
   circuito,
   rhythm,
+  dateFrom,
+  dateTo,
   activeDay,
   selectedStrategy,
   isSelecting,
@@ -53,9 +58,9 @@ export function Paso10Circuito({
   const circuitos = useMemo(
     () =>
       circuito.alternativas.map((alternativa) =>
-        toCircuitoRecomendado(alternativa, rhythm),
+        toCircuitoRecomendado(alternativa, rhythm, dateFrom, dateTo),
       ),
-    [circuito.alternativas, rhythm],
+    [circuito.alternativas, rhythm, dateFrom, dateTo],
   )
 
   if (mapCircuit !== null) {
@@ -82,6 +87,7 @@ export function Paso10Circuito({
         onGoToTrips={onGoToTrips}
         onExploreMap={() => setMapCircuit(selectedCircuit)}
         onRestart={onRestart}
+        ritmo={RHYTHM_MAP[rhythm] ?? null}
       />
     )
   }

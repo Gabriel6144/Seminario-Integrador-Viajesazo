@@ -15,6 +15,8 @@ import { PlanificadorPage } from '@/pages/planificador-page'
 import { PublicadorDetailPage } from '@/pages/publicador-detail-page'
 import { PublicadorNuevoPage } from '@/pages/publicador-nuevo-page'
 import { PublicadoresPage } from '@/pages/publicadores-page'
+import { UsuarioNuevoPage } from '@/pages/usuario-nuevo-page'
+import { UsuariosPage } from '@/pages/usuarios-page'
 
 /**
  * Rutas de la app.
@@ -50,6 +52,8 @@ export const router = createBrowserRouter([
       { path: 'publicadores', Component: PublicadoresPage },
       { path: 'publicadores/nuevo', Component: PublicadorNuevoPage },
       { path: 'publicadores/:id', Component: PublicadorDetailPage },
+      { path: 'usuarios', Component: UsuariosPage },
+      { path: 'usuarios/nuevo', Component: UsuarioNuevoPage },
       { path: '*', Component: NotFoundPage },
     ],
   },

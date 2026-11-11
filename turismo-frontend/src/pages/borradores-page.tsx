@@ -110,7 +110,7 @@ export function BorradoresPage() {
             Mis Viajes
           </h2>
           <p className="text-sm text-[#3f484e]">
-            Tus circuitos confirmados y los borradores que todavía podés retomar.
+            Tus viajes y los borradores que todavía podés retomar.
           </p>
         </div>
 
@@ -177,20 +177,19 @@ export function BorradoresPage() {
           aria-pressed={filtroEstado === 'CONFIRMADOS'}
           className={`flex cursor-pointer items-center gap-3.5 rounded-2xl border bg-white p-4 text-left shadow-sm transition-all sm:gap-4 ${
             filtroEstado === 'CONFIRMADOS'
-              ? 'border-emerald-600 ring-2 ring-emerald-500/25'
-              : 'border-[#bfc8cf]/40 hover:border-emerald-400 hover:shadow-md'
+              ? 'border-sky-600 ring-2 ring-sky-500/25'
+              : 'border-[#bfc8cf]/40 hover:border-sky-400 hover:shadow-md'
           }`}
         >
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-200/50 bg-emerald-50 text-emerald-700 sm:h-12 sm:w-12">
-            <span className="material-symbols-outlined text-xl sm:text-2xl">verified</span>
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-sky-200/50 bg-sky-50 text-sky-700 sm:h-12 sm:w-12">
+            <span className="material-symbols-outlined text-xl sm:text-2xl">route</span>
           </div>
           <div>
             <span className="block text-xs font-medium uppercase tracking-wider text-[#70787f]">
-              Listos para disfrutar
+              Viajes (sin borrador)
             </span>
-            <span className="font-heading text-lg font-bold text-emerald-800">
-              {confirmadosCount}{' '}
-              {confirmadosCount === 1 ? 'circuito confirmado' : 'circuitos confirmados'}
+            <span className="font-heading text-lg font-bold text-sky-800">
+              {confirmadosCount} {confirmadosCount === 1 ? 'viaje' : 'viajes'}
             </span>
           </div>
         </button>

@@ -122,9 +122,10 @@ function buildDaySummary(
   totalKm: number,
   totalMinutes: number,
 ): string {
-  if (stops.length === 0) return 'Sin paradas asignadas'
+  if (stops.length === 0) return 'No hay actividades para este día'
   const hours = Math.max(1, Math.round(totalMinutes / 60))
-  return `${stops.length} paradas · ${formatDistance(totalKm)} · ~${hours} h`
+  const paradas = `${stops.length} ${stops.length === 1 ? 'parada' : 'paradas'}`
+  return `${paradas} · ${formatDistance(totalKm)} · ~${hours} h`
 }
 
 function toStop(
@@ -169,18 +170,45 @@ function toStop(
   }
 }
 
+function eachDateInRange(from: string, to: string): string[] | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+    return null
+  }
+  if (from > to) return null
+
+  const [fy, fm, fd] = from.split('-').map(Number)
+  const [ty, tm, td] = to.split('-').map(Number)
+  const current = new Date(fy, fm - 1, fd)
+  const end = new Date(ty, tm - 1, td)
+  const dates: string[] = []
+
+  while (current <= end) {
+    const y = current.getFullYear()
+    const m = String(current.getMonth() + 1).padStart(2, '0')
+    const d = String(current.getDate()).padStart(2, '0')
+    dates.push(`${y}-${m}-${d}`)
+    current.setDate(current.getDate() + 1)
+  }
+  return dates
+}
+
 export function toCircuitoRecomendado(
   alternativa: CircuitoAlternativaResponse,
   rhythm: string,
+  dateFrom?: string,
+  dateTo?: string,
 ): CircuitoRecomendado {
   const items = [...alternativa.propuestas].sort((a, b) => {
     const byDate = a.fecha.localeCompare(b.fecha)
     return byDate !== 0 ? byDate : a.orden - b.orden
   })
 
-  const dates = [...new Set(items.map((item) => item.fecha))]
+  let dates = dateFrom && dateTo ? eachDateInRange(dateFrom, dateTo) : null
+  if (!dates || dates.length === 0) {
+    dates = [...new Set(items.map((item) => item.fecha))]
+  }
   if (dates.length === 0) {
-    dates.push('')
+    dates = ['']
   }
 
   const stopsByDay: Record<number, ParadaCircuitoDetalle[]> = {}

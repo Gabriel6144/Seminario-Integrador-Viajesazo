@@ -62,7 +62,7 @@ export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> 
 }
 
 /** Verbos que escriben. `GET` queda aparte porque no lleva body ni `Content-Type`. */
-type WriteMethod = 'POST' | 'PUT' | 'DELETE'
+type WriteMethod = 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 /** Alta. La respuesta es el recurso creado, con el id que le asignó la base. */
 export function apiPost<TResponse, TRequest>(
@@ -115,6 +115,15 @@ export function apiPostForm<TResponse>(
     }
     return readBody<TResponse>(response)
   })
+}
+
+/** Actualización parcial. Útil para cambios de estado (ej. baja de usuario). */
+export function apiPatch<TResponse, TRequest>(
+  path: string,
+  body: TRequest,
+  signal?: AbortSignal,
+): Promise<TResponse> {
+  return write<TResponse>('PATCH', path, body, signal)
 }
 
 function write<TResponse>(

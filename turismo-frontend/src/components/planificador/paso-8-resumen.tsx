@@ -1,3 +1,5 @@
+import { formatShortLocalDate } from '@/lib/dates'
+
 interface Paso8ResumenProps {
   tripName: string
   dateFrom: string
@@ -62,7 +64,7 @@ export function Paso8Resumen({
             <div>
               <span className="block text-[10px] font-semibold uppercase text-slate-400">Fechas</span>
               <span className="text-sm font-bold text-slate-800">
-                {dateFrom} al {dateTo} ({daysCount} días)
+                {formatShortLocalDate(dateFrom)} al {formatShortLocalDate(dateTo)} ({daysCount} días)
               </span>
             </div>
           </div>

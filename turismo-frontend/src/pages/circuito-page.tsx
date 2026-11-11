@@ -1,23 +1,27 @@
-import {
-  ArrowLeftIcon,
-  ArrowRightLeftIcon,
-  CalendarDaysIcon,
-  ClockIcon,
-  MapPinIcon,
-  Trash2Icon,
-} from 'lucide-react'
-import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { ArrowLeftIcon, ClockIcon, MapPinIcon } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import {
   useAlternativasReemplazo,
+  useCircuito,
   useCircuitoSeleccionado,
   useEliminarParadaCircuito,
   useGenerarCircuito,
   useReemplazarParadaCircuito,
+  useSeleccionarCircuito,
 } from '@/api/circuitos'
+import { useViaje } from '@/api/viajes'
 import { CategoriaBadge } from '@/components/categoria-badge'
+import { CircuitoDetalleView } from '@/components/planificador/circuito-detalle-view'
+import { CircuitoMapaGeneralView } from '@/components/planificador/circuito-mapa-general-view'
+import {
+  firstDayWithStops,
+  toCircuitoRecomendado,
+} from '@/components/planificador/circuito-view-model'
+import { Paso10Circuito } from '@/components/planificador/paso-10-circuito'
+import type { ParadaCircuitoDetalle } from '@/components/planificador/types'
 import { PlanificadorRegenerateModal } from '@/components/planificador/planificador-regenerate-modal'
 import { ErrorState } from '@/components/query-state'
 import {
@@ -32,20 +36,22 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatDateRange, formatLocalDate, formatTimeRange } from '@/lib/dates'
+import { formatTimeRange } from '@/lib/dates'
 import { toUserMessage } from '@/lib/http'
 import { parseId } from '@/lib/parse-id'
-import {
-  CIRCUIT_STRATEGY_LABELS,
-  type AlternativaItemResponse,
-  type CircuitoSeleccionadoResponse,
-} from '@/types/api'
+import type { AlternativaItemResponse, CircuitStrategy, TipoRitmo } from '@/types/api'
 
 const MOTIVO_LABELS: Record<string, string> = {
   FECHAS: 'fechas del viaje',
   PREFERENCIAS: 'intereses',
   ZONA: 'zona de destino',
   RITMO: 'ritmo',
+}
+
+const RHYTHM_LABELS: Record<TipoRitmo, string> = {
+  TRANQUILO: 'Tranquilo',
+  EQUILIBRADO: 'Equilibrado',
+  INTENSIVO: 'Intensivo',
 }
 
 function locationLabel(
@@ -55,14 +61,6 @@ function locationLabel(
     .filter((part): part is string => Boolean(part && part.trim()))
     .filter((part, index, all) => all.indexOf(part) === index)
   return parts.length > 0 ? parts.join(', ') : 'Ubicación a confirmar'
-}
-
-function durationLabel(minutes: number | null): string | null {
-  if (minutes === null || minutes <= 0) return null
-  const hours = Math.floor(minutes / 60)
-  const rest = minutes % 60
-  if (hours === 0) return `${rest} min`
-  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`
 }
 
 function CircuitoSkeleton() {
@@ -91,21 +89,180 @@ function IdInvalido() {
 }
 
 export function CircuitoPage() {
+  const navigate = useNavigate()
   const { id: rawId } = useParams()
   const viajeId = parseId(rawId)
   const query = useCircuitoSeleccionado(viajeId)
+  const circuitoGenerado = useCircuito(viajeId)
+  const viajeQuery = useViaje(viajeId)
   const regenerar = useGenerarCircuito()
   const eliminar = useEliminarParadaCircuito()
   const reemplazar = useReemplazarParadaCircuito()
+  const seleccionar = useSeleccionarCircuito()
   const [isRegenerateModalOpen, setIsRegenerateModalOpen] = useState(false)
   const [itemToDelete, setItemToDelete] = useState<AlternativaItemResponse | null>(null)
   const [itemToReplace, setItemToReplace] = useState<AlternativaItemResponse | null>(null)
   const [selectedPropuestaId, setSelectedPropuestaId] = useState<number | null>(null)
+  const [activeDay, setActiveDay] = useState(1)
+  const [showMap, setShowMap] = useState(false)
+  const [selectionActiveDay, setSelectionActiveDay] = useState(1)
+  const [selectionSuccess, setSelectionSuccess] = useState(false)
   const alternativas = useAlternativasReemplazo(viajeId, itemToReplace?.itemId ?? null)
+
+  const handleRegenerate = () => {
+    if (viajeId === null) return
+    regenerar.mutateAsync({ viajeId, reemplazar: true }).then(
+      () => {
+        setIsRegenerateModalOpen(false)
+        toast.success('Circuito regenerado correctamente')
+        setSelectionSuccess(false)
+        void query.refetch()
+      },
+      (error: unknown) => {
+        toast.error(
+          error instanceof Error ? error.message : 'No pudimos regenerar el circuito',
+        )
+      },
+    )
+  }
+
+  const circuito = query.data
+  const alternativaSeleccionada = useMemo(() => {
+    if (!circuito || !circuitoGenerado.data) return null
+    return (
+      circuitoGenerado.data.alternativas.find(
+        (alt) => alt.estrategia === circuito.estrategia,
+      ) ?? null
+    )
+  }, [circuito, circuitoGenerado.data])
+
+  const richCircuito = useMemo(() => {
+    if (!alternativaSeleccionada) return null
+    return toCircuitoRecomendado(alternativaSeleccionada, 'Equilibrado')
+  }, [alternativaSeleccionada])
+
+  useEffect(() => {
+    if (richCircuito) {
+      setActiveDay(firstDayWithStops(richCircuito))
+    }
+  }, [richCircuito])
 
   if (viajeId === null) return <IdInvalido />
 
+  const selectionErrorMessage = query.isError
+    ? toUserMessage(query.error).toLowerCase()
+    : ''
+  const needsSelection = selectionErrorMessage.includes('no tiene una alternativa seleccionada')
+  const needsGeneration = selectionErrorMessage.includes('no tiene un circuito generado')
+
   if (query.isPending) return <CircuitoSkeleton />
+
+  if (query.isError && (needsSelection || needsGeneration)) {
+    if (circuitoGenerado.isPending || viajeQuery.isPending) {
+      return <CircuitoSkeleton />
+    }
+
+    if (needsGeneration) {
+      return (
+        <div className="flex flex-col gap-4">
+          <Link to="/borradores" className="flex items-center gap-2 text-sm font-semibold text-sky-700">
+            <ArrowLeftIcon className="size-4" aria-hidden />
+            Volver a Mis viajes
+          </Link>
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-600">
+            <p className="font-medium text-slate-800">Este viaje todavía no tiene un circuito generado.</p>
+            <p className="mt-2">Podés generarlo desde el planificador para luego elegir una alternativa.</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button type="button" onClick={() => navigate(`/viajes/${viajeId}/planificar`)}>
+                Ir al planificador
+              </Button>
+              <Button type="button" variant="outline" onClick={() => navigate('/borradores')}>
+                Volver a Mis viajes
+              </Button>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    if (
+      circuitoGenerado.isSuccess &&
+      circuitoGenerado.data.alternativas.length > 0
+    ) {
+      const rhythmLabel = viajeQuery.data?.ritmo
+        ? RHYTHM_LABELS[viajeQuery.data.ritmo]
+        : 'Equilibrado'
+      const dateFrom = viajeQuery.data?.fechaInicio ?? ''
+      const dateTo = viajeQuery.data?.fechaFin ?? ''
+
+      const handleConfirmSelection = (estrategia: CircuitStrategy) => {
+        seleccionar.mutate(
+          { viajeId, estrategia },
+          {
+            onSuccess: () => {
+              setSelectionSuccess(true)
+              toast.success('Alternativa seleccionada')
+              void query.refetch()
+            },
+            onError: (error) => {
+              toast.error(toUserMessage(error))
+            },
+          },
+        )
+      }
+
+      return (
+        <div className="flex flex-col gap-4">
+          <Link
+            to="/borradores"
+            className="flex w-fit items-center gap-2 text-sm font-semibold text-sky-700 transition-colors hover:text-sky-900"
+          >
+            <ArrowLeftIcon className="size-4" aria-hidden />
+            Volver a Mis viajes
+          </Link>
+          <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
+            <p className="font-semibold">Este viaje tiene alternativas generadas, pero todavía no elegiste una.</p>
+            <p className="mt-1 text-sky-800">Elegí una alternativa para ver el circuito día por día.</p>
+          </div>
+          <Paso10Circuito
+            circuito={circuitoGenerado.data}
+            rhythm={rhythmLabel}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            activeDay={selectionActiveDay}
+            selectedStrategy={circuitoGenerado.data.estrategiaSeleccionada}
+            isSelecting={seleccionar.isPending}
+            showSuccessModal={selectionSuccess}
+            onChangeActiveDay={setSelectionActiveDay}
+            onConfirmCircuit={handleConfirmSelection}
+            onCloseSuccess={() => setSelectionSuccess(false)}
+            onGoToTrips={() => navigate('/borradores')}
+            onRestart={() => navigate('/borradores')}
+            onRegenerate={() => setIsRegenerateModalOpen(true)}
+          />
+
+          <PlanificadorRegenerateModal
+            isOpen={isRegenerateModalOpen}
+            isRegenerating={regenerar.isPending}
+            onClose={() => setIsRegenerateModalOpen(false)}
+            onConfirm={handleRegenerate}
+          />
+        </div>
+      )
+    }
+
+    if (circuitoGenerado.isError) {
+      return (
+        <div className="flex flex-col gap-4">
+          <Link to="/borradores" className="flex items-center gap-2 text-sm font-semibold text-sky-700">
+            <ArrowLeftIcon className="size-4" aria-hidden />
+            Volver a Mis viajes
+          </Link>
+          <ErrorState error={circuitoGenerado.error} />
+        </div>
+      )
+    }
+  }
 
   if (query.isError) {
     return (
@@ -119,22 +276,24 @@ export function CircuitoPage() {
     )
   }
 
-  const circuito = query.data
-  const firstDay = circuito.dias[0]?.fecha
-  const lastDay = circuito.dias[circuito.dias.length - 1]?.fecha
-
-  const handleRegenerate = () => {
-    regenerar.mutateAsync({ viajeId, reemplazar: true }).then(
-      () => {
-        setIsRegenerateModalOpen(false)
-        toast.success('Circuito regenerado correctamente')
-      },
-      (error: unknown) => {
-        toast.error(
-          error instanceof Error ? error.message : 'No pudimos regenerar el circuito',
-        )
-      },
+  if (!circuito) {
+    return (
+      <div className="flex flex-col gap-4">
+        <Link to="/borradores" className="flex items-center gap-2 text-sm font-semibold text-sky-700">
+          <ArrowLeftIcon className="size-4" aria-hidden />
+          Volver a Mis viajes
+        </Link>
+        <ErrorState error={new Error('No se pudo cargar la información')} />
+      </div>
     )
+  }
+
+  const findSelectedItem = (itemId: number): AlternativaItemResponse | null => {
+    for (const dia of circuito.dias) {
+      const item = dia.items.find((candidate) => candidate.itemId === itemId)
+      if (item) return item
+    }
+    return null
   }
 
   const handleDelete = () => {
@@ -163,6 +322,16 @@ export function CircuitoPage() {
     setItemToReplace(item)
   }
 
+  const openReplaceByStop = (stop: ParadaCircuitoDetalle) => {
+    const item = findSelectedItem(Number(stop.id))
+    if (item) openReplace(item)
+  }
+
+  const openDeleteByStop = (stop: ParadaCircuitoDetalle) => {
+    const item = findSelectedItem(Number(stop.id))
+    if (item) setItemToDelete(item)
+  }
+
   const handleReplace = () => {
     const target = itemToReplace
     if (target === null || selectedPropuestaId === null) return
@@ -179,8 +348,16 @@ export function CircuitoPage() {
     )
   }
 
+  if (showMap && richCircuito) {
+    return (
+      <div className="flex flex-col gap-4">
+        <CircuitoMapaGeneralView circuito={richCircuito} onBack={() => setShowMap(false)} />
+      </div>
+    )
+  }
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <Link
         to="/borradores"
         className="flex w-fit items-center gap-2 text-sm font-semibold text-sky-700 transition-colors hover:text-sky-900"
@@ -188,8 +365,6 @@ export function CircuitoPage() {
         <ArrowLeftIcon className="size-4" aria-hidden />
         Volver a Mis viajes
       </Link>
-
-      <CircuitoHeader circuito={circuito} firstDay={firstDay} lastDay={lastDay} />
 
       {circuito.advertencia && (
         <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
@@ -223,90 +398,28 @@ export function CircuitoPage() {
         </div>
       )}
 
-      {circuito.dias.length === 0 ? (
+      {richCircuito ? (
+        <CircuitoDetalleView
+          circuito={richCircuito}
+          activeDay={activeDay}
+          selectedStrategy={circuito.estrategia}
+          onChangeActiveDay={setActiveDay}
+          onBackToList={() => window.history.back()}
+          onExploreMap={() => setShowMap(true)}
+          editable
+          onReplaceStop={openReplaceByStop}
+          onDeleteStop={openDeleteByStop}
+          headerTitle="Circuito confirmado"
+          backAriaLabel="Volver a Mis viajes"
+          showHeroBadge={false}
+          ritmo={viajeQuery.data?.ritmo ?? null}
+        />
+      ) : circuitoGenerado.isPending ? (
+        <CircuitoSkeleton />
+      ) : (
         <p className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
           El circuito todavía no tiene días para mostrar.
         </p>
-      ) : (
-        <section aria-label="Itinerario día por día" className="flex flex-col gap-4">
-          {circuito.dias.map((dia, index) => (
-            <article
-              key={dia.fecha}
-              className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
-            >
-              <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/80 px-5 py-3.5">
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-sky-700">
-                    Día {index + 1}
-                  </p>
-                  <h2 className="font-heading text-base font-bold text-slate-900">
-                    {formatLocalDate(dia.fecha)}
-                  </h2>
-                </div>
-                <span className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
-                  <CalendarDaysIcon className="size-3.5" aria-hidden />
-                  {dia.items.length} {dia.items.length === 1 ? 'parada' : 'paradas'}
-                </span>
-              </header>
-
-              {dia.items.length === 0 ? (
-                <p className="px-5 py-6 text-sm text-slate-500">Sin actividades programadas.</p>
-              ) : (
-                <ol className="divide-y divide-slate-100">
-                  {dia.items.map((item) => (
-                    <li key={item.itemId} className="flex gap-4 px-5 py-4">
-                      <div className="flex w-20 shrink-0 flex-col gap-1 text-xs font-semibold text-sky-800">
-                        <span className="flex items-center gap-1">
-                          <ClockIcon className="size-3.5" aria-hidden />
-                          {formatTimeRange(item.horaInicio, item.horaFin) ?? 'A confirmar'}
-                        </span>
-                        {durationLabel(item.duracionMinutos) && (
-                          <span className="font-normal text-slate-500">
-                            {durationLabel(item.duracionMinutos)}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex min-w-0 flex-col gap-1.5">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="font-heading text-sm font-bold text-slate-900 sm:text-base">
-                            {item.propuestaNombre}
-                          </h3>
-                          <CategoriaBadge categoria={item.categoria} />
-                        </div>
-                        <p className="flex items-start gap-1.5 text-xs text-slate-600">
-                          <MapPinIcon className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-                          {locationLabel(item)}
-                        </p>
-                      </div>
-                      <div className="ml-auto flex shrink-0 items-center gap-1">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => openReplace(item)}
-                          aria-label={`Sustituir ${item.propuestaNombre}`}
-                          className="text-slate-400 hover:bg-sky-50 hover:text-sky-700"
-                        >
-                          <ArrowRightLeftIcon aria-hidden />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => setItemToDelete(item)}
-                          aria-label={`Eliminar ${item.propuestaNombre}`}
-                          className="text-slate-400 hover:bg-red-50 hover:text-red-600"
-                        >
-                          <Trash2Icon aria-hidden />
-                        </Button>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </article>
-          ))}
-        </section>
       )}
 
       <AlertDialog
@@ -431,44 +544,7 @@ export function CircuitoPage() {
   )
 }
 
-function CircuitoHeader({
-  circuito,
-  firstDay,
-  lastDay,
-}: {
-  circuito: CircuitoSeleccionadoResponse
-  firstDay: string | undefined
-  lastDay: string | undefined
-}) {
-  const paradas = circuito.dias.reduce((total, dia) => total + dia.items.length, 0)
-  return (
-    <header className="rounded-3xl bg-gradient-to-br from-[#00658d] via-sky-800 to-slate-900 p-6 text-white shadow-lg sm:p-8">
-      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-sky-200">
-        Circuito confirmado
-      </p>
-      <h1 className="font-heading mt-2 text-2xl font-bold sm:text-3xl">
-        {CIRCUIT_STRATEGY_LABELS[circuito.estrategia]}
-      </h1>
-      <div className="mt-4 flex flex-wrap items-center gap-4 text-xs font-semibold text-sky-100 sm:text-sm">
-        {firstDay && lastDay && (
-          <span className="flex items-center gap-1.5">
-            <CalendarDaysIcon className="size-4" aria-hidden />
-            {formatDateRange(firstDay, lastDay)}
-          </span>
-        )}
-        <span className="flex items-center gap-1.5">
-          <MapPinIcon className="size-4" aria-hidden />
-          {paradas} {paradas === 1 ? 'parada' : 'paradas'}
-        </span>
-        {circuito.distanciasEstimadas && (
-          <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[11px]">
-            Distancias estimadas
-          </span>
-        )}
-      </div>
-    </header>
-  )
-}
+// Header visual se renderiza con el mismo formato de alternativas (CircuitoDetalleView).
 
 function describeReasons(motivos: string[]): string {
   const labels = motivos.map((motivo) => MOTIVO_LABELS[motivo] ?? motivo.toLowerCase())

@@ -305,7 +305,7 @@ export function CircuitoMapaGeneralView({
         <div className="absolute top-16 left-4 z-30 hidden items-center gap-2 rounded-xl border border-slate-200/80 bg-white/95 px-3 py-1.5 shadow-md backdrop-blur-md sm:flex">
           <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
           <span className="text-[11px] font-bold text-slate-700">
-            {dayData?.summary ?? 'Sin paradas asignadas'}
+            {dayData?.summary ?? 'No hay actividades para este día'}
           </span>
         </div>
 
@@ -353,7 +353,14 @@ export function CircuitoMapaGeneralView({
             <div className="h-1 w-10 rounded-full bg-slate-400/80" />
           </div>
           <div className="pointer-events-auto flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 py-1.5">
-            {stops.map((stop) => {
+            {stops.length === 0 ? (
+              <div className="w-full px-2">
+                <div className="mx-auto max-w-sm rounded-2xl border border-slate-200/90 bg-white/95 px-4 py-3 text-center text-xs font-medium text-slate-600 shadow-lg backdrop-blur-md">
+                  No hay actividades para este día.
+                </div>
+              </div>
+            ) : (
+              stops.map((stop) => {
               const isSelected = stop.id === selectedStopId
               return (
                 <div
@@ -425,7 +432,8 @@ export function CircuitoMapaGeneralView({
                   </div>
                 </div>
               )
-            })}
+            })
+            )}
           </div>
         </div>
       </div>
