@@ -1,6 +1,8 @@
 package com.viajesazo.turismo_backend.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -20,9 +22,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.viajesazo.turismo_backend.config.AppConfig;
+import com.viajesazo.turismo_backend.dto.request.BajaUsuarioRequest;
 import com.viajesazo.turismo_backend.dto.request.UsuarioRequest;
+import com.viajesazo.turismo_backend.dto.response.BajaUsuarioResponse;
 import com.viajesazo.turismo_backend.dto.response.UsuarioResponse;
 import com.viajesazo.turismo_backend.exception.BusinessRuleException;
+import com.viajesazo.turismo_backend.exception.ConfirmationRequiredException;
 import com.viajesazo.turismo_backend.exception.ResourceNotFoundException;
 import com.viajesazo.turismo_backend.service.UsuarioService;
 
@@ -119,6 +124,70 @@ class UsuarioControllerTest {
 		when(usuarioService.findById(99L)).thenThrow(new ResourceNotFoundException("No existe el usuario con id 99"));
 
 		mockMvc.perform(get("/api/usuarios/99")).andExpect(status().isNotFound());
+	}
+
+	// --- Baja ---
+
+	private static final String BODY_BAJA = """
+			{ "contrasena": "secreta123" }
+			""";
+
+	@Test
+	@DisplayName("baja confirmada responde 200 con el aviso y los viajes cancelados")
+	void deactivatesUser() throws Exception {
+		when(usuarioService.darDeBaja(eq(1L), any(BajaUsuarioRequest.class), eq(true)))
+				.thenReturn(new BajaUsuarioResponse(1L, "la cuenta se dio de baja correctamente", 2));
+
+		mockMvc.perform(post("/api/usuarios/1/baja?confirmar=true")
+						.contentType(MediaType.APPLICATION_JSON).content(BODY_BAJA))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.mensaje").value("la cuenta se dio de baja correctamente"))
+				.andExpect(jsonPath("$.viajesCancelados").value(2));
+	}
+
+	@Test
+	@DisplayName("baja sin confirmar: el flag por defecto es false y responde 409")
+	void deactivationWithoutConfirmationIsConflict() throws Exception {
+		when(usuarioService.darDeBaja(eq(1L), any(BajaUsuarioRequest.class), eq(false)))
+				.thenThrow(new ConfirmationRequiredException(
+						"la baja de la cuenta requiere confirmación; confirmá con confirmar=true"));
+
+		mockMvc.perform(post("/api/usuarios/1/baja")
+						.contentType(MediaType.APPLICATION_JSON).content(BODY_BAJA))
+				.andExpect(status().isConflict());
+	}
+
+	@Test
+	@DisplayName("baja sin contraseña responde 400 y no llama al service")
+	void deactivationRequiresPassword() throws Exception {
+		mockMvc.perform(post("/api/usuarios/1/baja?confirmar=true")
+						.contentType(MediaType.APPLICATION_JSON).content("{}"))
+				.andExpect(status().isBadRequest());
+
+		verify(usuarioService, never()).darDeBaja(any(), any(), anyBoolean());
+	}
+
+	@Test
+	@DisplayName("baja con contraseña incorrecta responde 400 con el mensaje")
+	void deactivationWithWrongPassword() throws Exception {
+		when(usuarioService.darDeBaja(eq(1L), any(BajaUsuarioRequest.class), eq(true)))
+				.thenThrow(new BusinessRuleException("la contraseña es incorrecta"));
+
+		mockMvc.perform(post("/api/usuarios/1/baja?confirmar=true")
+						.contentType(MediaType.APPLICATION_JSON).content(BODY_BAJA))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.message").value("la contraseña es incorrecta"));
+	}
+
+	@Test
+	@DisplayName("baja de un usuario inexistente o ya dado de baja responde 404")
+	void deactivationOfMissingUser() throws Exception {
+		when(usuarioService.darDeBaja(eq(99L), any(BajaUsuarioRequest.class), eq(true)))
+				.thenThrow(new ResourceNotFoundException("No existe el usuario con id 99"));
+
+		mockMvc.perform(post("/api/usuarios/99/baja?confirmar=true")
+						.contentType(MediaType.APPLICATION_JSON).content(BODY_BAJA))
+				.andExpect(status().isNotFound());
 	}
 
 }

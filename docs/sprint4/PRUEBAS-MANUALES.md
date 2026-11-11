@@ -599,6 +599,43 @@ contraseña. Un id inexistente → **404** `No existe el usuario con id 999`.
 
 El seed no carga usuarios: la tabla arranca vacía en cada inicio.
 
+### 8.26 `POST /api/usuarios/{id}/baja?confirmar=true` — dar de baja la cuenta
+
+Body (guardarlo en `baja.json`), con la contraseña con la que se registró el usuario:
+
+```json
+{ "contrasena": "secreta123" }
+```
+
+```powershell
+curl.exe -s -i -X POST "http://localhost:8080/api/usuarios/1/baja?confirmar=true" `
+  -H "Content-Type: application/json; charset=utf-8" `
+  --data-binary "@baja.json"
+```
+
+Qué esperar: **200** con
+`{ "id": 1, "mensaje": "la cuenta se dio de baja correctamente", "viajesCancelados": 0 }`.
+
+| Caso | Status | `message` esperado |
+| --- | --- | --- |
+| Sin `?confirmar=true` | **409** | `la baja de la cuenta requiere confirmación; confirmá con confirmar=true` |
+| Body `{}` | **400** | `contrasena: la contraseña es obligatoria` |
+| Contraseña incorrecta | **400** | `la contraseña es incorrecta` |
+| Usuario inexistente o ya dado de baja | **404** | `No existe el usuario con id 1` |
+
+Después de la baja:
+
+- `GET /api/usuarios/1` → **404**: la cuenta deja de existir para la API, aunque la fila sigue en
+  la base (baja lógica).
+- Repetir la baja → **404**.
+- Registrar de nuevo con el mismo email → **400** `ya existe un usuario con ese email`: el email de
+  una cuenta dada de baja no se puede reutilizar.
+
+**Cancelación de viajes.** Los viajes se asocian por email (`Viaje.usuario`). Para probarlo,
+registrar un usuario con el email `turista.demo@viajesazo.com` (el del seed) y darlo de baja:
+`viajesCancelados` tiene que ser mayor que 0, y `GET /api/viajes?usuario=turista.demo@viajesazo.com`
+ya no debe listar esos viajes. Los viajes `EN_CURSO` no se cancelan: el dominio no lo permite.
+
 ## 9. Bordes conocidos — probar a mano
 
 Estos no los verifiqué y no están cubiertos por los tests, así que conviene comprobarlos:

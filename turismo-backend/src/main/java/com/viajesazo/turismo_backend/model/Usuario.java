@@ -33,4 +33,18 @@ public class Usuario {
 	@Column(nullable = false, length = 100)
 	private String contrasena;
 
+	/**
+	 * Baja lógica: {@code false} cuando el usuario dio de baja su cuenta. La fila se conserva, pero
+	 * para la API la cuenta deja de existir (consultas → 404). El login futuro también debe filtrar
+	 * por este campo.
+	 */
+	@Builder.Default
+	@Column(nullable = false)
+	private boolean activo = true;
+
+	/** Da de baja la cuenta (baja lógica). */
+	public void darDeBaja() {
+		this.activo = false;
+	}
+
 }

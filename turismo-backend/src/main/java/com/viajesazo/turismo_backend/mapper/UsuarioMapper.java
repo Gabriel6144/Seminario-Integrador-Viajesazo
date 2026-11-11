@@ -17,6 +17,7 @@ public interface UsuarioMapper {
 	 */
 	@Mapping(target = "id", ignore = true)
 	@Mapping(target = "contrasena", ignore = true)
+	@Mapping(target = "activo", ignore = true)
 	Usuario toEntity(UsuarioRequest request);
 
 	UsuarioResponse toResponse(Usuario usuario);

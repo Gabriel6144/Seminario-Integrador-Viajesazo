@@ -29,6 +29,20 @@ class UsuarioRepositoryTest {
 	}
 
 	@Test
+	@DisplayName("un usuario dado de baja no se encuentra por id; uno activo sí")
+	void findByIdExcludesInactiveUsers() {
+		Usuario activo = usuarioRepository.saveAndFlush(
+				Usuario.builder().nombre("Ana Pérez").email("ana@mail.com").contrasena("$2a$hash").build());
+		Usuario dadoDeBaja = Usuario.builder().nombre("Beto").email("beto@mail.com").contrasena("$2a$hash").build();
+		dadoDeBaja.darDeBaja();
+		dadoDeBaja = usuarioRepository.saveAndFlush(dadoDeBaja);
+
+		assertThat(activo.isActivo()).isTrue();
+		assertThat(usuarioRepository.findByIdAndActivoTrue(activo.getId())).isPresent();
+		assertThat(usuarioRepository.findByIdAndActivoTrue(dadoDeBaja.getId())).isEmpty();
+	}
+
+	@Test
 	@DisplayName("la base rechaza dos usuarios con el mismo email y el mensaje nombra usuario(email")
 	void enforcesUniqueEmail() {
 		usuarioRepository.saveAndFlush(Usuario.builder().nombre("Ana Pérez").email("ana@mail.com").contrasena("$2a$hash").build());

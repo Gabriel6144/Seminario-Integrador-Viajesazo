@@ -12,11 +12,11 @@ Tesis de facultad: API REST que centraliza la información turística de la prov
   en el mismo commit, y es lo normal: la API y el cliente se cambian juntos. El `.gitignore` de la
   raíz es el que manda.
 - Estado actual: Sprints 1–4 completos (eventos, viajes, agenda VZ-18, circuitos VZ-25, consulta
-  seleccionada VZ-26, eliminación de paradas VZ-29 y reemplazo de paradas VZ-28), con **278
-  tests: 276 en verde y 2 fallos preexistentes por fechas fijas ya vencidas (`ViajeMapperTest`,
+  seleccionada VZ-26, eliminación de paradas VZ-29 y reemplazo de paradas VZ-28), con **290
+  tests: 288 en verde y 2 fallos preexistentes por fechas fijas ya vencidas (`ViajeMapperTest`,
   `ViajeTest`)**. Incluye
   paginación, CRUD de eventos, alta de publicadores, **registro de usuarios con contraseña
-  hasheada (BCrypt)**, CRUD de viajes con baja lógica, listado
+  hasheada (BCrypt) y baja lógica de la cuenta**, CRUD de viajes con baja lógica, listado
   unificado de propuestas (eventos + actividades), **agenda filtrable por
   fecha/tipo/categoría/ubicación/acceso**, **generación y selección única de tres alternativas de
   circuito con distancias estimadas**, **consulta del circuito seleccionado agrupado por día**,
@@ -25,7 +25,7 @@ Tesis de facultad: API REST que centraliza la información turística de la prov
   MapStruct,
   **geocodificación de la ubicación del evento con OpenStreetMap (Nominatim)** y **subida de
   imágenes a disco con servido estático**. Pendientes: `Itinerario` editable (VZ-27),
-  modificación/baja/inicio de sesión de `Usuario`, `Preferencia` y ruteo real (OSRM).
+  modificación e inicio de sesión de `Usuario`, `Preferencia` y ruteo real (OSRM).
 - Para probar los endpoints a mano ver **`PRUEBAS-MANUALES.md`**: levantar, curl de cada ruta,
   casos de error, el detalle de los acentos y los bordes conocidos sin cubrir.
 
@@ -231,9 +231,11 @@ de nombres").
   `CircuitoItem` guarda la parada con fecha, orden, horario y traslado.
 - `Itinerario` editable — **pendiente (VZ-27)**: agregar, eliminar, reorganizar y regenerar
   paradas sobre el circuito ya generado.
-- `Usuario` — **ya existe el registro** (`model/Usuario.java`): `nombre`, `email` (único),
-  `telefono` y `contrasena` (hash BCrypt, nunca texto plano). Ver "API de Usuarios". Pendientes:
-  modificación, baja e inicio de sesión.
+- `Usuario` — **ya existen el registro y la baja** (`model/Usuario.java`): `nombre`, `email`
+  (único), `telefono`, `contrasena` (hash BCrypt, nunca texto plano) y `activo` (baja lógica,
+  default `true`). A diferencia de `Viaje`, la baja lógica de `Usuario` **sí** es un booleano: no
+  hay ciclo de vida con estados, solo activo/inactivo. Ver "API de Usuarios". Pendientes:
+  modificación e inicio de sesión.
 - Rutas y traslados — hoy Haversine con velocidad media; falta ruteo real (OSRM) y visualización
   en mapa.
 
@@ -454,12 +456,13 @@ Decisiones y trampas:
   `propuestaId` responde **400**. `GET .../alternativas` devuelve **200** con `alternativas: []`
   y `mensaje` cuando no hay opciones.
 
-## API de Usuarios — registro
+## API de Usuarios — registro y baja
 
 | Método | Ruta | Caso de uso |
 | --- | --- | --- |
 | POST | `/api/usuarios` | registrar usuario → **201** |
-| GET | `/api/usuarios/{id}` | soporte (consultar el usuario registrado) → 200 / **404** |
+| GET | `/api/usuarios/{id}` | soporte (consultar el usuario activo) → 200 / **404** |
+| POST | `/api/usuarios/{id}/baja?confirmar=true` | dar de baja la cuenta (body `{ "contrasena": "..." }`) → **200** |
 
 Body del `POST`: `nombre` (obligatorio, ≤120), `email` (obligatorio, formato válido, ≤180, único),
 `telefono` (opcional, ≤40) y `contrasena` (obligatoria, **8 a 72 caracteres**). La respuesta
@@ -488,6 +491,32 @@ Decisiones que no son obvias y conviene no deshacer sin motivo:
   mismas limitaciones: es case-sensitive y permite enumerar emails registrados.
 - **Sin autenticación todavía**: `GET /api/usuarios/{id}` lo puede llamar cualquiera. Cuando haya
   login hay que restringirlo al propio usuario.
+
+### Baja de usuario
+
+`UsuarioService.darDeBaja` responde **200** con `{ id, mensaje, viajesCancelados }`. Decisiones:
+
+- **Es `POST /{id}/baja` y no `DELETE /{id}`** porque lleva la contraseña en el body, y hay
+  clientes y proxies que descartan el body de un `DELETE`.
+- **El orden de los chequeos es parte del contrato**: usuario activo (si no **404**) →
+  `confirmar=true` (si no **409**, mismo patrón que la eliminación de paradas) → contraseña con
+  `passwordEncoder.matches` (si no **400** `"la contraseña es incorrecta"`). Body sin `contrasena`
+  → 400 por `@Valid`, antes de todo lo anterior.
+- **Baja lógica con `activo = false`**: la fila se conserva. **Toda lectura por id tiene que usar
+  `findByIdAndActivoTrue`**, nunca `findById`: un usuario dado de baja no existe para la API
+  (`GET` → 404, segunda baja → 404). El login futuro también debe filtrar por `activo`.
+- **Cancela los viajes `BORRADOR` y `PLANIFICADO`** del usuario con `Viaje.cancelar()`, en la misma
+  transacción que la baja. Los `EN_CURSO` **quedan como están**: `EstadoViaje` no permite pasar de
+  `EN_CURSO` a `CANCELADO`, y no se cambió la regla del dominio para esta US; el scheduler los
+  finaliza al terminar. Los terminales no se tocan.
+- **Los viajes se asocian por email** (`findByUsuarioAndEstadoIn(usuario.getEmail(), ...)`)
+  porque `Viaje.usuario` todavía es un `String` libre (ver la deuda del Sprint 2). Un viaje cargado
+  con otro identificador (por ejemplo `turista_demo`, como en los fixtures del frontend) no se
+  cancela. Se resuelve al migrar `Viaje.usuario` a un `@ManyToOne` con `Usuario`.
+- **El email de una cuenta dada de baja no se puede volver a registrar**: `existsByEmail` incluye
+  a los inactivos y la constraint `UNIQUE` también. El registro responde
+  `"ya existe un usuario con ese email"`. Si se decide permitir el re-registro o reactivar la
+  cuenta, hay que cambiar ambas cosas.
 
 ## Servicios
 
@@ -640,7 +669,7 @@ Las anotaciones de test **cambiaron de package**. Importar desde el package viej
 `@MockBean` ya no existe. Para tests unitarios con Mockito alcanza con
 `@ExtendWith(MockitoExtension.class)` + `@Mock`, sin contexto de Spring.
 
-Reparto actual (278 tests; 2 fallos preexistentes por fechas fijas ya vencidas en `ViajeMapperTest`
+Reparto actual (290 tests; 2 fallos preexistentes por fechas fijas ya vencidas en `ViajeMapperTest`
 y `ViajeTest`):
 
 | Archivo | Tests | Cubre |
@@ -665,11 +694,11 @@ y `ViajeTest`):
 | `ImagenServiceTest` | 6 | **guardar/borrar, magic bytes, tope 5 MB, anti path traversal (`@TempDir`)** |
 | `GeocodingServiceTest` | 5 | **dedup de la query de Nominatim, campos vacíos, provincia** |
 | `PublicadorRepositoryTest` | 5 | orden alfabético, paginación, página vacía, **derived query + constraint de unicidad** |
-| `UsuarioControllerTest` | 7 | registro 201 **sin `contrasena` en la respuesta**, faltantes/email inválido/contraseña corta → 400, duplicado (negocio y constraint) con mensaje de usuario, 404 |
-| `UsuarioServiceTest` | 6 | alta, **hash BCrypt verificable con `matches`**, **contraseña de más de 72 bytes → 400 (no 500)**, pre-chequeo de email, consulta, 404 |
-| `UsuarioRepositoryTest` | 2 | `existsByEmail` y constraint de unicidad (el mensaje nombra `usuario(email`) |
+| `UsuarioControllerTest` | 12 | registro 201 **sin `contrasena` en la respuesta**, faltantes/email inválido/contraseña corta → 400, duplicado (negocio y constraint) con mensaje de usuario, 404; **baja 200/409/400/404** |
+| `UsuarioServiceTest` | 11 | alta, **hash BCrypt verificable con `matches`**, **contraseña de más de 72 bytes → 400 (no 500)**, pre-chequeo de email, consulta, 404; **baja: inactiva y cancela viajes, solo `BORRADOR`/`PLANIFICADO`, sin confirmar/contraseña incorrecta no tocan nada, ya dado de baja → 404** |
+| `UsuarioRepositoryTest` | 3 | `existsByEmail`, **`findByIdAndActivoTrue` excluye inactivos** y constraint de unicidad (el mensaje nombra `usuario(email`) |
 | `ViajeMapperTest` | 4 | mapeo entidad↔DTO, fechas `LocalDate`↔`LocalDateTime` (**1 fallo preexistente por fecha fija**) |
-| `ViajeRepositoryTest` | 4 | activos por usuario, exclusión de cancelados, orden |
+| `ViajeRepositoryTest` | 5 | activos por usuario, exclusión de cancelados, orden, **viajes por usuario y estados (baja de usuario)** |
 | `CircuitoRepositoryTest` | 1 | **VZ-25: recarga el circuito con ítems ordenados y sin `null`** |
 | `ImagenControllerTest` | 4 | **POST/DELETE de `/api/imagenes`, parte faltante y archivo vacío → 400** |
 | `PropuestaControllerTest` | 3 | listado unificado, filtros (incluida `ubicacion`), 400 |
