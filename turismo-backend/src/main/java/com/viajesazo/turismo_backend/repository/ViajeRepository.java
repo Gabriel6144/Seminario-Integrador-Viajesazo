@@ -51,4 +51,10 @@ public interface ViajeRepository extends JpaRepository<Viaje, Long> {
      */
     List<Viaje> findByEstadoIn(Collection<EstadoViaje> estados);
 
+    /**
+     * Viajes de un turista en ciertos estados. Lo usa la baja de usuario para cancelar sus viajes
+     * activos.
+     */
+    List<Viaje> findByUsuarioAndEstadoIn(String usuario, Collection<EstadoViaje> estados);
+
 }

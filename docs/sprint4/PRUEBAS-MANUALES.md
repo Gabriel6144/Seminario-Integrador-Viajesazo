@@ -556,6 +556,86 @@ Qué esperar:
   comparan el snapshot contra el viaje; las coordenadas se comparan por valor, no por escala
   decimal.
 
+## 8 ter. Usuarios — registro
+
+### 8.24 `POST /api/usuarios` — registrar usuario
+
+Guardar el body en un archivo (ver sección 5) y mandarlo con `--data-binary`:
+
+```json
+{ "nombre": "Ana Pérez", "email": "ana@mail.com", "telefono": "351-5551234", "contrasena": "secreta123" }
+```
+
+```powershell
+curl.exe -s -i -X POST http://localhost:8080/api/usuarios `
+  -H "Content-Type: application/json; charset=utf-8" `
+  --data-binary "@usuario.json"
+```
+
+Qué esperar: **201** con `id`, `nombre`, `email` y `telefono`. **La respuesta no trae
+`contrasena`**, ni en texto plano ni como hash: si aparece, es un bug.
+
+Casos de error, todos **400** con el detalle en `message`:
+
+| Body | `message` esperado |
+| --- | --- |
+| `{"email":"a@b.com","contrasena":"secreta123"}` | `nombre: el nombre es obligatorio` |
+| `{"nombre":"X","contrasena":"secreta123"}` | `email: el email es obligatorio` |
+| `{"nombre":"X","email":"esto-no-es-un-email","contrasena":"secreta123"}` | `email: el email no tiene un formato válido` |
+| `{"nombre":"X","email":"a@b.com"}` | `contrasena: la contraseña es obligatoria` |
+| `{"nombre":"X","email":"a@b.com","contrasena":"corta"}` | `contrasena: la contraseña debe tener entre 8 y 72 caracteres` |
+| `contrasena` con 40 `ñ` (40 caracteres, 80 bytes) | `la contraseña es demasiado larga: las letras con tilde o ñ ocupan el doble` |
+
+Registrar dos veces el mismo email → **400** `ya existe un usuario con ese email`.
+
+Que se guarde el hash y no el texto plano no se puede ver desde la API (la consola de H2 no está
+habilitada). Lo cubre `UsuarioServiceTest.storesHashedPassword`: el valor guardado empieza con
+`$2` y valida contra la contraseña original con `matches`.
+
+### 8.25 `GET /api/usuarios/{id}` — soporte
+
+`GET /api/usuarios/1` (después de registrar uno) → **200** con los mismos campos del alta, sin la
+contraseña. Un id inexistente → **404** `No existe el usuario con id 999`.
+
+El seed no carga usuarios: la tabla arranca vacía en cada inicio.
+
+### 8.26 `POST /api/usuarios/{id}/baja?confirmar=true` — dar de baja la cuenta
+
+Body (guardarlo en `baja.json`), con la contraseña con la que se registró el usuario:
+
+```json
+{ "contrasena": "secreta123" }
+```
+
+```powershell
+curl.exe -s -i -X POST "http://localhost:8080/api/usuarios/1/baja?confirmar=true" `
+  -H "Content-Type: application/json; charset=utf-8" `
+  --data-binary "@baja.json"
+```
+
+Qué esperar: **200** con
+`{ "id": 1, "mensaje": "la cuenta se dio de baja correctamente", "viajesCancelados": 0 }`.
+
+| Caso | Status | `message` esperado |
+| --- | --- | --- |
+| Sin `?confirmar=true` | **409** | `la baja de la cuenta requiere confirmación; confirmá con confirmar=true` |
+| Body `{}` | **400** | `contrasena: la contraseña es obligatoria` |
+| Contraseña incorrecta | **400** | `la contraseña es incorrecta` |
+| Usuario inexistente o ya dado de baja | **404** | `No existe el usuario con id 1` |
+
+Después de la baja:
+
+- `GET /api/usuarios/1` → **404**: la cuenta deja de existir para la API, aunque la fila sigue en
+  la base (baja lógica).
+- Repetir la baja → **404**.
+- Registrar de nuevo con el mismo email → **400** `ya existe un usuario con ese email`: el email de
+  una cuenta dada de baja no se puede reutilizar.
+
+**Cancelación de viajes.** Los viajes se asocian por email (`Viaje.usuario`). Para probarlo,
+registrar un usuario con el email `turista.demo@viajesazo.com` (el del seed) y darlo de baja:
+`viajesCancelados` tiene que ser mayor que 0, y `GET /api/viajes?usuario=turista.demo@viajesazo.com`
+ya no debe listar esos viajes. Los viajes `EN_CURSO` no se cancelan: el dominio no lo permite.
+
 ## 9. Bordes conocidos — probar a mano
 
 Estos no los verifiqué y no están cubiertos por los tests, así que conviene comprobarlos:
@@ -583,9 +663,9 @@ El **email duplicado ya no está en esta lista**: `PublicadorService.create` hac
 cubierto por `PublicadorControllerTest`, `PublicadorServiceTest` y `PublicadorRepositoryTest`.
 
 Lo que sigue siendo un **bug de diseño conocido**, no un endpoint roto: el mensaje de duplicado
-confirma que un email está registrado, así que permite enumerar publicadores. Sin autenticación no
-tiene arreglo razonable; cuando se agregue `Usuario`, conviene responder un 409 genérico o
-verificar propiedad del email.
+confirma que un email está registrado, así que permite enumerar publicadores. El registro de
+usuarios (8.24) tiene la misma limitación. Sin autenticación no tiene arreglo razonable; cuando se
+agregue el inicio de sesión, conviene responder un 409 genérico o verificar propiedad del email.
 
 Para comprobar el mensaje crudo de la violación de unicidad en el log del servidor (que es donde
 está el detalle, no en la respuesta):

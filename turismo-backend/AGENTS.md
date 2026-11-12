@@ -12,10 +12,11 @@ Tesis de facultad: API REST que centraliza la información turística de la prov
   en el mismo commit, y es lo normal: la API y el cliente se cambian juntos. El `.gitignore` de la
   raíz es el que manda.
 - Estado actual: Sprints 1–4 completos (eventos, viajes, agenda VZ-18, circuitos VZ-25, consulta
-  seleccionada VZ-26, eliminación de paradas VZ-29 y reemplazo de paradas VZ-28), con **263
-  tests: 261 en verde y 2 fallos preexistentes por fechas fijas ya vencidas (`ViajeMapperTest`,
+  seleccionada VZ-26, eliminación de paradas VZ-29 y reemplazo de paradas VZ-28), con **290
+  tests: 288 en verde y 2 fallos preexistentes por fechas fijas ya vencidas (`ViajeMapperTest`,
   `ViajeTest`)**. Incluye
-  paginación, CRUD de eventos, alta de publicadores, CRUD de viajes con baja lógica, listado
+  paginación, CRUD de eventos, alta de publicadores, **registro de usuarios con contraseña
+  hasheada (BCrypt) y baja lógica de la cuenta**, CRUD de viajes con baja lógica, listado
   unificado de propuestas (eventos + actividades), **agenda filtrable por
   fecha/tipo/categoría/ubicación/acceso**, **generación y selección única de tres alternativas de
   circuito con distancias estimadas**, **consulta del circuito seleccionado agrupado por día**,
@@ -23,8 +24,8 @@ Tesis de facultad: API REST que centraliza la información turística de la prov
   alternativas compatibles con el bloque horario y los traslados**, seed de datos, mapeo con
   MapStruct,
   **geocodificación de la ubicación del evento con OpenStreetMap (Nominatim)** y **subida de
-  imágenes a disco con servido estático**. Pendientes: `Itinerario` editable (VZ-27), `Usuario`,
-  `Preferencia` y ruteo real (OSRM).
+  imágenes a disco con servido estático**. Pendientes: `Itinerario` editable (VZ-27),
+  modificación e inicio de sesión de `Usuario`, `Preferencia` y ruteo real (OSRM).
 - Para probar los endpoints a mano ver **`PRUEBAS-MANUALES.md`**: levantar, curl de cada ruta,
   casos de error, el detalle de los acentos y los bordes conocidos sin cubrir.
 
@@ -90,6 +91,11 @@ Los nombres de starters cambiaron respecto a Boot 3:
 - Faltan y habrá que agregar explícitamente: `spring-boot-starter-security` y
   `spring-boot-starter-test` (solo si hacen falta utilidades compartidas; hoy cada slice ya trae
   lo suyo).
+- `org.springframework.security:spring-security-crypto` **ya está agregado** (sin `<version>`, la
+  gestiona el BOM). Es solo el módulo de criptografía, para hashear la contraseña de `Usuario` con
+  BCrypt. **No es el starter de Security**: no activa la cadena de filtros ni exige login. Cuando
+  se agregue `spring-boot-starter-security` para el inicio de sesión, este artefacto ya viene
+  incluido y se puede quitar del `pom.xml`.
 - En Boot 4, `RestClient` **no** está en `spring-boot-starter-webmvc`: hace falta
   `spring-boot-starter-restclient` para llamar a servicios externos. **Ya está agregado**, y lo
   usa `GeocodingService` para pegarle a Nominatim.
@@ -185,7 +191,7 @@ tests fallarían sin que el código esté mal.
 ## Modelo de dominio
 
 Nombres y campos tomados de los requerimientos de la tesis. **Ya existen `Publicador`, `Evento`,
-`Ubicacion` y `Viaje`** (más los enums `InteresCategoria`, `TipoRitmo` y `EstadoViaje`) — el
+`Ubicacion`, `Viaje` y `Usuario`** (más los enums `InteresCategoria`, `TipoRitmo` y `EstadoViaje`) — el
 resto son tipos que hay que crear. La nomenclatura del dominio va en español (ver "Convenciones
 de nombres").
 
@@ -225,7 +231,11 @@ de nombres").
   `CircuitoItem` guarda la parada con fecha, orden, horario y traslado.
 - `Itinerario` editable — **pendiente (VZ-27)**: agregar, eliminar, reorganizar y regenerar
   paradas sobre el circuito ya generado.
-- `Usuario` — registro, modificación, baja, inicio de sesión.
+- `Usuario` — **ya existen el registro y la baja** (`model/Usuario.java`): `nombre`, `email`
+  (único), `telefono`, `contrasena` (hash BCrypt, nunca texto plano) y `activo` (baja lógica,
+  default `true`). A diferencia de `Viaje`, la baja lógica de `Usuario` **sí** es un booleano: no
+  hay ciclo de vida con estados, solo activo/inactivo. Ver "API de Usuarios". Pendientes:
+  modificación e inicio de sesión.
 - Rutas y traslados — hoy Haversine con velocidad media; falta ruteo real (OSRM) y visualización
   en mapa.
 
@@ -322,8 +332,8 @@ Decisiones que no son obvias y conviene no deshacer sin motivo:
 - **"Activo" = `estado <> CANCELADO`**, no un campo `activo` booleano. El listado y el detalle usan
   `findByUsuarioAndEstadoNotOrderByFechaInicioAsc` y `findByIdAndEstadoNot`; un viaje cancelado
   deja de existir para la API (el listado no lo muestra, `GET /{id}` → 404, `PUT` → 404).
-- **"Mis viajes" filtra por `usuario` (String), no por `turistaId`.** No hay entidad `Usuario`
-  todavía; es deuda. `GET /api/viajes` **exige** `?usuario=` y sin él responde **400** (lo maneja
+- **"Mis viajes" filtra por `usuario` (String), no por `turistaId`.** La entidad `Usuario` ya
+  existe, pero `Viaje` todavía no la referencia; es deuda. `GET /api/viajes` **exige** `?usuario=` y sin él responde **400** (lo maneja
   `handleMissingParameter`).
 - **La API expone `LocalDate`; la entidad guarda `LocalDateTime`.** `ViajeMapper` convierte con
   helpers `default` (medianoche). El tipo de persistencia no se filtra al contrato de la API.
@@ -334,8 +344,9 @@ Decisiones que no son obvias y conviene no deshacer sin motivo:
 - **La confirmación previa de VZ-23 CA1 es de la UI** (AlertDialog); el backend solo expone el
   `DELETE`.
 
-Deuda conocida: `usuario` es un `String` sin FK, igual que el `email` de `Publicador`. Cuando
-exista `Usuario`/autenticación hay que migrar a una relación real.
+Deuda conocida: `usuario` es un `String` sin FK, igual que el `email` de `Publicador`. Ya existe
+la entidad `Usuario` (solo registro); cuando haya autenticación hay que migrar `Viaje.usuario` a un
+`@ManyToOne` con `Usuario` y sacar el `?usuario=` del listado.
 
 ## API del Sprint 3 — Agenda turística (VZ-18)
 
@@ -445,9 +456,71 @@ Decisiones y trampas:
   `propuestaId` responde **400**. `GET .../alternativas` devuelve **200** con `alternativas: []`
   y `mensaje` cuando no hay opciones.
 
+## API de Usuarios — registro y baja
+
+| Método | Ruta | Caso de uso |
+| --- | --- | --- |
+| POST | `/api/usuarios` | registrar usuario → **201** |
+| GET | `/api/usuarios/{id}` | soporte (consultar el usuario activo) → 200 / **404** |
+| POST | `/api/usuarios/{id}/baja?confirmar=true` | dar de baja la cuenta (body `{ "contrasena": "..." }`) → **200** |
+
+Body del `POST`: `nombre` (obligatorio, ≤120), `email` (obligatorio, formato válido, ≤180, único),
+`telefono` (opcional, ≤40) y `contrasena` (obligatoria, **8 a 72 caracteres**). La respuesta
+(`UsuarioResponse`) devuelve `id`, `nombre`, `email` y `telefono`: **nunca la contraseña, ni
+siquiera el hash**.
+
+Decisiones que no son obvias y conviene no deshacer sin motivo:
+
+- **La contraseña se guarda como hash BCrypt.** El `PasswordEncoder` es un bean de
+  `config/PasswordConfig` y `UsuarioService.create` lo usa antes del `save`. El login futuro debe
+  inyectar el mismo bean y comparar con `matches`, nunca volver a hashear y comparar strings
+  (BCrypt usa un salt aleatorio: el mismo texto da un hash distinto cada vez).
+- **`UsuarioMapper.toEntity` ignora `contrasena` a propósito.** Si el mapper la copiara, un olvido
+  en el service guardaría el texto plano sin que nada fallara. Ignorada, el olvido deja el campo en
+  `null` y la base lo rechaza (`nullable = false`).
+- **El tope de 72 no es arbitrario y se valida dos veces.** El `BCryptPasswordEncoder` de esta
+  versión **lanza `IllegalArgumentException`** si la contraseña supera 72 **bytes** (versiones
+  viejas la truncaban en silencio). `@Size(max = 72)` cuenta **caracteres**, y una tilde o una ñ
+  ocupan 2 bytes en UTF-8: 40 `ñ` pasan el `@Size` y son 80 bytes. Por eso `UsuarioService.create`
+  chequea además `getBytes(UTF_8).length > 72` y responde 400 (`BusinessRuleException`) antes de
+  llamar a `encode`. Sin ese chequeo, esa contraseña terminaba en un **500**. No sacarlo aunque
+  parezca redundante con el `@Size`.
+- **Email único con el mismo esquema que `Publicador`**: pre-chequeo con
+  `UsuarioRepository.existsByEmail` → 400 `"ya existe un usuario con ese email"`, y
+  `GlobalExceptionHandler` cubre la carrera contra la constraint con el mismo mensaje. Valen las
+  mismas limitaciones: es case-sensitive y permite enumerar emails registrados.
+- **Sin autenticación todavía**: `GET /api/usuarios/{id}` lo puede llamar cualquiera. Cuando haya
+  login hay que restringirlo al propio usuario.
+
+### Baja de usuario
+
+`UsuarioService.darDeBaja` responde **200** con `{ id, mensaje, viajesCancelados }`. Decisiones:
+
+- **Es `POST /{id}/baja` y no `DELETE /{id}`** porque lleva la contraseña en el body, y hay
+  clientes y proxies que descartan el body de un `DELETE`.
+- **El orden de los chequeos es parte del contrato**: usuario activo (si no **404**) →
+  `confirmar=true` (si no **409**, mismo patrón que la eliminación de paradas) → contraseña con
+  `passwordEncoder.matches` (si no **400** `"la contraseña es incorrecta"`). Body sin `contrasena`
+  → 400 por `@Valid`, antes de todo lo anterior.
+- **Baja lógica con `activo = false`**: la fila se conserva. **Toda lectura por id tiene que usar
+  `findByIdAndActivoTrue`**, nunca `findById`: un usuario dado de baja no existe para la API
+  (`GET` → 404, segunda baja → 404). El login futuro también debe filtrar por `activo`.
+- **Cancela los viajes `BORRADOR` y `PLANIFICADO`** del usuario con `Viaje.cancelar()`, en la misma
+  transacción que la baja. Los `EN_CURSO` **quedan como están**: `EstadoViaje` no permite pasar de
+  `EN_CURSO` a `CANCELADO`, y no se cambió la regla del dominio para esta US; el scheduler los
+  finaliza al terminar. Los terminales no se tocan.
+- **Los viajes se asocian por email** (`findByUsuarioAndEstadoIn(usuario.getEmail(), ...)`)
+  porque `Viaje.usuario` todavía es un `String` libre (ver la deuda del Sprint 2). Un viaje cargado
+  con otro identificador (por ejemplo `turista_demo`, como en los fixtures del frontend) no se
+  cancela. Se resuelve al migrar `Viaje.usuario` a un `@ManyToOne` con `Usuario`.
+- **El email de una cuenta dada de baja no se puede volver a registrar**: `existsByEmail` incluye
+  a los inactivos y la constraint `UNIQUE` también. El registro responde
+  `"ya existe un usuario con ese email"`. Si se decide permitir el re-registro o reactivar la
+  cuenta, hay que cambiar ambas cosas.
+
 ## Servicios
 
-`EventoService` y `PublicadorService` usan Lombok `@RequiredArgsConstructor` (todos los collaborators
+`EventoService`, `PublicadorService` y `UsuarioService` usan Lombok `@RequiredArgsConstructor` (todos los collaborators
 son `final`), y `@Transactional` **granular**:
 
 - `@Transactional` en las escrituras (`create`, `update`, `delete`).
@@ -485,10 +558,14 @@ Tres detalles a no romper:
 - **`handleDataIntegrityViolation` sigue la misma regla**: registra la excepción completa en el log
   y devuelve un mensaje fijo y en español. El mensaje crudo de Hibernate nombra la tabla, el índice
   y el valor que chocó,   y eso es un mapa de la base para cualquiera que podría llamar al alta.
+  **El orden de los chequeos importa**: primero busca `usuario(email` (el índice único de
+  `usuario`) y después el genérico `email`/`publicador`. Si se invierte, un duplicado de usuario
+  responde "ya existe un publicador". No buscar `usuario` a secas: `viaje` tiene una columna
+  `usuario` que aparece en el SQL de cualquier violación sobre viajes.
 - El `Clock` llega por inyección (`AppConfig.clock()`), no por `LocalDateTime.now()`. Los tests de
   la semana ISO fijan el reloj y así no dependen del día en que corren. Por el mismo motivo, los
-  `@WebMvcTest` (`EventoControllerTest`, `PublicadorControllerTest`, `AgendaControllerTest`,
-  `ViajeControllerTest`, `ImagenControllerTest` y `ImagenServingTest`) hacen
+  `@WebMvcTest` (`EventoControllerTest`, `PublicadorControllerTest`, `UsuarioControllerTest`,
+  `AgendaControllerTest`, `ViajeControllerTest`, `ImagenControllerTest` y `ImagenServingTest`) hacen
   `@Import(AppConfig.class)`: un slice no carga los beans de `config/` y sin ese import el `Clock`
   no existiría.
 
@@ -592,7 +669,7 @@ Las anotaciones de test **cambiaron de package**. Importar desde el package viej
 `@MockBean` ya no existe. Para tests unitarios con Mockito alcanza con
 `@ExtendWith(MockitoExtension.class)` + `@Mock`, sin contexto de Spring.
 
-Reparto actual (263 tests; 2 fallos preexistentes por fechas fijas ya vencidas en `ViajeMapperTest`
+Reparto actual (290 tests; 2 fallos preexistentes por fechas fijas ya vencidas en `ViajeMapperTest`
 y `ViajeTest`):
 
 | Archivo | Tests | Cubre |
@@ -617,8 +694,11 @@ y `ViajeTest`):
 | `ImagenServiceTest` | 6 | **guardar/borrar, magic bytes, tope 5 MB, anti path traversal (`@TempDir`)** |
 | `GeocodingServiceTest` | 5 | **dedup de la query de Nominatim, campos vacíos, provincia** |
 | `PublicadorRepositoryTest` | 5 | orden alfabético, paginación, página vacía, **derived query + constraint de unicidad** |
+| `UsuarioControllerTest` | 12 | registro 201 **sin `contrasena` en la respuesta**, faltantes/email inválido/contraseña corta → 400, duplicado (negocio y constraint) con mensaje de usuario, 404; **baja 200/409/400/404** |
+| `UsuarioServiceTest` | 11 | alta, **hash BCrypt verificable con `matches`**, **contraseña de más de 72 bytes → 400 (no 500)**, pre-chequeo de email, consulta, 404; **baja: inactiva y cancela viajes, solo `BORRADOR`/`PLANIFICADO`, sin confirmar/contraseña incorrecta no tocan nada, ya dado de baja → 404** |
+| `UsuarioRepositoryTest` | 3 | `existsByEmail`, **`findByIdAndActivoTrue` excluye inactivos** y constraint de unicidad (el mensaje nombra `usuario(email`) |
 | `ViajeMapperTest` | 4 | mapeo entidad↔DTO, fechas `LocalDate`↔`LocalDateTime` (**1 fallo preexistente por fecha fija**) |
-| `ViajeRepositoryTest` | 4 | activos por usuario, exclusión de cancelados, orden |
+| `ViajeRepositoryTest` | 5 | activos por usuario, exclusión de cancelados, orden, **viajes por usuario y estados (baja de usuario)** |
 | `CircuitoRepositoryTest` | 1 | **VZ-25: recarga el circuito con ítems ordenados y sin `null`** |
 | `ImagenControllerTest` | 4 | **POST/DELETE de `/api/imagenes`, parte faltante y archivo vacío → 400** |
 | `PropuestaControllerTest` | 3 | listado unificado, filtros (incluida `ubicacion`), 400 |

@@ -82,6 +82,22 @@ class ViajeRepositoryTest {
 				List.of(EstadoViaje.BORRADOR, EstadoViaje.CANCELADO))).isPresent();
 	}
 
+	@Test
+	@DisplayName("baja de usuario: trae solo los viajes del turista en los estados pedidos")
+	void findsTripsOfTouristByStates() {
+		save("Borrador propio", TURISTA, EstadoViaje.BORRADOR);
+		save("Planificado propio", TURISTA, EstadoViaje.PLANIFICADO);
+		save("En curso propio", TURISTA, EstadoViaje.EN_CURSO);
+		save("Finalizado propio", TURISTA, EstadoViaje.FINALIZADO);
+		save("Planificado ajeno", OTRO, EstadoViaje.PLANIFICADO);
+
+		List<Viaje> result = viajeRepository.findByUsuarioAndEstadoIn(TURISTA,
+				List.of(EstadoViaje.BORRADOR, EstadoViaje.PLANIFICADO));
+
+		assertThat(result).extracting(Viaje::getNombre)
+				.containsExactlyInAnyOrder("Borrador propio", "Planificado propio");
+	}
+
 	private Viaje save(String nombre, String usuario, EstadoViaje estado) {
 		return save(nombre, usuario, estado, LocalDate.parse("2026-10-20"));
 	}

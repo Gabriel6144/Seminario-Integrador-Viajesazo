@@ -145,6 +145,13 @@ public class GlobalExceptionHandler {
 		logger.warn("Violación de integridad al escribir", ex);
 		String cause = ex.getMostSpecificCause().getMessage();
 		String normalized = cause == null ? "" : cause.toLowerCase(Locale.ROOT);
+		// Usuario va antes que el chequeo genérico de "email": su constraint también menciona la
+		// columna email y, si no, el duplicado de usuario respondería con el mensaje de publicador.
+		// Se busca el índice "usuario(email" y no "usuario" a secas porque viaje tiene una columna
+		// usuario que aparece en el SQL de cualquier violación sobre viaje.
+		if (normalized.contains("usuario(email")) {
+			return build(HttpStatus.BAD_REQUEST, "ya existe un usuario con ese email");
+		}
 		if (normalized.contains("email") || normalized.contains("publicador")) {
 			return build(HttpStatus.BAD_REQUEST, "ya existe un publicador con ese email");
 		}
