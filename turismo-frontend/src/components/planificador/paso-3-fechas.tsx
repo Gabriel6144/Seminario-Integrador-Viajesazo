@@ -1,3 +1,6 @@
+import { useRef } from 'react'
+
+import { formatShortLocalDate } from '@/lib/dates'
 import { GuiaCallout } from './guia-callout'
 
 interface Paso3FechasProps {
@@ -25,6 +28,19 @@ export function Paso3Fechas({
   onChangeDateTo,
   onNext,
 }: Paso3FechasProps) {
+  const dateFromInputRef = useRef<HTMLInputElement>(null)
+  const dateToInputRef = useRef<HTMLInputElement>(null)
+
+  const openDatePicker = (input: HTMLInputElement | null) => {
+    if (!input) return
+    if (typeof input.showPicker === 'function') {
+      input.showPicker()
+      return
+    }
+    input.focus()
+    input.click()
+  }
+
   return (
     <div className="flex min-h-[500px] w-full flex-col justify-between">
       <div>
@@ -43,18 +59,33 @@ export function Paso3Fechas({
             <span>Fecha de Llegada</span>
             <span className="text-[11px] font-bold text-sky-600">Check-in</span>
           </label>
-          <div className="relative flex items-center">
-            <span className="material-symbols-outlined pointer-events-none absolute left-3.5 text-sky-500">
+          <div
+            className="relative flex cursor-pointer items-center"
+            onClick={() => openDatePicker(dateFromInputRef.current)}
+          >
+            <span className="material-symbols-outlined pointer-events-none absolute left-3.5 z-10 text-sky-500">
               flight_land
             </span>
+
+            {/* Input nativo transparente encima para que abra el calendario al hacer clic */}
             <input
+              ref={dateFromInputRef}
               id={dateFromId}
               type="date"
               min={todayStr}
               value={dateFrom}
               onChange={(e) => onChangeDateFrom(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-12 pr-4 text-sm font-semibold text-slate-800 outline-none focus:border-sky-500 focus:bg-white"
+              className="absolute inset-0 z-20 h-full w-full cursor-pointer opacity-0"
             />
+
+            {/* Capa visual que muestra la fecha en formato DD/MM/AAAA */}
+            <div className="pointer-events-none flex w-full items-center rounded-xl border border-slate-200 bg-slate-50 py-3 pl-12 pr-4 text-sm font-semibold text-slate-800">
+              {dateFrom ? (
+                formatShortLocalDate(dateFrom)
+              ) : (
+                <span className="text-slate-400">Selecciona una fecha</span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -63,18 +94,33 @@ export function Paso3Fechas({
             <span>Fecha de Partida</span>
             <span className="text-[11px] font-bold text-amber-600">Check-out</span>
           </label>
-          <div className="relative flex items-center">
-            <span className="material-symbols-outlined pointer-events-none absolute left-3.5 text-amber-500">
+          <div
+            className="relative flex cursor-pointer items-center"
+            onClick={() => openDatePicker(dateToInputRef.current)}
+          >
+            <span className="material-symbols-outlined pointer-events-none absolute left-3.5 z-10 text-amber-500">
               flight_takeoff
             </span>
+
+            {/* Input nativo transparente encima para que abra el calendario al hacer clic */}
             <input
+              ref={dateToInputRef}
               id={dateToId}
               type="date"
               min={dateFrom && dateFrom >= todayStr ? dateFrom : todayStr}
               value={dateTo}
               onChange={(e) => onChangeDateTo(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-12 pr-4 text-sm font-semibold text-slate-800 outline-none focus:border-sky-500 focus:bg-white"
+              className="absolute inset-0 z-20 h-full w-full cursor-pointer opacity-0"
             />
+
+            {/* Capa visual que muestra la fecha en formato DD/MM/AAAA */}
+            <div className="pointer-events-none flex w-full items-center rounded-xl border border-slate-200 bg-slate-50 py-3 pl-12 pr-4 text-sm font-semibold text-slate-800">
+              {dateTo ? (
+                formatShortLocalDate(dateTo)
+              ) : (
+                <span className="text-slate-400">Selecciona una fecha</span>
+              )}
+            </div>
           </div>
         </div>
       </div>

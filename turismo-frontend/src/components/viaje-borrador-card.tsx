@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 
-import type { ViajeResponse } from '@/types/api'
+import { ESTADO_VIAJE_LABELS, type ViajeResponse } from '@/types/api'
 
 interface Props {
   borrador: ViajeResponse
@@ -9,14 +9,15 @@ interface Props {
 }
 
 export function ViajeBorradorCard({ borrador, onDescartar, descartando }: Props) {
-  const confirmado = borrador.estado !== 'BORRADOR'
+  const esBorrador = borrador.estado === 'BORRADOR'
   const paso = borrador.pasoActual ?? 0
   const progreso = Math.min(100, Math.max(0, Math.round((paso / 8) * 100)))
+  const estadoLabel = ESTADO_VIAJE_LABELS[borrador.estado] ?? borrador.estado
 
   return (
     <article
       className={`flex flex-col gap-3 rounded-2xl border bg-white p-5 shadow-sm ${
-        confirmado ? 'border-emerald-200' : 'border-amber-200'
+        esBorrador ? 'border-amber-200' : 'border-sky-200'
       }`}
     >
       <header className="flex items-start justify-between gap-3">
@@ -27,21 +28,16 @@ export function ViajeBorradorCard({ borrador, onDescartar, descartando }: Props)
         </div>
         <span
           className={`rounded-full px-3 py-1 text-xs font-bold ${
-            confirmado
-              ? 'bg-emerald-50 text-emerald-700'
-              : 'bg-amber-50 text-amber-700'
+            esBorrador
+              ? 'bg-amber-50 text-amber-700'
+              : 'bg-sky-50 text-sky-700'
           }`}
         >
-          {confirmado ? 'Circuito confirmado' : `Borrador · Paso ${borrador.pasoActual ?? '?'} de 8`}
+          {esBorrador ? `Borrador · Paso ${borrador.pasoActual ?? '?'} de 8` : estadoLabel}
         </span>
       </header>
 
-      {confirmado ? (
-        <div className="flex items-center gap-2 rounded-2xl bg-emerald-50 p-3 text-xs font-medium text-emerald-800">
-          <span className="material-symbols-outlined text-[20px]">verified</span>
-          <span>Tu itinerario está listo. ¡Buen viaje!</span>
-        </div>
-      ) : (
+      {esBorrador ? (
         <div className="rounded-2xl bg-slate-50 p-3">
           <div className="mb-1.5 flex items-center justify-between text-xs font-medium text-slate-500">
             <span>Progreso de armado</span>
@@ -52,6 +48,11 @@ export function ViajeBorradorCard({ borrador, onDescartar, descartando }: Props)
           <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200">
             <div className="h-full rounded-full bg-amber-500 transition-all duration-500" style={{ width: `${progreso}%` }} />
           </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 rounded-2xl bg-sky-50 p-3 text-xs font-medium text-sky-800">
+          <span className="material-symbols-outlined text-[20px]">info</span>
+          <span>Estado del viaje: {estadoLabel}.</span>
         </div>
       )}
 
@@ -93,10 +94,10 @@ export function ViajeBorradorCard({ borrador, onDescartar, descartando }: Props)
         ) : null}
       </div>
 
-      {confirmado ? (
+      {!esBorrador ? (
         <Link
           to={`/viajes/${borrador.id}/circuito`}
-          className="mt-auto flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-3 text-center text-xs font-bold text-white transition hover:bg-emerald-700"
+          className="mt-auto flex items-center justify-center gap-1.5 rounded-xl bg-sky-600 px-4 py-3 text-center text-xs font-bold text-white transition hover:bg-sky-700"
         >
           <span className="material-symbols-outlined text-base">map</span>
           Ver circuito

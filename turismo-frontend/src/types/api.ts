@@ -370,6 +370,53 @@ export interface PublicadorRequest {
   telefono: string | null
 }
 
+// ---------------------------------------------------------------------------
+// Usuarios (plantilla frontend — contrato pendiente de backend)
+// ---------------------------------------------------------------------------
+
+export const ROLES_USUARIO = ['TURISTA', 'PUBLICADOR', 'ADMINISTRADOR'] as const
+export type RolUsuario = (typeof ROLES_USUARIO)[number]
+
+export const ROL_USUARIO_LABELS: Record<RolUsuario, string> = {
+  TURISTA: 'Turista',
+  PUBLICADOR: 'Publicador',
+  ADMINISTRADOR: 'Administrador',
+}
+
+export const ESTADOS_USUARIO = ['ACTIVO', 'INACTIVO'] as const
+export type EstadoUsuario = (typeof ESTADOS_USUARIO)[number]
+
+/**
+ * Contrato esperado para `GET /api/usuarios` y `GET /api/usuarios/{id}`.
+ * Ajustar campos cuando el backend defina el modelo definitivo.
+ */
+export interface UsuarioResponse {
+  id: number
+  nombre: string
+  apellido: string
+  email: string
+  rol: RolUsuario
+  estado: EstadoUsuario
+  /** `yyyy-MM-dd` (o ISO) según lo que exponga el backend; opcional en la plantilla. */
+  fechaAlta: LocalDate | null
+}
+
+/** Contrato esperado para `POST /api/usuarios`. */
+export interface UsuarioRequest {
+  nombre: string
+  apellido: string
+  email: string
+  rol: RolUsuario
+}
+
+/**
+ * Contrato esperado para baja/cambio de estado.
+ * Sugerido: `PATCH /api/usuarios/{id}/baja` o `PATCH /api/usuarios/{id}` con `{ estado }`.
+ */
+export interface UsuarioBajaRequest {
+  estado: EstadoUsuario
+}
+
 /**
  * Cuerpo de error del `GlobalExceptionHandler`. Es la única parte de la API con las claves en
  * inglés: `message` se llama así, pero su **valor** sigue siendo texto en español.
@@ -390,6 +437,14 @@ export type TipoRitmo = (typeof TIPOS_RITMO)[number]
 
 export const ESTADOS_VIAJE = ['BORRADOR', 'PLANIFICADO', 'EN_CURSO', 'FINALIZADO', 'CANCELADO'] as const
 export type EstadoViaje = (typeof ESTADOS_VIAJE)[number]
+
+export const ESTADO_VIAJE_LABELS: Record<EstadoViaje, string> = {
+  BORRADOR: 'Borrador',
+  PLANIFICADO: 'Planificado',
+  EN_CURSO: 'En curso',
+  FINALIZADO: 'Finalizado',
+  CANCELADO: 'Cancelado',
+}
 
 export const INTERESES_CATEGORIA = [
   'NATURALEZA',

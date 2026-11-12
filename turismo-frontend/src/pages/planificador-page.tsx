@@ -544,6 +544,8 @@ export function PlanificadorPage() {
             <Paso10Circuito
               circuito={circuito}
               rhythm={rhythm}
+              dateFrom={dateFrom}
+              dateTo={dateTo}
               activeDay={activeDay}
               selectedStrategy={selectedStrategy}
               isSelecting={seleccionarCircuito.isPending}

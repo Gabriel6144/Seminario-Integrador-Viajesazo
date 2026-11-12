@@ -198,6 +198,17 @@ export const handlers = [
     return HttpResponse.json(borrador)
   }),
 
+  http.get('/api/viajes/:id', ({ params }) => {
+    if (params.id === 'borradores') return
+    const viaje = findBorrador(Number(params.id))
+    if (viaje === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el viaje con id ${String(params.id)}`), {
+        status: 404,
+      })
+    }
+    return HttpResponse.json(viaje)
+  }),
+
   http.post('/api/viajes/borradores', async ({ request }) => {
     const body = await readJson<Partial<ViajeBorradorRequest>>(request)
     return HttpResponse.json(createBorrador(body as ViajeBorradorRequest), { status: 201 })
@@ -377,12 +388,60 @@ export const handlers = [
       })
     }
     const circuito = findCircuito(viaje.id)
-    if (circuito === undefined) {
-      return HttpResponse.json(errorBody(404, 'El viaje todavía no tiene un circuito generado'), {
-        status: 404,
+    if (circuito !== undefined) {
+      return HttpResponse.json(circuito)
+    }
+    const seleccionado = findCircuitoSeleccionado(viaje.id)
+    if (seleccionado !== undefined) {
+      return HttpResponse.json({
+        generadoEn: seleccionado.generadoEn,
+        estrategiaSeleccionada: seleccionado.estrategia,
+        distanciasEstimadas: seleccionado.distanciasEstimadas,
+        advertencia: seleccionado.advertencia,
+        alternativas: [
+          {
+            estrategia: seleccionado.estrategia,
+            distanciaTotalKm: 0,
+            afinidadIntereses: 0,
+            categoriasCubiertas: [],
+            advertencia: seleccionado.advertencia,
+            propuestas: seleccionado.dias.flatMap((dia) =>
+              dia.items.map((item, index) => ({
+                itemId: item.itemId,
+                propuestaId: item.propuestaId,
+                propuestaNombre: item.propuestaNombre,
+                descripcion: null,
+                categoria: item.categoria,
+                tipo: item.tipo,
+                fecha: dia.fecha,
+                orden: index + 1,
+                horaInicio: item.horaInicio,
+                horaFin: item.horaFin,
+                trasladoKm: 0,
+                trasladoMinutos: 0,
+                disponible: true,
+                motivoNoDisponible: null,
+                imagenes: [],
+                ciudad: item.ciudad,
+                localidad: item.localidad,
+                direccion: item.direccion,
+                lugarRecinto: null,
+                latitud: null,
+                longitud: null,
+                tipoAcceso: null,
+                montoEstimado: null,
+                descripcionArancel: null,
+                sitioOficial: null,
+                duracionMinutos: item.duracionMinutos,
+              })),
+            ),
+          },
+        ],
       })
     }
-    return HttpResponse.json(circuito)
+    return HttpResponse.json(errorBody(404, 'El viaje todavía no tiene un circuito generado'), {
+      status: 404,
+    })
   }),
 
   http.post('/api/viajes/:id/circuito', ({ params, request }) => {

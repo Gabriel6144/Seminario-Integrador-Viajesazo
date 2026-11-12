@@ -42,13 +42,68 @@ let nextEventoId = 0
 let nextPublicadorId = 0
 let nextBorradorId = 0
 
+function buildGeneradoFromSeleccionado(
+  seleccionado: CircuitoSeleccionadoResponse,
+): GeneracionCircuitoResponse {
+  return {
+    generadoEn: seleccionado.generadoEn,
+    estrategiaSeleccionada: seleccionado.estrategia,
+    distanciasEstimadas: seleccionado.distanciasEstimadas,
+    advertencia: seleccionado.advertencia,
+    alternativas: [
+      {
+        estrategia: seleccionado.estrategia,
+        distanciaTotalKm: 0,
+        afinidadIntereses: 0.87,
+        categoriasCubiertas: ['CULTURA', 'MUSICA'],
+        advertencia: seleccionado.advertencia,
+        propuestas: seleccionado.dias.flatMap((dia) =>
+          dia.items.map((item, index) => ({
+            itemId: item.itemId,
+            propuestaId: item.propuestaId,
+            propuestaNombre: item.propuestaNombre,
+            descripcion:
+              item.propuestaNombre === 'Festival de Doma y Folklore de Jesús María'
+                ? 'La mayor fiesta de la tradición gaucha y música folklórica.'
+                : item.propuestaNombre === 'Circuito Peatonal Histórico Córdoba Jesuítica'
+                  ? 'Recorrido patrimonial guiado por templos y museos fundacionales.'
+                  : 'Experiencia sugerida para tu recorrido.',
+            categoria: item.categoria,
+            tipo: item.tipo,
+            fecha: dia.fecha,
+            orden: index + 1,
+            horaInicio: item.horaInicio,
+            horaFin: item.horaFin,
+            trasladoKm: 0,
+            trasladoMinutos: 0,
+            disponible: true,
+            motivoNoDisponible: null,
+            imagenes: ['https://example.com/circuito.jpg'],
+            ciudad: item.ciudad,
+            localidad: item.localidad,
+            direccion: item.direccion,
+            lugarRecinto: item.localidad ?? 'Centro',
+            latitud: -31.42,
+            longitud: -64.18,
+            tipoAcceso: 'GRATUITO',
+            montoEstimado: null,
+            descripcionArancel: null,
+            sitioOficial: null,
+            duracionMinutos: item.duracionMinutos,
+          })),
+        ),
+      },
+    ],
+  }
+}
+
 export function resetStore(): void {
   eventos = structuredClone(EVENTOS)
   publicadores = structuredClone(PUBLICADORES)
   borradores = structuredClone(BORRADORES)
-  circuitos = new Map()
-  // El viaje confirmado del fixture ya tiene su circuito elegido, listo para VZ-26.
-  circuitosSeleccionados = new Map([[2, structuredClone(CIRCUITO_SELECCIONADO)]])
+  const seleccionadoViaje2 = structuredClone(CIRCUITO_SELECCIONADO)
+  circuitosSeleccionados = new Map([[2, seleccionadoViaje2]])
+  circuitos = new Map([[2, buildGeneradoFromSeleccionado(seleccionadoViaje2)]])
   // Los fixtures ya traen ids 1..3 y 1..7, así que los siguientes arrancan por arriba.
   nextEventoId = Math.max(0, ...EVENTOS.map((evento) => evento.id)) + 1
   nextPublicadorId = Math.max(0, ...PUBLICADORES.map((publicador) => publicador.id)) + 1
@@ -167,6 +222,13 @@ export function findCircuitoItem(
   return undefined
 }
 
+function syncGeneradoFromSeleccionado(viajeId: number): void {
+  const seleccionado = circuitosSeleccionados.get(viajeId)
+  if (seleccionado !== undefined) {
+    circuitos.set(viajeId, buildGeneradoFromSeleccionado(seleccionado))
+  }
+}
+
 /** VZ-28: pisa los datos de la parada con la propuesta elegida, como el backend. */
 export function replaceCircuitoItem(
   viajeId: number,
@@ -185,6 +247,7 @@ export function replaceCircuitoItem(
   item.horaInicio = alternativa.horaInicio
   item.horaFin = alternativa.horaFin
   item.duracionMinutos = alternativa.duracionMinutos
+  syncGeneradoFromSeleccionado(viajeId)
   return true
 }
 
@@ -196,6 +259,7 @@ export function removeCircuitoItem(viajeId: number, itemId: number): boolean {
     const index = dia.items.findIndex((item) => item.itemId === itemId)
     if (index === -1) continue
     dia.items.splice(index, 1)
+    syncGeneradoFromSeleccionado(viajeId)
     return true
   }
   return false

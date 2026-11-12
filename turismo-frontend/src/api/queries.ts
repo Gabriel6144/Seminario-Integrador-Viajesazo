@@ -43,6 +43,7 @@ export const queryKeys = {
   borradores: (page: number, size: number) => ['borradores', { page, size }] as const,
   borradoresAll: () => ['borradores'] as const,
   borrador: (id: number) => ['borrador', id] as const,
+  viaje: (id: number) => ['viaje', id] as const,
   viajes: (page: number, size: number) => ['viajes', { page, size }] as const,
   viajesAll: () => ['viajes'] as const,
   circuito: (viajeId: number) => ['circuito', viajeId] as const,
@@ -56,6 +57,15 @@ export const queryKeys = {
    * cambia uno de sus eventos.
    */
   publicadorEventosAll: (id: number) => ['publicador', id, 'eventos'] as const,
+
+  /**
+   * Usuarios del sistema (plantilla frontend; contrato backend pendiente).
+   * `list` incluye filtros de UI para cachear búsquedas por separado.
+   */
+  usuarios: (page: number, size: number, q = '', rol: string = 'TODOS') =>
+    ['usuarios', { page, size, q, rol }] as const,
+  usuariosAll: () => ['usuarios'] as const,
+  usuario: (id: number) => ['usuario', id] as const,
 }
 
 /** Construye `?page=&size=` omitiendo los valores por defecto. */

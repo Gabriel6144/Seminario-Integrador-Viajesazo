@@ -19,6 +19,12 @@ function toLocalDate(iso: LocalDate): Date {
   return new Date(year, month - 1, day)
 }
 
+/** `"2026-10-01"` → `"01/10/2026"`. */
+export function formatShortLocalDate(iso: LocalDate): string {
+  const [year, month, day] = iso.split('-')
+  return `${day}/${month}/${year}`
+}
+
 /** `"2026-10-01"` → `"1 de octubre de 2026"`. */
 export function formatLocalDate(iso: LocalDate): string {
   return toLocalDate(iso).toLocaleDateString('es-AR', { dateStyle: 'long' })

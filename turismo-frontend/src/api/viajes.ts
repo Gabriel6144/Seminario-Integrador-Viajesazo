@@ -45,6 +45,14 @@ export function useBorrador(id: number | null) {
   })
 }
 
+export function useViaje(id: number | null) {
+  return useQuery({
+    queryKey: queryKeys.viaje(id ?? 0),
+    queryFn: ({ signal }) => apiGet<ViajeResponse>(`/api/viajes/${id}`, signal),
+    enabled: id !== null,
+  })
+}
+
 export function useCrearViaje() {
   const queryClient = useQueryClient()
 

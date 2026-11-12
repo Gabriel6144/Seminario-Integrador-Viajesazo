@@ -4,6 +4,7 @@ import {
   CATEGORIAS,
   DIAS_SEMANA,
   MODALIDADES,
+  ROLES_USUARIO,
   TIPOS_ACCESO,
   TIPOS_PROPUESTA,
   type ActividadRequest,
@@ -13,9 +14,11 @@ import {
   type EventoRequest,
   type Modalidad,
   type PublicadorRequest,
+  type RolUsuario,
   type TipoAcceso,
   type TipoPropuesta,
   type TipoRegistro,
+  type UsuarioRequest,
 } from '@/types/api'
 
 /**
@@ -509,5 +512,31 @@ export function toActividadFormValues(actividad: ActividadResponse): EventoFormV
     })),
     imagenes: actividad.imagenes.map((url) => ({ url })),
     publicadorId: String(actividad.publicadorId),
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Usuario (plantilla frontend — contrato backend pendiente)
+// ---------------------------------------------------------------------------
+
+export const usuarioSchema = z.object({
+  nombre: z.string().trim().min(1, 'El nombre es obligatorio.'),
+  apellido: z.string().trim().min(1, 'El apellido es obligatorio.'),
+  email: z
+    .string()
+    .trim()
+    .min(1, 'El correo electrónico es obligatorio.')
+    .email('El email no tiene un formato válido.'),
+  rol: z.enum(ROLES_USUARIO, { message: 'El rol de usuario es obligatorio.' }),
+})
+
+export type UsuarioFormValues = z.infer<typeof usuarioSchema>
+
+export function toUsuarioRequest(values: UsuarioFormValues): UsuarioRequest {
+  return {
+    nombre: values.nombre.trim(),
+    apellido: values.apellido.trim(),
+    email: values.email.trim(),
+    rol: values.rol as RolUsuario,
   }
 }
