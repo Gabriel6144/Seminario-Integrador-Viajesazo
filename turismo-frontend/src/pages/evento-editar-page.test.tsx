@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { EventoEditarPage } from './evento-editar-page'
-import { COSQUIN, FOLKLORE, TURISMO } from '@/test/fixtures'
+import { COSQUIN, FOLKLORE, GASTRONOMIA_ESTANCIA, TURISMO } from '@/test/fixtures'
 import { findEvento, resetStore } from '@/test/store'
 import { user, renderRoute } from '@/test/utils'
 
@@ -27,7 +27,7 @@ function renderEdicion(id: string) {
 }
 
 async function esperarFormulario() {
-  return screen.findByLabelText('Nombre')
+  return screen.findByLabelText('Nombre del evento')
 }
 
 async function elegirPublicador(nombre: string) {
@@ -49,7 +49,7 @@ describe('EventoEditarPage', () => {
     expect(screen.getByLabelText('Horario de inicio')).toHaveValue('20:00')
     expect(screen.getByLabelText('Horario de finalización')).toHaveValue('23:30')
     expect(screen.getByLabelText('URL de la imagen 1')).toHaveValue(
-      'https://cdn.cordoba.gob.ar/folklore-cosquin.jpg',
+      FOLKLORE.imagenes[0],
     )
   })
 
@@ -70,8 +70,8 @@ describe('EventoEditarPage', () => {
     renderEdicion('1')
     await esperarFormulario()
 
-    await user().clear(screen.getByLabelText('Nombre'))
-    await user().type(screen.getByLabelText('Nombre'), 'Con imagen')
+    await user().clear(screen.getByLabelText('Nombre del evento'))
+    await user().type(screen.getByLabelText('Nombre del evento'), 'Con imagen')
     await user().click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
     await waitFor(() => expect(findEvento(1)?.nombre).toBe('Con imagen'))
@@ -105,7 +105,7 @@ describe('EventoEditarPage', () => {
     renderEdicion('1')
     await esperarFormulario()
 
-    await user().clear(screen.getByLabelText('Descripción'))
+    await user().clear(screen.getByLabelText('Descripción completa'))
     await user().clear(screen.getByLabelText('Horario de inicio'))
     await user().click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
@@ -122,7 +122,7 @@ describe('EventoEditarPage', () => {
     await user().click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
     expect(
-      await screen.findByText('la fecha de finalización no puede ser anterior a la de inicio'),
+      await screen.findByText('La fecha de finalización no puede ser anterior a la de inicio.'),
     ).toBeInTheDocument()
     expect(findEvento(1)?.fechaFin).toBe(FOLKLORE.fechaFin)
   })
@@ -142,5 +142,24 @@ describe('EventoEditarPage', () => {
     expect(await screen.findByRole('combobox', { name: 'Publicador' })).toHaveTextContent(
       TURISMO.nombre,
     )
+  })
+
+  it('precarga el arancel de un evento arancelado y lo limpia al pasar a gratuito', async () => {
+    renderEdicion('3')
+    await esperarFormulario()
+
+    expect(screen.getByLabelText('Monto estimado')).toHaveValue(GASTRONOMIA_ESTANCIA.montoEstimado)
+    expect(screen.getByLabelText('Sitio oficial de la boletería o entradas')).toHaveValue(
+      GASTRONOMIA_ESTANCIA.sitioOficial,
+    )
+
+    await user().click(screen.getByRole('combobox', { name: 'Tipo de acceso' }))
+    await user().click(await screen.findByRole('option', { name: 'Gratuito' }))
+    await user().click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    await waitFor(() => expect(findEvento(3)?.tipoAcceso).toBe('GRATUITO'))
+    // Al dejar de ser arancelado, el monto y el link no pueden quedar colgados en la base.
+    expect(findEvento(3)?.montoEstimado).toBeNull()
+    expect(findEvento(3)?.sitioOficial).toBeNull()
   })
 })

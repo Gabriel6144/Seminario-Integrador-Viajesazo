@@ -4,7 +4,7 @@ import { PAGE_SIZE } from '@/api/eventos'
 import { getPage, pageParams, queryKeys } from '@/api/queries'
 import { apiGet, apiPost } from '@/lib/http'
 import type {
-  EventoResponse,
+  PropuestaResumenResponse,
   PublicadorRequest,
   PublicadorResponse,
 } from '@/types/api'
@@ -40,21 +40,18 @@ export function usePublicador(id: number | null) {
 }
 
 /**
- * `GET /api/publicadores/{id}/eventos?page=&size=` — eventos de un publicador.
- *
- * Un publicador **sin** eventos devuelve una página vacía con **200**, no un 404: eso se resuelve
- * mostrando el estado vacío, no un error. En cambio, un publicador inexistente sí devuelve 404,
- * y lo maneja `usePublicador`.
+ * `GET /api/propuestas?publicadorId=&page=&size=` — propuestas turísticas (eventos y actividades) de un publicador.
  */
 export function useEventosDePublicador(id: number | null, page: number) {
   return useQuery({
     queryKey: queryKeys.publicadorEventos(id ?? 0, page, PAGE_SIZE),
     queryFn: ({ signal }) =>
-      getPage<EventoResponse>(
-        `/api/publicadores/${id}/eventos${pageParams(page, PAGE_SIZE)}`,
+      getPage<PropuestaResumenResponse>(
+        `/api/propuestas${pageParams(page, PAGE_SIZE)}&publicadorId=${id}`,
         signal,
       ),
     placeholderData: keepPreviousData,
+    enabled: id !== null,
   })
 }
 

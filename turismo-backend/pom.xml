@@ -11,8 +11,8 @@
 	<groupId>com.viajesazo</groupId>
 	<artifactId>turismo-backend</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name/>
-	<description/>
+	<name>Turismo Backend</name>
+	<description>API para administrar destinos y eventos turísticos</description>
 	<url/>
 	<licenses>
 		<license/>
@@ -29,6 +29,11 @@
 	<properties>
 		<java.version>17</java.version>
 		<mapstruct.version>1.6.3</mapstruct.version>
+		<!-- H2 2.4.240 tiene una regresión con los check constraints de enums: el esquema lo
+		     crea Hibernate en una conexión y el INSERT corre en otra, y H2 responde
+		     "Check constraint invalid" (h2database#4320, corregido pero sin release).
+		     2.3.232 es la última versión estable sin ese bug. -->
+		<h2.version>2.3.232</h2.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -51,6 +56,12 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
+		</dependency>
+		<!-- En Boot 4 `RestClient` no está en `-webmvc`: este starter lo trae y expone
+		     el `RestClient.Builder` que usa la geocodificación contra Nominatim (OSM). -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-restclient</artifactId>
 		</dependency>
 
 		<dependency>
@@ -106,6 +117,7 @@
 					-->
 					<systemPropertyVariables>
 						<spring.sql.init.mode>never</spring.sql.init.mode>
+						<app.viajes.transiciones.enabled>false</app.viajes.transiciones.enabled>
 					</systemPropertyVariables>
 				</configuration>
 			</plugin>

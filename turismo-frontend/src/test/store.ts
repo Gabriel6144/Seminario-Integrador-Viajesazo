@@ -1,5 +1,24 @@
-import { EVENTOS, PUBLICADORES } from './fixtures'
-import type { EventoRequest, EventoResponse, PublicadorRequest, PublicadorResponse } from '@/types/api'
+import {
+  BORRADORES,
+  CIRCUITO,
+  CIRCUITO_SELECCIONADO,
+  EVENTOS,
+  PUBLICADORES,
+} from './fixtures'
+import type {
+  AlternativaItemResponse,
+  AlternativaReemplazoResponse,
+  CircuitStrategy,
+  CircuitoSeleccionadoResponse,
+  EventoRequest,
+  EventoResponse,
+  GeneracionCircuitoResponse,
+  PublicadorRequest,
+  PublicadorResponse,
+  ViajeBorradorRequest,
+  ViajeRequest,
+  ViajeResponse,
+} from '@/types/api'
 
 /**
  * Base de datos en memoria para los tests.
@@ -16,15 +35,24 @@ import type { EventoRequest, EventoResponse, PublicadorRequest, PublicadorRespon
 
 let eventos: EventoResponse[] = []
 let publicadores: PublicadorResponse[] = []
+let borradores: ViajeResponse[] = []
+let circuitos = new Map<number, GeneracionCircuitoResponse>()
+let circuitosSeleccionados = new Map<number, CircuitoSeleccionadoResponse>()
 let nextEventoId = 0
 let nextPublicadorId = 0
+let nextBorradorId = 0
 
 export function resetStore(): void {
   eventos = structuredClone(EVENTOS)
   publicadores = structuredClone(PUBLICADORES)
+  borradores = structuredClone(BORRADORES)
+  circuitos = new Map()
+  // El viaje confirmado del fixture ya tiene su circuito elegido, listo para VZ-26.
+  circuitosSeleccionados = new Map([[2, structuredClone(CIRCUITO_SELECCIONADO)]])
   // Los fixtures ya traen ids 1..3 y 1..7, así que los siguientes arrancan por arriba.
   nextEventoId = Math.max(0, ...EVENTOS.map((evento) => evento.id)) + 1
   nextPublicadorId = Math.max(0, ...PUBLICADORES.map((publicador) => publicador.id)) + 1
+  nextBorradorId = Math.max(0, ...BORRADORES.map((borrador) => borrador.id)) + 1
 }
 
 export function allEventos(): EventoResponse[] {
@@ -33,6 +61,170 @@ export function allEventos(): EventoResponse[] {
 
 export function allPublicadores(): PublicadorResponse[] {
   return publicadores
+}
+
+export function allBorradores(): ViajeResponse[] {
+  return borradores
+}
+
+export function findBorrador(id: number): ViajeResponse | undefined {
+  return borradores.find((borrador) => borrador.id === id)
+}
+
+export function createBorrador(request: ViajeBorradorRequest): ViajeResponse {
+  const created: ViajeResponse = {
+    id: nextBorradorId++,
+    nombre: request.nombre ?? null,
+    ubicacion: request.ubicacion
+      ? {
+          nombre: request.ubicacion.ciudad,
+          localidad: request.ubicacion.localidad,
+          ciudad: request.ubicacion.ciudad,
+          latitud: request.ubicacion.latitud,
+          longitud: request.ubicacion.longitud,
+        }
+      : null,
+    rangoInteresKm: request.rangoInteresKm ?? null,
+    fechaInicio: request.fechaInicio ?? null,
+    fechaFin: request.fechaFin ?? null,
+    ritmo: request.ritmo ?? null,
+    interesesCategoria: request.interesesCategoria ?? [],
+    estado: 'BORRADOR',
+    pasoActual: request.pasoActual ?? null,
+    usuario: request.usuario,
+  }
+  borradores.push(created)
+  return created
+}
+
+export function updateBorrador(id: number, request: ViajeBorradorRequest): ViajeResponse | undefined {
+  const borrador = findBorrador(id)
+  if (borrador === undefined) return undefined
+  if (request.nombre !== undefined) borrador.nombre = request.nombre
+  if (request.ubicacion) {
+    borrador.ubicacion = {
+      nombre: request.ubicacion.ciudad,
+      localidad: request.ubicacion.localidad,
+      ciudad: request.ubicacion.ciudad,
+      latitud: request.ubicacion.latitud,
+      longitud: request.ubicacion.longitud,
+    }
+  }
+  if (request.rangoInteresKm !== undefined) borrador.rangoInteresKm = request.rangoInteresKm
+  if (request.fechaInicio !== undefined) borrador.fechaInicio = request.fechaInicio
+  if (request.fechaFin !== undefined) borrador.fechaFin = request.fechaFin
+  if (request.ritmo !== undefined) borrador.ritmo = request.ritmo
+  if (request.interesesCategoria) borrador.interesesCategoria = request.interesesCategoria
+  if (request.pasoActual !== undefined) borrador.pasoActual = request.pasoActual
+  return borrador
+}
+
+export function completeBorrador(id: number): ViajeResponse | undefined {
+  const borrador = findBorrador(id)
+  if (borrador === undefined) return undefined
+  borrador.estado = 'PLANIFICADO'
+  borrador.pasoActual = 8
+  return borrador
+}
+
+/** `POST /api/viajes`: el viaje queda persistido antes de pedir el circuito. */
+export function createViaje(request: ViajeRequest): ViajeResponse {
+  const created = createBorrador({
+    nombre: request.nombre,
+    ubicacion: request.ubicacion,
+    rangoInteresKm: request.rangoInteresKm,
+    fechaInicio: request.fechaInicio,
+    fechaFin: request.fechaFin,
+    ritmo: request.ritmo,
+    interesesCategoria: request.intereses,
+    pasoActual: 8,
+    usuario: request.usuario,
+  })
+  created.estado = 'PLANIFICADO'
+  return created
+}
+
+export function findCircuito(viajeId: number): GeneracionCircuitoResponse | undefined {
+  return circuitos.get(viajeId)
+}
+
+export function findCircuitoSeleccionado(
+  viajeId: number,
+): CircuitoSeleccionadoResponse | undefined {
+  return circuitosSeleccionados.get(viajeId)
+}
+
+export function findCircuitoItem(
+  viajeId: number,
+  itemId: number,
+): AlternativaItemResponse | undefined {
+  const circuito = circuitosSeleccionados.get(viajeId)
+  if (circuito === undefined) return undefined
+  for (const dia of circuito.dias) {
+    const item = dia.items.find((candidate) => candidate.itemId === itemId)
+    if (item !== undefined) return item
+  }
+  return undefined
+}
+
+/** VZ-28: pisa los datos de la parada con la propuesta elegida, como el backend. */
+export function replaceCircuitoItem(
+  viajeId: number,
+  itemId: number,
+  alternativa: AlternativaReemplazoResponse,
+): boolean {
+  const item = findCircuitoItem(viajeId, itemId)
+  if (item === undefined) return false
+  item.propuestaId = alternativa.propuestaId
+  item.propuestaNombre = alternativa.propuestaNombre
+  item.tipo = alternativa.tipo
+  item.categoria = alternativa.categoria
+  item.ciudad = alternativa.ciudad
+  item.localidad = alternativa.localidad
+  item.direccion = alternativa.direccion
+  item.horaInicio = alternativa.horaInicio
+  item.horaFin = alternativa.horaFin
+  item.duracionMinutos = alternativa.duracionMinutos
+  return true
+}
+
+/** VZ-29: quita la parada del día y renumera lo que queda, como el backend. */
+export function removeCircuitoItem(viajeId: number, itemId: number): boolean {
+  const circuito = circuitosSeleccionados.get(viajeId)
+  if (circuito === undefined) return false
+  for (const dia of circuito.dias) {
+    const index = dia.items.findIndex((item) => item.itemId === itemId)
+    if (index === -1) continue
+    dia.items.splice(index, 1)
+    return true
+  }
+  return false
+}
+
+export function createCircuito(viajeId: number): GeneracionCircuitoResponse {
+  const created = structuredClone(CIRCUITO)
+  circuitos.set(viajeId, created)
+  return created
+}
+
+export function selectCircuito(
+  viajeId: number,
+  estrategia: CircuitStrategy,
+): GeneracionCircuitoResponse | undefined {
+  const circuito = circuitos.get(viajeId)
+  if (circuito === undefined || circuito.estrategiaSeleccionada !== null) return undefined
+  if (!circuito.alternativas.some((alternativa) => alternativa.estrategia === estrategia)) {
+    return undefined
+  }
+  circuito.estrategiaSeleccionada = estrategia
+  return circuito
+}
+
+export function deleteBorrador(id: number): boolean {
+  const index = borradores.findIndex((borrador) => borrador.id === id)
+  if (index === -1) return false
+  borradores.splice(index, 1)
+  return true
 }
 
 export function findEvento(id: number): EventoResponse | undefined {
@@ -69,11 +261,21 @@ export function updateEvento(id: number, request: EventoRequest): EventoResponse
   const evento = findEvento(id)
   if (evento === undefined) return undefined
 
+  const esDePago = request.tipoAcceso === 'DE_PAGO'
   const actualizado: EventoResponse = {
     ...evento,
     nombre: request.nombre,
     descripcion: request.descripcion,
     categoria: request.categoria,
+    tipoPropuesta: request.tipoPropuesta,
+    modalidad: request.modalidad,
+    tipoAcceso: request.tipoAcceso ?? evento.tipoAcceso,
+    // El backend calcula las coordenadas al guardar: un mock no las geocodifica y las conserva
+    // como están. El arancel solo tiene sentido para un evento arancelado.
+    montoEstimado: esDePago ? request.montoEstimado : null,
+    descripcionArancel: esDePago ? request.descripcionArancel : null,
+    sitioOficial: esDePago ? request.sitioOficial : null,
+    lugarRecinto: request.lugarRecinto,
     localidad: request.localidad,
     direccion: request.direccion,
     fechaInicio: request.fechaInicio,
@@ -90,13 +292,26 @@ export function updateEvento(id: number, request: EventoRequest): EventoResponse
 }
 
 export function createEvento(request: EventoRequest): EventoResponse {
+  const esDePago = request.tipoAcceso === 'DE_PAGO'
   const created: EventoResponse = {
     id: nextEventoId++,
     nombre: request.nombre,
     descripcion: request.descripcion,
     categoria: request.categoria,
+    tipoPropuesta: request.tipoPropuesta,
+    modalidad: request.modalidad,
+    tipoAcceso: request.tipoAcceso ?? 'GRATUITO',
+    // Igual que el backend real: el estado es una regla de negocio, no algo que manda el usuario.
+    estadoPropuesta: 'INICIADO',
+    montoEstimado: esDePago ? request.montoEstimado : null,
+    descripcionArancel: esDePago ? request.descripcionArancel : null,
+    sitioOficial: esDePago ? request.sitioOficial : null,
+    lugarRecinto: request.lugarRecinto,
     localidad: request.localidad,
     direccion: request.direccion,
+    // El mock no geocodifica: las coordenadas las pone el servidor con Nominatim.
+    latitud: null,
+    longitud: null,
     fechaInicio: request.fechaInicio,
     fechaFin: request.fechaFin,
     horarioInicio: request.horarioInicio,

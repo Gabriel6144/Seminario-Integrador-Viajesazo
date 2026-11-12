@@ -14,7 +14,7 @@ import com.viajesazo.turismo_backend.model.Evento;
 public interface EventoMapper {
 
 	/**
-	 * <p>El {@code publicador} se ignera a propósito: el request trae un
+	 * <p>El {@code publicador} se ignora a propósito: el request trae un
 	 * {@code publicadorId} y es el service quien lo resuelve contra el repositorio, para poder
 	 * devolver 404 cuando no existe. Mapear el id a una entidad Publicador a mano dejaría el
 	 * evento apuntando a un Publicador sin nombre ni email.
@@ -24,16 +24,25 @@ public interface EventoMapper {
 	 * con null.
 	 */
 	@Mapping(target = "id", ignore = true)
+	@Mapping(target = "version", ignore = true)
 	@Mapping(target = "publicador", ignore = true)
+	@Mapping(target = "tipoAcceso", ignore = true)
+	@Mapping(target = "estadoPropuesta", ignore = true)
+	@Mapping(target = "ubicacion", ignore = true)
 	@Mapping(target = "imagenes", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
 	Evento toEntity(EventoRequest request);
 
 	/**
 	 * Actualización sobre la entidad ya cargada, para no perder el {@code id} ni borrarla y
-	 * volver a guardarla. Mismas reglas que {@link #toEntity}.
+	 * volver a guardarla. Mismas reglas que {@link #toEntity}: {@code estadoPropuesta} se ignora
+	 * porque solo cambia por reglas de negocio, y las coordenadas las resuelve el service.
 	 */
 	@Mapping(target = "id", ignore = true)
+	@Mapping(target = "version", ignore = true)
 	@Mapping(target = "publicador", ignore = true)
+	@Mapping(target = "tipoAcceso", ignore = true)
+	@Mapping(target = "estadoPropuesta", ignore = true)
+	@Mapping(target = "ubicacion", ignore = true)
 	@Mapping(target = "imagenes", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
 	void updateEntity(EventoRequest request, @MappingTarget Evento evento);
 
@@ -41,6 +50,10 @@ public interface EventoMapper {
 	 * Los campos del publicador se anidan a mano porque el destino es un record: MapStruct no
 	 * resuelve solo {@code publicadorId} &larr; {@code publicador.id}.
 	 */
+	@Mapping(target = "localidad", source = "ubicacion.localidad")
+	@Mapping(target = "direccion", source = "ubicacion.direccion")
+	@Mapping(target = "latitud", source = "ubicacion.latitud")
+	@Mapping(target = "longitud", source = "ubicacion.longitud")
 	@Mapping(target = "publicadorId", source = "publicador.id")
 	@Mapping(target = "publicadorNombre", source = "publicador.nombre")
 	EventoResponse toResponse(Evento evento);

@@ -1,18 +1,45 @@
 import { http, HttpResponse } from 'msw'
 
-import { errorBody, page } from './fixtures'
 import {
+  ALTERNATIVAS_REEMPLAZO,
+  errorBody,
+  NOMINATIM_REVERSE,
+  NOMINATIM_SEARCH,
+  page,
+} from './fixtures'
+import {
+  allBorradores,
   allEventos,
   allPublicadores,
+  completeBorrador,
+  createBorrador,
+  createCircuito,
   createEvento,
   createPublicador,
+  createViaje,
+  deleteBorrador,
   deleteEvento,
+  findBorrador,
+  findCircuito,
+  findCircuitoItem,
+  findCircuitoSeleccionado,
   findEvento,
   findPublicador,
   findPublicadorByEmail,
+  removeCircuitoItem,
+  replaceCircuitoItem,
+  selectCircuito,
+  updateBorrador,
   updateEvento,
 } from './store'
-import type { EventoRequest, PublicadorRequest } from '@/types/api'
+import { CIRCUIT_STRATEGIES } from '@/types/api'
+import type {
+  EventoRequest,
+  PublicadorRequest,
+  SeleccionCircuitoRequest,
+  ViajeBorradorRequest,
+  ViajeRequest,
+} from '@/types/api'
 
 /**
  * Handlers de MSW que replican la API real.
@@ -30,6 +57,24 @@ import type { EventoRequest, PublicadorRequest } from '@/types/api'
  * grilla— en vez de solo que se haya hecho un POST.
  */
 export const handlers = [
+  http.get('/api/propuestas', ({ request }) => {
+    const searchParams = new URL(request.url).searchParams
+    const tipo = searchParams.get('tipo')
+    const publicadorId = searchParams.get('publicadorId')
+    const propuestas = allEventos().map((evento) => ({
+      ...evento,
+      tipo: 'EVENTO' as const,
+      duracionMinutos: null,
+    }))
+    const filtradas = propuestas.filter((p) => {
+      if (tipo && p.tipo !== tipo) return false
+      if (publicadorId && p.publicadorId !== Number(publicadorId)) return false
+      return true
+    })
+    const { content, meta } = paginate(filtradas, request.url)
+    return HttpResponse.json(page(content, meta))
+  }),
+
   http.get('/api/eventos', ({ request }) => {
     const { content, meta } = paginate(allEventos(), request.url)
     return HttpResponse.json(page(content, meta))
@@ -130,10 +175,348 @@ export const handlers = [
     return HttpResponse.json(createPublicador(body as PublicadorRequest), { status: 201 })
   }),
 
-  http.get('/api/agenda/semanal', ({ request }) => {
-    const { content, meta } = paginate(allEventos(), request.url)
+  http.get('/api/viajes', ({ request }) => {
+    const params = new URL(request.url).searchParams
+    const usuario = params.get('usuario')
+    const viajes = allBorradores().filter(
+      (viaje) => usuario === null || viaje.usuario === usuario,
+    )
+    const { content, meta } = paginate(viajes, request.url)
     return HttpResponse.json(page(content, meta))
   }),
+
+  http.get('/api/viajes/borradores', ({ request }) => {
+    const { content, meta } = paginate(allBorradores(), request.url)
+    return HttpResponse.json(page(content, meta))
+  }),
+
+  http.get('/api/viajes/borradores/:id', ({ params }) => {
+    const borrador = findBorrador(Number(params.id))
+    if (borrador === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el borrador con id ${String(params.id)}`), { status: 404 })
+    }
+    return HttpResponse.json(borrador)
+  }),
+
+  http.post('/api/viajes/borradores', async ({ request }) => {
+    const body = await readJson<Partial<ViajeBorradorRequest>>(request)
+    return HttpResponse.json(createBorrador(body as ViajeBorradorRequest), { status: 201 })
+  }),
+
+  http.put('/api/viajes/borradores/:id', async ({ params, request }) => {
+    const body = await readJson<Partial<ViajeBorradorRequest>>(request)
+    const actualizado = updateBorrador(Number(params.id), body as ViajeBorradorRequest)
+    if (actualizado === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el borrador con id ${String(params.id)}`), { status: 404 })
+    }
+    return HttpResponse.json(actualizado)
+  }),
+
+  http.post('/api/viajes/borradores/:id/completar', ({ params }) => {
+    const completado = completeBorrador(Number(params.id))
+    if (completado === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el borrador con id ${String(params.id)}`), { status: 404 })
+    }
+    return HttpResponse.json(completado)
+  }),
+
+  http.delete('/api/viajes/borradores/:id', ({ params }) => {
+    if (!deleteBorrador(Number(params.id))) {
+      return HttpResponse.json(errorBody(404, `No existe el borrador con id ${String(params.id)}`), { status: 404 })
+    }
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.post('/api/viajes', async ({ request }) => {
+    const body = await readJson<Partial<ViajeRequest>>(request)
+    if (body.nombre === undefined || body.nombre.trim().length === 0) {
+      return HttpResponse.json(errorBody(400, 'nombre: el nombre es obligatorio'), { status: 400 })
+    }
+    if (!Array.isArray(body.intereses) || body.intereses.length === 0) {
+      return HttpResponse.json(
+        errorBody(400, 'intereses: La lista de intereses de categoría no puede estar vacía'),
+        { status: 400 },
+      )
+    }
+    return HttpResponse.json(createViaje(body as ViajeRequest), { status: 201 })
+  }),
+
+  http.get('/api/viajes/:id/circuito/seleccionado', ({ params }) => {
+    const viaje = findBorrador(Number(params.id))
+    if (viaje === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el viaje con id ${String(params.id)}`), {
+        status: 404,
+      })
+    }
+    const circuito = findCircuitoSeleccionado(viaje.id)
+    if (circuito === undefined) {
+      return HttpResponse.json(
+        errorBody(404, 'El circuito del viaje todavía no tiene una alternativa seleccionada'),
+        { status: 404 },
+      )
+    }
+    return HttpResponse.json(circuito)
+  }),
+
+  http.delete('/api/viajes/:id/circuito/seleccionado/items/:itemId', ({ params, request }) => {
+    const viaje = findBorrador(Number(params.id))
+    if (viaje === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el viaje con id ${String(params.id)}`), {
+        status: 404,
+      })
+    }
+    const circuito = findCircuitoSeleccionado(viaje.id)
+    if (circuito === undefined) {
+      return HttpResponse.json(
+        errorBody(404, 'El circuito del viaje todavía no tiene una alternativa seleccionada'),
+        { status: 404 },
+      )
+    }
+    const itemId = Number(params.itemId)
+    const exists = circuito.dias.some((dia) => dia.items.some((item) => item.itemId === itemId))
+    if (!exists) {
+      return HttpResponse.json(
+        errorBody(404, `No existe la parada con id ${String(params.itemId)} en el circuito seleccionado`),
+        { status: 404 },
+      )
+    }
+    const confirmar = new URL(request.url).searchParams.get('confirmar') === 'true'
+    if (!confirmar) {
+      return HttpResponse.json(
+        errorBody(
+          409,
+          'la eliminación de la parada requiere confirmación; confirmá con confirmar=true',
+        ),
+        { status: 409 },
+      )
+    }
+    removeCircuitoItem(viaje.id, itemId)
+    return HttpResponse.json(circuito)
+  }),
+
+  http.get('/api/viajes/:id/circuito/seleccionado/items/:itemId/alternativas', ({ params }) => {
+    const viaje = findBorrador(Number(params.id))
+    if (viaje === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el viaje con id ${String(params.id)}`), {
+        status: 404,
+      })
+    }
+    const circuito = findCircuitoSeleccionado(viaje.id)
+    if (circuito === undefined) {
+      return HttpResponse.json(
+        errorBody(404, 'El circuito del viaje todavía no tiene una alternativa seleccionada'),
+        { status: 404 },
+      )
+    }
+    const itemId = Number(params.itemId)
+    const item = findCircuitoItem(viaje.id, itemId)
+    if (item === undefined) {
+      return HttpResponse.json(
+        errorBody(
+          404,
+          `No existe la parada con id ${String(params.itemId)} en el circuito seleccionado`,
+        ),
+        { status: 404 },
+      )
+    }
+    if (itemId === 101) return HttpResponse.json(ALTERNATIVAS_REEMPLAZO)
+    return HttpResponse.json({
+      alternativas: [],
+      mensaje: 'No hay propuestas disponibles para reemplazar esta parada.',
+    })
+  }),
+
+  http.put('/api/viajes/:id/circuito/seleccionado/items/:itemId', async ({ params, request }) => {
+    const viaje = findBorrador(Number(params.id))
+    if (viaje === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el viaje con id ${String(params.id)}`), {
+        status: 404,
+      })
+    }
+    const circuito = findCircuitoSeleccionado(viaje.id)
+    if (circuito === undefined) {
+      return HttpResponse.json(
+        errorBody(404, 'El circuito del viaje todavía no tiene una alternativa seleccionada'),
+        { status: 404 },
+      )
+    }
+    const item = findCircuitoItem(viaje.id, Number(params.itemId))
+    if (item === undefined) {
+      return HttpResponse.json(
+        errorBody(
+          404,
+          `No existe la parada con id ${String(params.itemId)} en el circuito seleccionado`,
+        ),
+        { status: 404 },
+      )
+    }
+    const body = await readJson<Partial<{ propuestaId: number }>>(request)
+    if (typeof body.propuestaId !== 'number') {
+      return HttpResponse.json(errorBody(400, 'La propuesta de reemplazo es obligatoria'), {
+        status: 400,
+      })
+    }
+    const alternativa = ALTERNATIVAS_REEMPLAZO.alternativas.find(
+      (candidate) => candidate.propuestaId === body.propuestaId,
+    )
+    if (alternativa === undefined) {
+      return HttpResponse.json(
+        errorBody(422, 'La propuesta elegida no puede reemplazar a esta parada'),
+        { status: 422 },
+      )
+    }
+    replaceCircuitoItem(viaje.id, item.itemId, alternativa)
+    return HttpResponse.json(circuito)
+  }),
+
+  http.get('/api/viajes/:id/circuito', ({ params }) => {
+    const viaje = findBorrador(Number(params.id))
+    if (viaje === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el viaje con id ${String(params.id)}`), {
+        status: 404,
+      })
+    }
+    const circuito = findCircuito(viaje.id)
+    if (circuito === undefined) {
+      return HttpResponse.json(errorBody(404, 'El viaje todavía no tiene un circuito generado'), {
+        status: 404,
+      })
+    }
+    return HttpResponse.json(circuito)
+  }),
+
+  http.post('/api/viajes/:id/circuito', ({ params, request }) => {
+    const viaje = findBorrador(Number(params.id))
+    if (viaje === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el viaje con id ${String(params.id)}`), {
+        status: 404,
+      })
+    }
+    const existente = findCircuito(viaje.id)
+    const reemplazar = new URL(request.url).searchParams.get('reemplazar') === 'true'
+    if (existente !== undefined && !reemplazar) {
+      return HttpResponse.json(
+        errorBody(
+          409,
+          'el circuito del viaje ya fue generado; confirmá con reemplazar=true para regenerarlo',
+        ),
+        { status: 409 },
+      )
+    }
+    return HttpResponse.json(createCircuito(viaje.id), {
+      status: existente === undefined ? 201 : 200,
+    })
+  }),
+
+  http.post('/api/viajes/:id/circuito/seleccion', async ({ params, request }) => {
+    const viaje = findBorrador(Number(params.id))
+    if (viaje === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el viaje con id ${String(params.id)}`), {
+        status: 404,
+      })
+    }
+    const body = await readJson<Partial<SeleccionCircuitoRequest>>(request)
+    if (body.estrategia === undefined || !CIRCUIT_STRATEGIES.includes(body.estrategia)) {
+      return HttpResponse.json(errorBody(400, 'la estrategia del circuito no es válida'), {
+        status: 400,
+      })
+    }
+    const circuito = findCircuito(viaje.id)
+    if (circuito === undefined) {
+      return HttpResponse.json(errorBody(404, 'El viaje todavía no tiene un circuito generado'), {
+        status: 404,
+      })
+    }
+    if (circuito.estrategiaSeleccionada !== null) {
+      return HttpResponse.json(
+        errorBody(400, 'el circuito del viaje ya tiene una alternativa seleccionada'),
+        { status: 400 },
+      )
+    }
+    if (!circuito.alternativas.some((alternativa) => alternativa.estrategia === body.estrategia)) {
+      return HttpResponse.json(
+        errorBody(400, 'la alternativa seleccionada no existe en el circuito generado'),
+        { status: 400 },
+      )
+    }
+    const seleccionado = selectCircuito(viaje.id, body.estrategia)
+    return HttpResponse.json(seleccionado)
+  }),
+
+  http.get('/api/agenda', ({ request }) => {
+    const params = new URL(request.url).searchParams
+    const tipoPropuesta = params.get('tipoPropuesta')
+    const categoria = params.get('categoria')
+    const tipoAcceso = params.get('tipoAcceso')
+    const ubicacion = normalizeText(params.get('ubicacion') ?? '')
+    const fechaDesde = params.get('fechaDesde')
+    const fechaHasta = params.get('fechaHasta')
+
+    const eventos = allEventos()
+      .filter((evento) => {
+        // La agenda solo muestra eventos vigentes: ni cancelados ni terminados antes del rango.
+        const estado =
+          typeof evento.estadoPropuesta === 'object'
+            ? evento.estadoPropuesta?.nombre
+            : evento.estadoPropuesta
+        if (estado === 'CANCELADO') return false
+        if (fechaDesde !== null && evento.fechaFin < fechaDesde) return false
+        if (fechaHasta !== null && evento.fechaInicio > fechaHasta) return false
+        if (tipoPropuesta !== null && evento.tipoPropuesta !== tipoPropuesta) return false
+        if (categoria !== null && evento.categoria !== categoria) return false
+        if (tipoAcceso !== null && evento.tipoAcceso !== tipoAcceso) return false
+        if (ubicacion !== '') {
+          const camposUbicacion = normalizeText(
+            [evento.localidad ?? '', evento.lugarRecinto ?? '', evento.direccion ?? ''].join(' '),
+          )
+          if (!camposUbicacion.includes(ubicacion)) return false
+        }
+        return true
+      })
+      .map((evento) => ({ ...evento, tipo: 'EVENTO' as const, duracionMinutos: null }))
+      .sort((a, b) => {
+        const cmpFecha = a.fechaInicio.localeCompare(b.fechaInicio)
+        if (cmpFecha !== 0) return cmpFecha
+        return (a.horarioInicio ?? '99:99:99').localeCompare(b.horarioInicio ?? '99:99:99')
+      })
+
+    const { content, meta } = paginate(eventos, request.url)
+    return HttpResponse.json(page(content, meta))
+  }),
+
+  /**
+   * Subida de imágenes. Devuelve una **URL fija** para que el test compruebe que esa URL es la que
+   * viaja después en el `imagenes` del evento.
+   *
+   * No deriva del `archivo.name` a propósito: en jsdom el `File` es de otro realm que el `fetch` de
+   * Node (undici), que al serializar el `FormData` lo trata como un `Blob` anónimo y pierde el
+   * filename (queda `"blob"`). En el navegador real el nombre se preserva; el componente igual no
+   * lo usa, lo resuelve el backend.
+   *
+   * Tampoco valida el contenido (el backend lo hace por firma de bytes): alcanza con rechazar la
+   * parte faltante y el archivo vacío, que son los dos errores que el componente sabe mostrar.
+   */
+  http.post('/api/imagenes', async ({ request }) => {
+    const formData = await request.formData()
+    const archivo = formData.get('archivo')
+
+    if (archivo === null || typeof archivo === 'string') {
+      return HttpResponse.json(errorBody(400, 'falta el archivo a subir'), { status: 400 })
+    }
+    if (archivo.size === 0) {
+      return HttpResponse.json(errorBody(400, 'no se recibió ningún archivo de imagen'), {
+        status: 400,
+      })
+    }
+
+    return HttpResponse.json({ url: '/api/archivos/subida.png' }, { status: 201 })
+  }),
+
+  // Nominatim (OpenStreetMap) para el buscador de ubicación del formulario. Rutas relativas como
+  // las de la API: el frontend las pide por el proxy de Vite, nunca al dominio absoluto.
+  http.get('/nominatim/search', () => HttpResponse.json(NOMINATIM_SEARCH)),
+
+  http.get('/nominatim/reverse', () => HttpResponse.json(NOMINATIM_REVERSE)),
 ]
 
 /**
@@ -167,6 +550,25 @@ function validateEvento(body: Partial<EventoRequest>): string | null {
   if (body.publicadorId === undefined) {
     errores.push('publicadorId: el publicador es obligatorio')
   }
+  if (body.lugarRecinto === undefined || body.lugarRecinto.trim().length === 0) {
+    errores.push('lugarRecinto: el lugar o recinto es obligatorio')
+  }
+  if (body.localidad === undefined || body.localidad.trim().length === 0) {
+    errores.push('localidad: la ciudad es obligatoria')
+  }
+  if (body.direccion === undefined || body.direccion.trim().length === 0) {
+    errores.push('direccion: la dirección exacta es obligatoria')
+  }
+
+  // Misma regla de `EventoService.validateAcceso`: un evento arancelado exige monto y link.
+  if (body.tipoAcceso === 'DE_PAGO') {
+    if (body.montoEstimado === undefined || body.montoEstimado === null) {
+      errores.push('montoEstimado: el monto estimado es obligatorio para un evento arancelado')
+    }
+    if (body.sitioOficial === undefined || (body.sitioOficial ?? '').trim().length === 0) {
+      errores.push('sitioOficial: el link al sitio oficial es obligatorio para un evento arancelado')
+    }
+  }
 
   if (
     body.fechaInicio !== undefined &&
@@ -180,6 +582,14 @@ function validateEvento(body: Partial<EventoRequest>): string | null {
 }
 
 const DEFAULT_SIZE = 12
+
+function normalizeText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
 
 function paginate<T>(items: T[], url: string) {
   const params = new URL(url).searchParams

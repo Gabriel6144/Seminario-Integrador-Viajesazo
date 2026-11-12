@@ -27,8 +27,16 @@ dist/
 *.mv.db
 *.trace.db
 
+# Imágenes subidas por el publicador (app.imagenes.dir). Son datos de ejecución, no del repo.
+data/
+
 # Logs y temporal
 *.log
 npm-debug.log*
 .DS_Store
 Thumbs.db
+
+# MILI - Graphify (grafo de conocimiento y reglas locales)
+graphify-out/
+.agents/
+

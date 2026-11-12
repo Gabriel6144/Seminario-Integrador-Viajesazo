@@ -3,15 +3,23 @@
 ## Contexto
 
 Tesis de facultad: **este proyecto es solo el frontend**. La API REST de Spring Boot vive en
-`../turismo-backend` y expone eventos, publicadores y agenda semanal. Acá no va código de
+`../turismo-backend` y expone eventos, publicadores, propuestas y agenda. Acá no va código de
 servidor ni lógica de negocio: la UI **consume** la API.
 
 Los dos proyectos viven en el **mismo repositorio git**, como subcarpetas. Eso no los hace
 acoplados de build: cada uno tiene su `package.json` / `pom.xml` y sus propios comandos.
 
-- Estado actual: Sprint 1 completo. Listados paginados de eventos y publicadores, detalle de
-  ambos, agenda semanal, **CRUD de eventos y alta de publicadores**, y ruta 404.
-  **120 tests en verde.**
+- Estado actual: Sprints 1–3 completos y **consulta (VZ-26), eliminación (VZ-29) y reemplazo
+  (VZ-28) de paradas**. Listados paginados de eventos y publicadores, detalle de ambos, agenda
+  (VZ-18), **CRUD de eventos y alta de publicadores**, **planificador de viajes con generación y
+  selección de circuitos (VZ-25)**, **página día por día del circuito seleccionado con
+  eliminación confirmada y reemplazo de paradas por alternativas compatibles (VZ-26/VZ-28/VZ-29)**
+  y ruta 404. La agenda filtra y pagina en el servidor. El alta/edición de eventos
+  soporta **tipo de acceso y arancel** (`GRATUITO` / `DE_PAGO` con monto y link al sitio oficial)
+  y **ubicación con mapa** (Leaflet + OpenStreetMap), incluido un **selector de ubicación** con
+  buscador y pin arrastrable. **191 tests en 22 archivos (182 en verde).** Los 9 que fallan son
+  preexistentes y ajenos: 8 de `eventos-page.test.tsx` (mockea `/api/eventos` y la página usa
+  `/api/propuestas`) y 1 de `evento-editar-page.test.tsx` (validación de fecha).
 - Sigue sin autenticación: cualquiera que abra la app puede crear, editar y borrar eventos. Es
   una limitación conocida del alcance de la tesis, no una decisión de diseño closed.
 - Para la API ver el `AGENTS.md` y el `PRUEBAS-MANUALES.md` de `../turismo-backend`.
@@ -52,9 +60,13 @@ Cosas que se olvidan fácil y ya están resueltas en el código, para no volver 
   pedir y la vista muestra un mensaje honesto.
 - **`content: []` con 200 es una respuesta válida**, no un error: publicador sin eventos, base
   recién arrancada. Es estado vacío, se maneja distinto al error.
-- **La agenda usa el reloj del servidor**: la ventana va de hoy al domingo, así que la cantidad
-  de eventos cambia según el día de la semana en que se levanta la app. No se puede fijar un
-  total esperado ni en la UI ni en los tests.
+- **La agenda filtra en el servidor**: `useAgenda` manda `fechaDesde`/`fechaHasta`,
+  `tipoPropuesta`, `categoria`, `ubicacion`, `tipoAcceso`, `page` y `size` a `GET /api/agenda`.
+  El cliente no vuelve a filtrar ni a ordenar: el backend ya devuelve solo eventos no cancelados,
+  ordenados por fecha/hora, y pagina. `keepPreviousData` evita el parpadeo al cambiar de página.
+- **`/api/agenda` no es la agenda semanal**: la semanal (`/api/agenda/semanal`, US6) va de hoy al
+  domingo y no acepta filtros; su cantidad de eventos depende del día en que se corre la app. La
+  agenda turística (VZ-18) usa una ventana abierta y filtros explícitos.
 - **El cuerpo de error va en inglés** (`status`, `error`, `message`, `timestamp`) pero el
   **valor** de `message` está en español. El catch-all de 500 filtra el detalle a propósito, así
   que para 500 solo hay un texto genérico: ver `toUserMessage`.
@@ -75,9 +87,110 @@ Cosas que se olvidan fácil y ya están resueltas en el código, para no volver 
   la borre de verdad.
 - **`publicadorNombre` viene aplanado**: es un JOIN del backend, no un campo del DTO de entrada.
   No se manda al crear ni al editar.
+- **`ViajeRequest` y `ViajeBorradorRequest` no comparten el nombre de los intereses**:
+  `POST/PUT /api/viajes` usa `intereses`; `POST/PUT /api/viajes/borradores` usa
+  `interesesCategoria`. El planificador arma ambos desde `buildViajeData()`; no castear un payload
+  de borrador a `ViajeRequest`, porque el backend responde `400` con “la lista de intereses no
+  puede estar vacía”. El handler de MSW valida `intereses` para que el test lo detecte.
+- **El alta/edición de un evento geocodifica de verdad**: el backend resuelve
+  `lugarRecinto + direccion + localidad` con Nominatim (OpenStreetMap) y **rechaza con 400** si no
+  encuentra la ubicación (`no se encontró la ubicación del evento: ...`). O sea, crear o editar un
+  evento **necesita que el backend tenga internet y que la dirección exista**. `lugarRecinto`,
+  `localidad` y `direccion` son obligatorios por eso. El 400 llega como banner, igual que el resto
+  de los errores del servidor.
+- **`tipoAcceso` / arancel**: `DE_PAGO` exige `montoEstimado` y `sitioOficial` (URL `http(s)`);
+  `GRATUITO` los ignora. `estadoPropuesta` **no se manda** (lo fija el server en `INICIADO`).
+  Cambiar a `GRATUITO` limpia el arancel en `toEventoRequest` para no dejar un monto colgado.
 - **El email duplicado responde 400 con un string plano** (`"ya existe un publicador con ese
   email"`), no con errores por campo. `PublicadorService` lo anticipa con `existsByEmail` para dar
   un mensaje claro en vez del error de constraint de H2.
+
+## Planificador y circuitos (VZ-25)
+
+`src/pages/planificador-page.tsx` orquesta los pasos 1–10. Los pasos 1–8 son el wizard; el 9 es la
+animación de generación y el 10 muestra las tres alternativas reales.
+
+- **El viaje se persiste antes de generar.** `startCircuitGeneration` completa el borrador o crea
+  el viaje, guarda `tripId` y recién ahí llama a `POST /api/viajes/{id}/circuito`. Si la generación
+  falla, el viaje ya quedó guardado: el reintento reutiliza `tripId` y no duplica el alta.
+- **La animación no decide el resultado.** El paso 9 muestra cuatro mensajes cada 1100 ms, pero
+  solo se pasa al 10 cuando terminó la animación **y** llegó el circuito. Un error cancela el
+  intervalo, muestra toast y vuelve al paso 8.
+- **La generación es única.** Si el backend responde `409` con "ya fue generado" (por ejemplo, al
+  reintentar), el page hace un `GET` del circuito existente y lo muestra. Regenerar exige el modal
+  de confirmación y manda `?reemplazar=true`; descarta ediciones manuales previas.
+- **La selección también es única.** `useSeleccionarCircuito` actualiza la caché del circuito; la
+  UI deshabilita el botón cuando `estrategiaSeleccionada !== null`. Cambiar de pestaña solo cambia
+  la vista (`activeStrategy`), no selecciona.
+- **`isTripSaved` se deriva de `tripId !== null`**, no de un flag aparte. El botón de guardado
+  cambia a "Ver en Mis viajes" cuando el viaje ya existe.
+- **No se guarda otro borrador después de persistir el viaje.** `handleSaveDraft` corta si
+  `tripId !== null` y navega a Mis viajes; de lo contrario, con `borradorId` actualiza y sin él
+  crea un borrador nuevo. Sin esa guarda, cerrar el planificador después de generar creaba un
+  duplicado (o intentaba actualizar un borrador ya completado).
+- **`buildViajeRequest` mapea los intereses de la UI a `InteresCategoria`** con `INTEREST_MAP`;
+  `interests` en el estado guarda los labels visibles. El `pasoActual` que se manda es el `step`
+  actual.
+- `useCircuito` existe para reabrir un circuito desde un viaje guardado; el flujo del wizard usa
+  las mutaciones de generación/selección.
+- **`circuito-view-model.ts` es el único adaptador API → UI.** `toCircuitoRecomendado` agrupa los
+  ítems por `fecha`, arma `days`/`stopsByDay`, resuelve imagen o placeholder y calcula la duración;
+  `buildMapStops` y `firstDayWithStops` alimentan los mapas. El detalle y los mapas no deben
+  volver a leer campos de la propuesta ni usar los mocks que se quitaron de `constants.ts`.
+- **“Mis viajes” usa `GET /api/viajes?usuario=`**, no `/borradores`: el listado trae borradores y
+  viajes confirmados. `estado !== 'BORRADOR'` decide si la tarjeta muestra “Circuito confirmado” y
+  oculta descartar/continuar. `useViajes` invalida `viajesAll` al crear, completar y descartar.
+- **El detalle del planificador (paso 10) sigue mostrando “Sustituir” y “Eliminar” como
+  “Próximamente”**: esas acciones operan sobre el circuito ya seleccionado y viven en
+  `/viajes/:id/circuito` (VZ-28/VZ-29), no sobre las alternativas recién generadas. Así la UI no
+  ofrece una acción que todavía no tiene un `itemId` seleccionado.
+- **El detalle del viaje NO devuelve `GeneracionCircuitoResponse`**: `GET /api/viajes/{id}` trae
+  `circuito: { estrategia, alternativa, ... }` (singular), mientras que
+  `GET /api/viajes/{id}/circuito` trae `estrategiaSeleccionada` y `alternativas` (plural). En
+  `types/api.ts` son `CircuitoResponse` y `GeneracionCircuitoResponse` respectivamente.
+- **MSW replica el ciclo completo**: `POST /api/viajes`, `GET /api/viajes`, `POST/GET
+  /api/viajes/:id/circuito` (con `409` y `?reemplazar=true`) y `POST .../seleccion` sobre
+  `src/test/store.ts`. El fixture
+  `CIRCUITO` trae las tres estrategias con paradas y el snapshot visual/de ubicación; sin ese
+  estado, el test del paso 10 no podría verificar la selección. `BORRADORES` incluye un viaje
+  confirmado además del borrador para cubrir “Mis viajes”.
+
+## Circuito seleccionado día por día (VZ-26/VZ-28/VZ-29)
+
+`src/pages/circuito-page.tsx` se abre en `/viajes/:id/circuito` (ruta registrada antes de
+`/viajes/:id/planificar`). La tarjeta de un viaje confirmado muestra “Ver circuito” y navega ahí.
+
+- **La página consume `GET /api/viajes/{id}/circuito/seleccionado`**, no el `GET` de alternativas:
+  `useCircuitoSeleccionado` usa la query key `['circuito', viajeId, 'seleccionado']`. Un `404`
+  (sin viaje, sin circuito o sin selección) se muestra como estado de error con “No se pudo cargar
+  la información” y botón de reintento.
+- **Los días vacíos se renderizan igual**: el backend ya devuelve todos los días del rango y la UI
+  muestra “Sin actividades programadas.” cuando `items` está vacío. No agrupar de nuevo en el
+  cliente ni descartar días sin paradas.
+- **El banner de desactualizado sale de `desactualizado` + `motivosDesactualizacion`**, que solo
+  expone este endpoint. “Regenerar” reutiliza `planificador-regenerate-modal` y
+  `useGenerarCircuito` con `?reemplazar=true`; al terminar invalida el prefijo `['circuito']`, así
+  que la página vuelve a pedir el seleccionado.
+- **Eliminar una parada pasa por un `AlertDialog`** que repite el nombre. `useEliminarParadaCircuito`
+  manda `?confirmar=true`, escribe el `CircuitoSeleccionadoResponse` actualizado en la caché de
+  `circuitoSeleccionado` e invalida `['circuito', viajeId]` y `viajesAll`; la fila desaparece sin
+  recargar. El `apiDelete` genérico existe porque esta baja devuelve cuerpo, a diferencia del
+  `DELETE` de eventos (204).
+- **Sustituir una parada (VZ-28) usa un `AlertDialog` como selector.** `useAlternativasReemplazo`
+  pide las opciones del ítem solo cuando el diálogo está abierto (`enabled` con `viajeId` e
+  `itemId`); `useReemplazarParadaCircuito` hace el `PUT`, escribe el `CircuitoSeleccionadoResponse`
+  en caché e invalida `['circuito', viajeId]`, las alternativas del ítem y `viajesAll`. El botón
+  “Reemplazar” queda deshabilitado hasta elegir una propuesta y mientras la mutación está en
+  vuelo; si `alternativas` viene vacío se muestra el `mensaje` del backend. No se agregó un
+  componente `dialog` de shadcn: `AlertDialog` ya estaba y el footer usa un `Button` normal para
+  no cerrarse antes de que termine el `PUT`.
+- **MSW** agrega los handlers `GET /api/viajes/:id/circuito/seleccionado`, `DELETE
+  .../items/:itemId`, `GET .../items/:itemId/alternativas` y `PUT .../items/:itemId`, además de
+  los fixtures `CIRCUITO_SELECCIONADO` (viaje `2`, estrategia `INTERESES`,
+  `desactualizado: true`, con un día vacío) y `ALTERNATIVAS_REEMPLAZO` (una opción válida para la
+  parada `101`). `resetStore()` siembra la selección del viaje `2`; los tests de la página cubren
+  agrupado por día, regeneración, eliminación confirmada/cancelada, alternativas, reemplazo,
+  ausencia de opciones y `404`.
 
 ## Escritura: cómo está armado
 
@@ -106,6 +219,57 @@ Decisiones que conviene no deshacer:
   sin salida, así que se avisa con un link al alta.
 - **El selector de publicadores pide `size=100`**: es un tope deliberado
   (`PUBLICADORES_MAX_SIZE`). Con más de 100 hay que agregar un buscador o paginar el select.
+
+## Mapa del evento
+
+`src/components/evento-mapa.tsx` muestra la ubicación del evento en el detalle.
+
+- **Leaflet directo, sin `react-leaflet`.** `react-leaflet` no soporta React 19; el wrapper
+  nativo son ~30 líneas. Dependencias: `leaflet` + `@types/leaflet`.
+- **El mapa se monta a mano en un `useEffect`** (crear `L.map`, tile layer, marcador) sobre un
+  `div` con `ref`, y se destruye con `map.remove()` en el cleanup. Leaflet es imperativo: no
+  intentar manejarlo con estado de React.
+- **`L.map(..., { scrollWheelZoom: false })`**: sin esto, la rueda del mouse sobre el mapa se
+  come el scroll de la página.
+- **La burbuja del marcador se arma con nodos DOM, no con HTML string**: `bindPopup` acepta un
+  `HTMLElement` y así el nombre de la dirección no se interpola como HTML.
+- Los tiles son de OpenStreetMap (`https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png`) con la
+  atribución obligatoria. El contenedor va con `role="img"` y `aria-label`.
+- El detalle pinta la tarjeta del mapa **solo si hay `latitud`/`longitud`**: un evento sin
+  coordenadas (no debería pasar, el backend las exige) no rompe la página.
+- En tests el mapa se mockea (`vi.mock('@/components/evento-mapa')` en el test del detalle; en el
+  test propio del componente se mockea `leaflet` con `vi.hoisted`). jsdom no tiene layout ni
+  canvas, así que un Leaflet real ahí revienta.
+
+## Selector de ubicación (formulario)
+
+`src/components/ubicacion-selector.tsx` es el buscador que va en la Sección 3 del alta/edición de
+evento, para no tener que tipear `lugarRecinto` / `localidad` / `direccion` a mano.
+
+- **La geocodificación del cliente es solo UX.** El backend vuelve a geocodificar con Nominatim y
+  es el que guarda `latitud`/`longitud` (y rechaza con 400 si no encuentra la dirección). El
+  buscador no manda coordenadas: solo completa los tres campos de texto que exige `EventoRequest`.
+- **No toca `EventoFormValues` ni `toEventoRequest`.** El selector es estado efímero de UI y
+  comunica los campos por callbacks (`onLugarRecintoChange` & cia.), que el form enchufa a
+  `setValue`. El schema y el contrato de la API quedan igual.
+- **`direccion` se arma a nivel calle, nunca con el `display_name`.** `geocoding.ts` toma
+  `address.road` (sin el número: con número, la búsqueda free-form de un POI devuelve vacío),
+  con fallback a barrio y a la localidad. Mandar el `display_name` entero hacía que el backend,
+  que **vuelve a concatenar** los tres campos, arme una query irresoluble → 400. Por eso el
+  backend además deduplica (ver el `AGENTS.md` de `../turismo-backend`).
+- **Las llamadas a Nominatim viven en `src/lib/geocoding.ts`** (`buscarLugar`,
+  `geocodificarInverso`), un helper puro sin React, con la misma regla de "ningún componente hace
+  `fetch`". Tolerante a fallos: un error de red devuelve `[]` / `null`, nunca tira.
+- **El transporte va por el proxy `/nominatim` de Vite** (`vite.config.ts`), igual que `/api`:
+  rutas relativas, nunca el dominio absoluto de OpenStreetMap.
+- **El mapa se monta recién cuando hay coordenadas** (un resultado elegido, o el evento en edición
+  con `latitudInicial`/`longitudInicial`). Se carga con `lazy()` + `Suspense` para no arrastrar
+  Leaflet al bundle inicial. Un alta que no toca la ubicación no carga el mapa.
+- **El pin es arrastrable y dispara *reverse geocoding*** al soltarlo, con debounce (default
+  1000 ms) para respetar el límite ~1 req/s de Nominatim. La prop `reverseDelayMs` existe para
+  bajarlo a 0 en los tests y no esperar un segundo real.
+- `src/components/ubicacion-preview-mapa.tsx` es el mapa de preview (Leaflet directo, mismo patrón
+  que `evento-mapa.tsx`), separado del buscador para que el `lazy()` tenga un módulo propio.
 
 ## Estructura
 
@@ -159,13 +323,24 @@ Cuidado con los bordes de la paginación: `pointer-events-none` depende del CSS 
   `asChild`: cuando el título tiene que ser un heading de verdad, se compone el `<h2>` a mano.
 - **Tokens semánticos de shadcn** (`bg-secondary`, `text-muted-foreground`) en vez de colores
   crudos (`bg-emerald-500`), así el tema funciona en claro y oscuro.
-- **Los dos warnings de `only-export-components` en `ui/badge.tsx` y `ui/button.tsx` se dejan
+- **Los warnings de `only-export-components` en `ui/badge.tsx` y `ui/button.tsx` se dejan
   como están**: son exports de `cva` del propio shadcn. En los archivos propios sí se separan
-  los helpers puros (ver `lib/group-by-day.ts` y `components/day-heading.tsx`).
+  los helpers puros (ver `lib/group-by-day.ts` y `components/day-heading.tsx`). Hay además un
+  warning de `react(incompatible-library)` en `evento-form.tsx` por `useForm` de RHF: es
+  inherente a la librería, se deja.
 
 ## Tests
 
-Vitest + Testing Library + MSW. 120 tests en 12 archivos.
+Vitest + Testing Library + MSW. 191 tests en 22 archivos (9 en rojo, preexistentes y ajenos a la
+agenda y al planificador: 8 de `eventos-page` y 1 de `evento-editar-page`). `circuito-view-model`
+cubre el adaptador real, `borradores-page` el listado mixto borrador/confirmado y
+`circuito-page` la vista día por día del seleccionado (días vacíos, regeneración, eliminación
+confirmada/cancelada, reemplazo, ausencia de alternativas y cancelación).
+
+- **Nominatim se mockea con handlers MSW** (`/nominatim/search` y `/nominatim/reverse`), igual que
+  la API: `onUnhandledRequest: 'error'` no perdona una request real. El test del selector mockea
+  `leaflet` con `vi.hoisted` (fábricas encadenables + el callback de `dragend` guardado para
+  simular el arrastre del pin) y usa `reverseDelayMs={0}`.
 
 - **MSW corre con `onUnhandledRequest: 'error'`**: una request sin handler falla el test en vez
   de salir a la red. Por eso un test que "funciona" y en realidad pegó a internet no puede pasar.
@@ -234,5 +409,5 @@ Migrar a 4 no es un bump de versión.
 Commits con [Conventional Commits](https://www.conventionalcommits.com/): `feat:`, `fix:`,
 `chore:`, `docs:`.
 
-El repositorio **todavía no es un repositorio git**: hay que hacer `git init` antes de poder
-commitear.
+El repositorio **es un repo git único** con los dos proyectos como subcarpetas (`turismo-backend`
+y `turismo-frontend`); se commitea desde la raíz, con el `.gitignore` de la raíz.

@@ -1,12 +1,17 @@
 import { createBrowserRouter } from 'react-router-dom'
 
 import { Layout } from '@/components/layout'
+import { ActividadDetailPage } from '@/pages/actividad-detail-page'
+import { ActividadEditarPage } from '@/pages/actividad-editar-page'
 import { AgendaPage } from '@/pages/agenda-page'
+import { BorradoresPage } from '@/pages/borradores-page'
+import { CircuitoPage } from '@/pages/circuito-page'
 import { EventoDetailPage } from '@/pages/evento-detail-page'
 import { EventoEditarPage } from '@/pages/evento-editar-page'
 import { EventoNuevoPage } from '@/pages/evento-nuevo-page'
 import { EventosPage } from '@/pages/eventos-page'
 import { NotFoundPage } from '@/pages/not-found-page'
+import { PlanificadorPage } from '@/pages/planificador-page'
 import { PublicadorDetailPage } from '@/pages/publicador-detail-page'
 import { PublicadorNuevoPage } from '@/pages/publicador-nuevo-page'
 import { PublicadoresPage } from '@/pages/publicadores-page'
@@ -33,9 +38,15 @@ export const router = createBrowserRouter([
     children: [
       { index: true, Component: EventosPage },
       { path: 'agenda', Component: AgendaPage },
+      { path: 'borradores', Component: BorradoresPage },
+      { path: 'viajes/:id/circuito', Component: CircuitoPage },
+      { path: 'planificar', Component: PlanificadorPage },
+      { path: 'propuestas/nueva', Component: EventoNuevoPage },
       { path: 'eventos/nuevo', Component: EventoNuevoPage },
       { path: 'eventos/:id', Component: EventoDetailPage },
       { path: 'eventos/:id/editar', Component: EventoEditarPage },
+      { path: 'actividades/:id', Component: ActividadDetailPage },
+      { path: 'actividades/:id/editar', Component: ActividadEditarPage },
       { path: 'publicadores', Component: PublicadoresPage },
       { path: 'publicadores/nuevo', Component: PublicadorNuevoPage },
       { path: 'publicadores/:id', Component: PublicadorDetailPage },

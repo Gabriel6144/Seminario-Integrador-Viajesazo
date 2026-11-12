@@ -48,7 +48,8 @@ Base: `http://localhost:8080`. Comprobación rápida de vida: `curl.exe -s http:
 ## 3. Datos de arranque
 
 Cada arranque borra y recrea el esquema (`ddl-auto=create-drop`) y corre `data.sql`, así que la
-base arranca siempre con los mismos datos: **3 publicadores, 7 eventos y 5 imágenes**.
+base arranca siempre con los mismos datos: **3 publicadores, 8 eventos (cada uno con una imagen),
+5 ubicaciones y 5 viajes**.
 
 **Los ids son siempre los mismos** (van por orden de inserción), lo cual hace predecibles los ejemplos:
 
@@ -58,20 +59,47 @@ base arranca siempre con los mismos datos: **3 publicadores, 7 eventos y 5 imág
 | 2 | Municipalidad de Cosquín | cosquin@cordoba.gob.ar |
 | 3 | Asociación de Artesanos | artesanos@cordoba.gob.ar |
 
-| id | Evento | Categoría | Publicador | Fechas |
-| --- | --- | --- | --- | --- |
-| 1 | Festival de Folklore | CULTURA | 1 | hoy−2 → hoy+1 |
-| 2 | Exposición de artesanías | CULTURA | 3 | hoy → hoy+3 |
-| 3 | Gastronomía de la estancia | GASTRONOMIA | 1 | hoy+1 → hoy+1 |
-| 4 | Cabalgata por las Sierras | AVENTURA | 2 | hoy+2 → hoy+2 |
-| 5 | Festival de la Buena Mesa | GASTRONOMIA | 1 | hoy+4 → hoy+6 |
-| 6 | Tarde de campo y avistamiento de aves | FAMILIA | 2 | hoy+5 → hoy+5 |
-| 7 | Caminata al Cerro San Bernardo | NATURALEZA | 1 | hoy+9 → hoy+9 |
+| id | Evento | Publicador | Fechas |
+| --- | --- | --- | --- |
+| 1 | Cosquín Rock | 1 | 2027-02-06 → 2027-02-07 |
+| 2 | Festival Nacional de Folklore de Cosquín | 2 | 2026-01-24 → 2026-02-01 |
+| 3 | Oktoberfest | 1 | 2026-10-02 → 2026-10-12 |
+| 4 | Peperina | 3 | 2026-04-03 → 2026-04-05 |
+| 5 | Fiesta de las Colectividades | 3 | 2026-02-04 → 2026-02-08 |
+| 6 | Festival Nacional de Doma y Folklore de Jesús María | 2 | 2026-01-08 → 2026-01-18 |
+| 7 | Festival Internacional de Peñas | 1 | 2026-02-06 → 2026-02-10 |
+| 8 | Masa Vienesa | 1 | 2026-04-02 → 2026-04-05 |
 
-Eventos por publicador: **1 → 4 eventos** (1, 3, 5, 7), **2 → 2** (4, 6), **3 → 1** (2).
+Eventos por publicador: **1 → 4 eventos** (1, 3, 7, 8), **2 → 2** (2, 6), **3 → 2** (4, 5).
 
-Las fechas del seed son relativas a `CURRENT_DATE` a propósito, para que la agenda siempre tenga
-contenido sin importar el día en que se levante la app. Los ids, en cambio, son fijos.
+Ojo: los eventos del seed usan **fechas fijas** 2026/2027 y **no setean `categoria` ni horarios**
+(esas columnas quedan en NULL). Sí traen `tipo_acceso` (`DE_PAGO` o `GRATUITO`),
+`estado_propuesta` (`INICIADO`), lugar/recinto, localidad, dirección y `latitud`/`longitud`
+cargadas a mano (el backend las resolvería con Nominatim al darlas de alta por la API). Por eso la
+agenda semanal (sección 8.1) solo trae eventos cuando la fecha del ensayo cae dentro de alguno de
+esos rangos: hoy (2026-10-12) el único que entra es **Oktoberfest** (termina hoy).
+
+Los **viajes** sí usan fechas relativas a hoy, para que el demo siempre tenga viajes futuros. Las
+ubicaciones se siembran antes porque `Viaje.zonaInteres` es una FK a `ubicacion`:
+
+| id | Ubicación (ciudad) | Localidad | lat / long |
+| --- | --- | --- | --- |
+| 1 | Villa General Belgrano | Córdoba | -31.95 / -64.55 |
+| 2 | Ciudad de Córdoba | Córdoba | -31.42 / -64.18 |
+| 3 | Carlos Paz | Córdoba | -31.42 / -64.50 |
+| 4 | Alta Gracia | Córdoba | -31.65 / -64.43 |
+| 5 | La Cumbrecita | Córdoba | -31.90 / -64.77 |
+
+| id | Viaje | zonaInteres | rango | ritmo | Fechas | usuario |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Escapada serrana por Villa General Belgrano | 1 | 35 | EQUILIBRADO | hoy+7 → hoy+9 | turista.demo@viajesazo.com |
+| 2 | Cultura y naturaleza en Córdoba | 2 | 50 | TRANQUILO | hoy+14 → hoy+17 | turista.demo@viajesazo.com |
+| 3 | Aventura en el Valle de Punilla | 3 | 45 | INTENSIVO | hoy+21 → hoy+24 | turista.aventura@viajesazo.com |
+| 4 | Sabores y tradiciones de Córdoba | 4 | 30 | TRANQUILO | hoy+28 → hoy+30 | turista.gastronomico@viajesazo.com |
+| 5 | Recorrido familiar por las sierras | 5 | 40 | EQUILIBRADO | hoy+35 → hoy+38 | familia.demo@viajesazo.com |
+
+Todos nacen con `estado='PLANIFICADO'`. `turista.demo@viajesazo.com` es el único con dos viajes
+(ids 1 y 2), cómodo para probar VZ-22. Los ids, igual que los eventos, son fijos.
 
 ## 4. El detalle de los acentos (leer antes que nada)
 
@@ -121,7 +149,8 @@ curl -s -X POST http://localhost:8080/api/publicadores \
 
 ## 6. Paginación
 
-Los dos listados (`/api/agenda/semanal` y `/api/publicadores/{id}/eventos`) aceptan:
+Los listados (`/api/eventos`, `/api/publicadores`, `/api/publicadores/{id}/eventos`,
+`/api/agenda/semanal` y `/api/viajes`) aceptan:
 
 | Parámetro | Default | Tope |
 | --- | --- | --- |
@@ -177,11 +206,12 @@ Agenda de la semana ISO, de **hoy hasta el domingo** (límite inferior hoy, no e
 curl.exe -s "http://localhost:8080/api/agenda/semanal?page=0&size=20"
 ```
 
-Qué esperar: solo entran los eventos que **se solapan** con la ventana hoy→domingo. Como las fechas
-del seed son relativas, la cantidad depende del día de la semana en que se pruebe:
+Qué esperar: solo entran los eventos que **se solapan** con la ventana hoy→domingo. Como el seed de
+eventos usa **fechas fijas** 2026/2027 (ver sección 3), la agenda suele venir casi vacía:
 
-- Si hoy es **domingo**, la ventana es un solo día y entran los eventos 1 y 2 → `totalElements: 2`.
-- Si hoy es **miércoles** de una semana normal, entran los eventos 1, 2, 3, 4 → `totalElements: 4`.
+- Hoy (2026-10-12) el único evento que solapa es Oktoberfest (termina hoy) → `totalElements: 1`.
+- En general, mientras el seed siga con fechas fijas, la agenda suele estar vacía: es esperado, no
+  un bug. Para que tenga contenido, sembrar los eventos con fechas relativas.
 - Un evento que empezó antes de hoy y sigue vigente **también entra**: es solapamiento, no igualdad.
 
 Variante para ver la paginación:
@@ -200,7 +230,7 @@ curl.exe -s "http://localhost:8080/api/publicadores/1/eventos?page=0&size=2"
 
 Qué esperar: `totalElements: 4` para el publicador 1. Con `size=2` → `totalPages: 2`.
 
-- Publicador 2 → 2 eventos. Publicador 3 → 1 evento.
+- Publicador 2 → 2 eventos. Publicador 3 → 2 eventos.
 - Publicador **999** → 404 con `"No existe el publicador con id 999"`.
 
 ### 8.3 `GET /api/eventos/{id}` — US4
@@ -209,7 +239,9 @@ Qué esperar: `totalElements: 4` para el publicador 1. Con `size=2` → `totalPa
 curl.exe -s http://localhost:8080/api/eventos/1
 ```
 
-Qué esperar: el evento 1 con sus 2 imágenes y `publicadorId: 1`, `publicadorNombre: "Turismo Córdoba"`.
+Qué esperar: el evento 1 con su imagen y `publicadorId: 1`, `publicadorNombre: "Turismo Córdoba"`.
+También vienen `tipoAcceso`, `estadoPropuesta`, `lugarRecinto` y `latitud`/`longitud` (las
+coordenadas que el backend guardó al geocodificar).
 Ojo: `publicadorId` y `publicadorNombre` vienen **aplanados** en el response (en la entidad el origen
 es `publicador.id` / `publicador.nombre`).
 
@@ -251,8 +283,13 @@ puede parsear: el frontend lo muestra tal cual (ver sección 9).
   "nombre": "Festival de prueba",
   "descripcion": "Evento creado a mano",
   "categoria": "CULTURA",
+  "tipoAcceso": "DE_PAGO",
+  "montoEstimado": 1500,
+  "descripcionArancel": "Entrada general",
+  "sitioOficial": "https://entradas.cordoba.gob.ar/festival",
+  "lugarRecinto": "Plaza Pringles",
   "localidad": "Cosquín",
-  "direccion": "Plaza Pringles",
+  "direccion": "Plaza Pringles, Cosquín, Córdoba",
   "fechaInicio": "2026-10-01",
   "fechaFin": "2026-10-03",
   "horarioInicio": "20:00:00",
@@ -262,22 +299,41 @@ puede parsear: el frontend lo muestra tal cual (ver sección 9).
 }
 ```
 
-Qué esperar: **201** y el evento creado con su `id`.
+Qué esperar: **201** y el evento creado con su `id`, `latitud`/`longitud` resueltas por el backend y
+`estadoPropuesta: "INICIADO"`.
 
-Solo son obligatorios `nombre`, `fechaInicio`, `fechaFin` y `publicadorId`. El resto puede venir
-`null` o ausente; sin `imagenes` se guarda con lista vacía, no con `null`.
+Son obligatorios `nombre`, `lugarRecinto`, `localidad`, `direccion`, `fechaInicio`, `fechaFin` y
+`publicadorId`. El resto puede venir `null` o ausente; sin `imagenes` se guarda con lista vacía, no
+con `null`. Si `tipoAcceso` falta, el backend asume `GRATUITO`. `estadoPropuesta` **no se manda**:
+lo fija el service en `INICIADO`.
 
-`categoria` acepta exactamente: `GASTRONOMIA`, `FAMILIA`, `CULTURA`, `NATURALEZA`, `AVENTURA`
-(en mayúsculas; es como se persiste). **Cualquier otro valor da 400, no 500.**
+**El alta pasa por Nominatim (OpenStreetMap).** El backend geocodifica
+`lugarRecinto + direccion + localidad, Córdoba, Argentina`; si la dirección no resuelve (o no hay
+internet), responde **400** y el evento **no se guarda**. Para probar esto hace falta conexión a
+internet: sin ella, *cualquier* alta falla con el mensaje de ubicación.
+
+`tipoAcceso` acepta `GRATUITO` o `DE_PAGO`.
+
+`categoria` acepta exactamente: `NATURALEZA`, `GASTRONOMIA`, `CULTURA`, `HISTORIA`, `AVENTURA`,
+`VIDA_NOCTURNA`, `MUSICA`, `COMPRAS`, `FAMILIAR_Y_RELAX` (en mayúsculas; es como se persiste).
+**Cualquier otro valor da 400, no 500.**
 
 Casos de error, **medidos contra la app corriendo** (no deducidos del código):
 
 | Body | Status | `message` |
 | --- | --- | --- |
 | sin `nombre` o `nombre: ""` | 400 | `nombre: el nombre es obligatorio` |
+| sin `lugarRecinto` o vacío | 400 | `lugarRecinto: el lugar o recinto es obligatorio` |
+| sin `localidad` o vacía | 400 | `localidad: la ciudad es obligatoria` |
+| sin `direccion` o vacía | 400 | `direccion: la dirección exacta es obligatoria` |
 | sin `fechaInicio` o `fechaInicio: ""` | 400 | `fechaInicio: la fecha de inicio es obligatoria` |
 | sin `fechaFin` | 400 | `fechaFin: la fecha de finalización es obligatoria` |
 | sin `publicadorId` | 400 | `publicadorId: el publicador es obligatorio` |
+| `DE_PAGO` sin `montoEstimado` | 400 | `el monto estimado es obligatorio para un evento arancelado` |
+| `DE_PAGO` sin `sitioOficial` | 400 | `el link al sitio oficial es obligatorio para un evento arancelado` |
+| `montoEstimado` negativo | 400 | `montoEstimado: el monto estimado no puede ser negativo` |
+| `sitioOficial: "ftp://x"` | 400 | `sitioOficial: el link al sitio oficial debe ser una URL http(s)` |
+| ubicación que no resuelve | 400 | `no se encontró la ubicación del evento: revisá el lugar, la ciudad y la dirección` |
 | `"fechaInicio": "no-es-fecha"` | 400 | `el cuerpo de la petición no es válido o tiene un formato incorrecto` |
 | `"categoria": "NO_EXISTE"` | 400 | `el cuerpo de la petición no es válido o tiene un formato incorrecto` |
 | `"imagenes": [""]` | 400 | `imagenes[0]: las URLs de imagen no pueden estar vacías` |
@@ -303,7 +359,10 @@ curl.exe -s -X PUT http://localhost:8080/api/eventos/1 `
   -H "Content-Type: application/json" --data-binary "@target\body.json"
 ```
 
-Qué esperar: **200** con el evento ya modificado. Mismas validaciones que el alta.
+Qué esperar: **200** con el evento ya modificado. Mismas validaciones que el alta, **incluida la
+geocodificación**: si la nueva ubicación no resuelve en Nominatim, el PUT responde **400** y el
+evento queda como estaba (la transacción no llega a tocar las coordenadas viejas). `estadoPropuesta`
+no se puede cambiar desde acá (el mapper lo ignora).
 
 Ojo con el `update`: si el body **no** trae `imagenes`, se conserva la lista que ya tenía (no se
 borra), porque el mapper ignora los `null`. Para dejarla vacía hay que mandar `"imagenes": []`.
@@ -330,10 +389,11 @@ agenda, trae también los eventos que ya terminaron y los que todavía no empiez
 curl.exe -s "http://localhost:8080/api/eventos?page=0&size=20"
 ```
 
-Qué esperar: los 7 eventos del seed con `totalElements: 7`, `totalPages: 1`. Orden por fecha de
-inicio y, dentro del mismo día, por hora de inicio (el orden lo impone el servidor).
+Qué esperar: los 8 eventos del seed con `totalElements: 8`, `totalPages: 1`. Orden por fecha de
+inicio y, dentro del mismo día, por hora de inicio (el orden lo impone el servidor), así que el
+primero es el Festival de Doma y Folklore (2026-01-08), no el id 1.
 
-- `?size=3` → `totalPages: 3`. La primera página trae los eventos 1, 2 y 3.
+- `?size=3` → `totalPages: 3` (8 eventos).
 - Sin eventos cargados → página vacía con **200**, no 404.
 
 ### 8.10 `GET /api/publicadores` — US7
@@ -353,15 +413,157 @@ inserta Turismo Córdoba primero):
 
 - Sin publicadores cargados → página vacía con **200**, no 404.
 
+## 8 bis. Viajes (Sprint 2: VZ-19 / VZ-21 / VZ-22 / VZ-23)
+
+Base `/api/viajes`. La API expone fechas como `LocalDate` (`"2026-11-01"`) aunque la entidad guarde
+`LocalDateTime`. Recordar que la baja es **lógica** (ver 8.20).
+
+### 8.17 `GET /api/viajes?usuario=` — VZ-22
+
+Listado de viajes **activos** (no cancelados) de un turista, paginado. `usuario` es **obligatorio**.
+
+```powershell
+curl.exe -s "http://localhost:8080/api/viajes?usuario=turista.demo@viajesazo.com"
+```
+
+Qué esperar: `totalElements: 2` (ids 1 y 2), ordenados por fecha de inicio. El `@` del email se
+manda tal cual con `curl.exe`; si se usa `Invoke-RestMethod`, hay que codificarlo como `%40` o
+PowerShell lo interpreta como userinfo de la URL y falla con "remote name could not be resolved".
+
+- `?usuario=familia.demo@viajesazo.com` → `totalElements: 1` (id 5).
+- `?usuario=no.existe@viajesazo.com` → `totalElements: 0` con **200** (página vacía, no 404).
+- Sin `?usuario` → **400** `falta el parámetro obligatorio 'usuario'`.
+
+### 8.18 `GET /api/viajes/{id}` — soporte (detalle para editar)
+
+```powershell
+curl.exe -s http://localhost:8080/api/viajes/1
+```
+
+Qué esperar: el viaje con `ubicacion` anidada (con `latitud`/`longitud`), `ritmo`,
+`interesesCategoria`, `estado` y `usuario`. `GET /api/viajes/999` → 404
+`No existe el viaje con id 999`.
+
+### 8.19 `POST /api/viajes` — VZ-19
+
+```json
+{
+  "nombre": "Prueba manual",
+  "ubicacion": { "ciudad": "Bariloche", "localidad": "Río Negro", "latitud": -41.13, "longitud": -71.31 },
+  "rangoInteresKm": 25.5,
+  "fechaInicio": "2026-11-01",
+  "fechaFin": "2026-11-10",
+  "ritmo": "INTENSIVO",
+  "interesesCategoria": ["NATURALEZA", "AVENTURA"],
+  "usuario": "turista.demo@viajesazo.com"
+}
+```
+
+Qué esperar: **201**, el viaje creado con su `id` y `estado: "PLANIFICADO"` (lo fuerza el service;
+si el body trae otro `estado`, se ignora).
+
+`ritmo` acepta exactamente `TRANQUILO`, `EQUILIBRADO`, `INTENSIVO` (ojo: es **`INTENSIVO`**, no
+`INTENSO`). `interesesCategoria` acepta `NATURALEZA`, `GASTRONOMIA`, `CULTURA`, `HISTORIA`,
+`AVENTURA`, `VIDA_NOCTURNA`, `MUSICA`, `COMPRAS`, `FAMILIAR_Y_RELAX`.
+
+Casos de error, **medidos contra la app corriendo**:
+
+| Body | Status | `message` |
+| --- | --- | --- |
+| `nombre: ""` | 400 | `nombre: El nombre del viaje no puede estar vacío` |
+| `usuario: ""` | 400 | `usuario: El turista no puede estar vacío` |
+| `rangoInteresKm: -5` | 400 | `rangoInteresKm: El rango de interés debe ser mayor a cero` |
+| `fechaFin` anterior a `fechaInicio` | 400 | `la fecha de finalización no puede ser anterior a la de inicio` |
+| `ritmo: "INTENSO"` (inválido) | 400 | `el cuerpo de la petición no es válido o tiene un formato incorrecto` |
+| sin `ubicacion` | 400 | `ubicacion: La ubicación de interés no puede estar vacía` |
+| `latitud: -100` | 400 | `ubicacion.latitud: La latitud debe ser mayor o igual a -90` |
+
+### 8.20 `PUT /api/viajes/{id}` — VZ-21
+
+Mismo body que el POST.
+
+```powershell
+curl.exe -s -X PUT http://localhost:8080/api/viajes/1 `
+  -H "Content-Type: application/json" --data-binary "@target\viaje.json"
+```
+
+Qué esperar: **200** con el viaje modificado. No se puede cambiar el `estado` por acá (el mapeo de
+update lo ignora). `PUT /api/viajes/999` → 404.
+
+### 8.21 `DELETE /api/viajes/{id}` — VZ-23 (baja **lógica**)
+
+```powershell
+curl.exe -s -i -X DELETE http://localhost:8080/api/viajes/1
+```
+
+Qué esperar: **204** y **cuerpo vacío**. Pero a diferencia del `DELETE` de eventos (baja **física**),
+acá el viaje **no se borra**: queda con `estado = CANCELADO` y deja de estar disponible. Para
+comprobarlo:
+
+- `GET /api/viajes/1` → **404** `No existe el viaje con id 1`.
+- `GET /api/viajes?usuario=turista.demo@viajesazo.com` → `totalElements: 1` (ya no está el id 1).
+- `DELETE /api/viajes/999` → 404.
+- El viaje cancelado **reaparece al reiniciar la app**, porque el seed se reejecuta: la baja es
+  lógica, no sobrevive entre arranques.
+
+### 8.22 `GET /api/viajes/abc` (id no numérico) → 400
+
+```powershell
+curl.exe -s http://localhost:8080/api/viajes/abc
+```
+
+Qué esperar: **400** `el parámetro 'id' tiene un formato inválido` (lo maneja `handleTypeMismatch`).
+
+### 8.23 Circuito seleccionado, eliminación y reemplazo (VZ-26/VZ-28/VZ-29)
+
+Requiere un viaje con circuito generado y una alternativa seleccionada (secciones 8.13–8.15).
+
+```powershell
+# alternativa elegida agrupada por día (incluye días vacíos)
+curl.exe -s http://localhost:8080/api/viajes/2/circuito/seleccionado
+
+# reemplazos compatibles para una parada (usar el itemId de la respuesta anterior)
+curl.exe -s http://localhost:8080/api/viajes/2/circuito/seleccionado/items/5/alternativas
+
+# eliminar sin confirmar -> 409; con confirmar=true -> 200
+curl.exe -s -i -X DELETE http://localhost:8080/api/viajes/2/circuito/seleccionado/items/6
+curl.exe -s -X DELETE "http://localhost:8080/api/viajes/2/circuito/seleccionado/items/6?confirmar=true"
+
+# reemplazar la parada 5 por la propuesta 26 -> 200; una propuesta inválida -> 422
+curl.exe -s -X PUT http://localhost:8080/api/viajes/2/circuito/seleccionado/items/5 `
+  -H "Content-Type: application/json" -d '{\"propuestaId\":26}'
+
+# regenerar sin flag -> 409; con reemplazar=true -> 200 (conserva la estrategia)
+curl.exe -s -i -X POST http://localhost:8080/api/viajes/2/circuito
+curl.exe -s -X POST "http://localhost:8080/api/viajes/2/circuito?reemplazar=true"
+```
+
+Qué esperar:
+
+- `GET /seleccionado` → **200** con `dias[]`; cada ítem trae `itemId` y `propuestaId`. Si el viaje,
+  el circuito o la selección no existen → **404**.
+- Un segundo `POST /seleccion` → **400** `el circuito del viaje ya tiene una alternativa
+  seleccionada`.
+- `DELETE` sin `confirmar=true` → **409**; con el flag → **200** y el circuito actualizado (la
+  parada se borra, se renumeran `orden` y se recalculan traslados/métricas).
+- `PUT` sin `propuestaId` → **400** `propuestaId: La propuesta de reemplazo es obligatoria`; con
+  una propuesta que no encaja en el bloque/solapamiento/traslados → **422** y la parada queda
+  intacta; un `itemId` de otra alternativa → **404**.
+- `GET .../alternativas` sin candidatos → **200** con `alternativas: []` y `mensaje`.
+- `POST /circuito` sin flag con circuito existente → **409** `el circuito del viaje ya fue
+  generado; confirmá con reemplazar=true para regenerarlo`; con `?reemplazar=true` → **200**.
+- `desactualizado` y `motivosDesactualizacion` (`FECHAS`, `PREFERENCIAS`, `ZONA`, `RITMO`)
+  comparan el snapshot contra el viaje; las coordenadas se comparan por valor, no por escala
+  decimal.
+
 ## 9. Bordes conocidos — probar a mano
 
 Estos no los verifiqué y no están cubiertos por los tests, así que conviene comprobarlos:
 
-1. **Id no numérico**: `GET /api/eventos/abc`. Los controllers **no** tienen `@Validated`, así que
-   el handler de `ConstraintViolationException` no entra en juego. Lo esperable es que caiga en el
-   catch-all y devuelva **500** en lugar de un 400. Si se quiere 400, hay que agregar `@Validated` a
-   los controllers o manejar `MethodArgumentTypeMismatchException`. El frontend lo evita: valida el
-   id antes de pedir y muestra "Identificador inválido" sin pegarle a la API.
+1. **Id no numérico**: `GET /api/eventos/abc`. Devuelve **400** con
+   `el parámetro 'id' tiene un formato inválido`. Desde el Sprint 2, `GlobalExceptionHandler` maneja
+   `MethodArgumentTypeMismatchException` para **todos** los controllers (antes caía en el catch-all y
+   devolvía 500). El frontend igual lo evita: valida el id antes de pedir.
 2. **`?page` negativo o `?size=0`**: ver si Spring los clampa o devuelve 400.
 
 Verificados durante el smoke test y **ya cubiertos por los tests**, así que no quedan como bordes:
@@ -414,9 +616,12 @@ curl.exe -s "http://localhost:8080/api/eventos?page=0&size=3"
 curl.exe -s "http://localhost:8080/api/publicadores?page=0&size=20"
 curl.exe -s "http://localhost:8080/api/publicadores/1/eventos?page=0&size=2"
 curl.exe -s http://localhost:8080/api/eventos/1
+curl.exe -s "http://localhost:8080/api/viajes?usuario=turista.demo@viajesazo.com"
+curl.exe -s http://localhost:8080/api/viajes/1
 
 # errores
 curl.exe -s http://localhost:8080/api/eventos/999
+curl.exe -s http://localhost:8080/api/viajes/999
 
 # alta de publicador (ver sección 5 para el encoding)
 curl.exe -s -X POST http://localhost:8080/api/publicadores `
@@ -429,11 +634,18 @@ curl.exe -s -X POST http://localhost:8080/api/publicadores `
   -d '{\"nombre\":\"Duplicado\",\"email\":\"info@cordoba.gob.ar\"}'
 
 # alta, edicion y baja de un evento (secciones 8.6 a 8.8 para los bodies completos)
+# ojo: alta/edicion geocodifican con Nominatim -> necesitan internet y lugar/ciudad/direccion validos
 curl.exe -s -X POST http://localhost:8080/api/eventos -H "Content-Type: application/json" -d '...'
 curl.exe -s -X PUT  http://localhost:8080/api/eventos/1 -H "Content-Type: application/json" -d '...'
-curl.exe -s -i -X DELETE http://localhost:8080/api/eventos/7   # 204 sin cuerpo
+curl.exe -s -i -X DELETE http://localhost:8080/api/eventos/7   # 204 sin cuerpo (baja FISICA)
 
-# tests automatizados (83, incluye lo de arriba salvo los bordes de la sección 9)
+# viajes: alta, edicion y baja (seccion 8 bis para los bodies completos)
+curl.exe -s "http://localhost:8080/api/viajes?usuario=turista.demo@viajesazo.com"
+curl.exe -s -X POST http://localhost:8080/api/viajes -H "Content-Type: application/json" -d '...'
+curl.exe -s -X PUT  http://localhost:8080/api/viajes/1 -H "Content-Type: application/json" -d '...'
+curl.exe -s -i -X DELETE http://localhost:8080/api/viajes/1   # 204 sin cuerpo (baja LOGICA -> CANCELADO)
+
+# tests automatizados (258; 256 en verde y 2 fallos preexistentes por fechas fijas)
 .\mvnw.cmd clean test
 ```
 

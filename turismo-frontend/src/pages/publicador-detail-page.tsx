@@ -70,20 +70,20 @@ export function PublicadorDetailPage() {
       )}
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold tracking-tight">Eventos del publicador</h2>
+        <h2 className="text-lg font-semibold tracking-tight">Propuestas del publicador</h2>
 
         {eventosQuery.isPending ? <GridSkeleton count={3} /> : null}
         {eventosQuery.isError ? <ErrorState error={eventosQuery.error} /> : null}
 
         {/*
-          Un publicador sin eventos devuelve 200 con la página vacía, no 404: es un estado vacío
+          Un publicador sin propuestas devuelve 200 con la página vacía, no 404: es un estado vacío
           normal. La condición exige `isSuccess` porque durante `isPending` `data` es `undefined` y
           el mensaje saldría encima del skeleton.
         */}
         {eventosQuery.isSuccess && eventosQuery.data.content.length === 0 ? (
           <EmptyState
-            title="Sin eventos cargados"
-            description="Este publicador todavía no publicó ningún evento."
+            title="Sin propuestas cargadas"
+            description="Este publicador todavía no publicó ningún evento ni actividad."
           />
         ) : null}
 
@@ -92,8 +92,8 @@ export function PublicadorDetailPage() {
             className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
             aria-busy={eventosQuery.isPlaceholderData}
           >
-            {eventosQuery.data.content.map((evento) => (
-              <EventoCard key={evento.id} evento={evento} />
+            {eventosQuery.data.content.map((propuesta) => (
+              <EventoCard key={`${propuesta.tipo ?? 'EVENTO'}-${propuesta.id}`} evento={propuesta} />
             ))}
           </div>
         ) : null}

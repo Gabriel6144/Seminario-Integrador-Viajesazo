@@ -1,7 +1,10 @@
 import {
   ArrowLeftIcon,
+  Building2Icon,
   CalendarDaysIcon,
+  CircleDollarSignIcon,
   ClockIcon,
+  ExternalLinkIcon,
   LandmarkIcon,
   MapPinIcon,
 } from 'lucide-react'
@@ -11,6 +14,7 @@ import { useEvento } from '@/api/eventos'
 import { CategoriaBadge } from '@/components/categoria-badge'
 import { EventoActions } from '@/components/evento-actions'
 import { EventoImagen } from '@/components/evento-imagen'
+import { EventoMapa } from '@/components/evento-mapa'
 import { ErrorState } from '@/components/query-state'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -25,6 +29,21 @@ import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDateRange, formatLocalDate, formatTimeRange } from '@/lib/dates'
 import { parseId } from '@/lib/parse-id'
+import {
+  TIPO_ACCESO_LABELS,
+  ESTADO_PROPUESTA_LABELS,
+  MODALIDAD_LABELS,
+  TIPO_PROPUESTA_LABELS,
+  type EstadoPropuesta,
+  type EstadoPropuestaObj,
+} from '@/types/api'
+
+const ESTADO_DOT_COLORS: Record<EstadoPropuesta, string> = {
+  INICIADO: 'bg-emerald-400',
+  REPROGRAMADO: 'bg-amber-400',
+  CANCELADO: 'bg-rose-400',
+  FINALIZADO: 'bg-slate-400',
+}
 
 /** Detalle de un evento — `GET /api/eventos/{id}`. */
 export function EventoDetailPage() {
@@ -48,22 +67,96 @@ export function EventoDetailPage() {
 
   const evento = query.data
   const horario = formatTimeRange(evento.horarioInicio, evento.horarioFin)
+  const imagen = evento.imagenes[0]
+  const esDePago = evento.tipoAcceso === 'DE_PAGO'
+  const tieneMapa = evento.latitud !== null && evento.longitud !== null
 
   return (
     <div className="flex flex-col gap-6">
       <Volver />
 
+      {/* Hero image con overlay */}
+      {imagen && (
+        <div className="relative h-64 w-full overflow-hidden rounded-2xl shadow-sm sm:h-80 md:h-96">
+          <img
+            src={imagen}
+            alt={`Imagen de ${evento.nombre}`}
+            className="h-full w-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
+
+          {/* Badges flotantes */}
+          <div className="absolute left-3 right-3 top-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="rounded-full bg-[#df2a29] px-3 py-1 text-xs font-bold text-white shadow-sm backdrop-blur-md">
+                Evento
+              </span>
+              {evento.categoria ? (
+                <CategoriaBadge categoria={evento.categoria} />
+              ) : (
+                <span className="rounded-full bg-[#d7a73b] px-3 py-1 text-xs font-bold text-white shadow-sm backdrop-blur-md">
+                  Sin categoría
+                </span>
+              )}
+              <span className="rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-[#00658d] shadow-sm backdrop-blur-md">
+                {TIPO_ACCESO_LABELS[evento.tipoAcceso ?? 'GRATUITO']}
+              </span>
+            </div>
+            <span className="rounded-full bg-[#eaf6fc] px-3 py-1 text-xs font-semibold text-[#00658d] shadow-sm backdrop-blur-md">
+              Agenda Provincial Abierta
+            </span>
+          </div>
+
+          {/* Título sobre la imagen */}
+          <div className="absolute bottom-3 left-3 right-3 text-white">
+            <div className="mb-1 flex flex-wrap items-center gap-1.5 text-sm font-medium text-white/90">
+              <MapPinIcon className="h-4 w-4" aria-hidden />
+              <span>{evento.localidad ?? 'Córdoba'}</span>
+              <span aria-hidden>·</span>
+              <span className="inline-flex items-center gap-1 font-semibold text-white">
+                <span
+                  className={`h-2 w-2 rounded-full ${ESTADO_DOT_COLORS[estadoKey(evento.estadoPropuesta)]}`}
+                  aria-hidden
+                />
+                {estadoLabel(evento.estadoPropuesta)}
+              </span>
+            </div>
+            <h2 className="font-heading text-2xl font-bold leading-tight drop-shadow-sm">
+              {evento.nombre}
+            </h2>
+          </div>
+        </div>
+      )}
+
+      {/* Card principal */}
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-[#df2a29] px-2.5 py-0.5 text-xs font-semibold text-white">
+              Evento
+            </span>
             <CategoriaBadge categoria={evento.categoria} />
+            {evento.tipoPropuesta && (
+              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-[#3f484e]">
+                {TIPO_PROPUESTA_LABELS[evento.tipoPropuesta]}
+              </span>
+            )}
+            {evento.modalidad && (
+              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-[#3f484e]">
+                {MODALIDAD_LABELS[evento.modalidad]}
+              </span>
+            )}
           </div>
           {/*
             `CardTitle` de shadcn es un `div` fijo (no acepta `asChild`), así que el nombre del
             evento se compone como `<h2>` a mano. Sin esto la página no tendría ningún heading y
             el lector de pantalla no encontraría el título del contenido.
           */}
-          <h2 className="text-2xl font-semibold tracking-tight">{evento.nombre}</h2>
+          {!imagen && (
+            <h2 className="font-heading text-2xl font-bold tracking-tight text-[#191c1e]">
+              {evento.nombre}
+            </h2>
+          )}
           <CardDescription>
             Publicado por{' '}
             <Link
@@ -76,46 +169,100 @@ export function EventoDetailPage() {
         </CardHeader>
 
         <CardContent className="flex flex-col gap-6">
+          {/* Ficha del evento */}
           <dl className="flex flex-col gap-3 text-sm">
             <div className="flex items-center gap-2">
-              <CalendarDaysIcon aria-hidden className="text-muted-foreground" />
+              <CalendarDaysIcon className="h-4 w-4 text-[#7a5900]" aria-hidden />
               <dt className="sr-only">Fechas</dt>
-              <dd>{formatDateRange(evento.fechaInicio, evento.fechaFin)}</dd>
+              <dd className="font-medium text-[#191c1e]">
+                {formatDateRange(evento.fechaInicio, evento.fechaFin)}
+              </dd>
             </div>
 
-            {horario === null ? null : (
+            {horario !== null && (
               <div className="flex items-center gap-2">
-                <ClockIcon aria-hidden className="text-muted-foreground" />
+                <ClockIcon className="h-4 w-4 text-[#7a5900]" aria-hidden />
                 <dt className="sr-only">Horario</dt>
-                <dd>{horario}</dd>
+                <dd className="text-[#3f484e]">{horario}</dd>
               </div>
             )}
 
-            {evento.localidad === null ? null : (
+            {evento.localidad !== null && (
               <div className="flex items-center gap-2">
-                <MapPinIcon aria-hidden className="text-muted-foreground" />
+                <MapPinIcon className="h-4 w-4 text-[#bb0413]" aria-hidden />
                 <dt className="sr-only">Localidad</dt>
-                <dd>{evento.localidad}</dd>
+                <dd className="text-[#3f484e]">{evento.localidad}</dd>
               </div>
             )}
 
-            {evento.direccion === null ? null : (
+            {evento.lugarRecinto !== null && (
               <div className="flex items-center gap-2">
-                <LandmarkIcon aria-hidden className="text-muted-foreground" />
+                <LandmarkIcon className="h-4 w-4 text-[#3f484e]" aria-hidden />
+                <dt className="sr-only">Lugar o recinto</dt>
+                <dd className="text-[#3f484e]">{evento.lugarRecinto}</dd>
+              </div>
+            )}
+
+            {evento.direccion !== null && (
+              <div className="flex items-center gap-2">
+                <Building2Icon className="h-4 w-4 text-[#3f484e]" aria-hidden />
                 <dt className="sr-only">Dirección</dt>
-                <dd>{evento.direccion}</dd>
+                <dd className="text-[#3f484e]">{evento.direccion}</dd>
+              </div>
+            )}
+
+            {esDePago && (
+              <div className="flex items-start gap-2">
+                <CircleDollarSignIcon className="mt-0.5 h-4 w-4 shrink-0 text-[#1e7d32]" aria-hidden />
+                <div className="flex flex-col gap-0.5">
+                  <dt className="sr-only">Arancel</dt>
+                  <dd className="text-[#3f484e]">
+                    <span className="font-semibold text-[#1e7d32]">
+                      {formatArancel(evento.montoEstimado)}
+                    </span>
+                    {evento.descripcionArancel !== null && (
+                      <span> · {evento.descripcionArancel}</span>
+                    )}
+                  </dd>
+                  {evento.sitioOficial !== null && (
+                    <dd>
+                      <a
+                        href={evento.sitioOficial}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-[#00658d] underline-offset-4 hover:underline"
+                      >
+                        Sitio oficial de entradas
+                        <ExternalLinkIcon className="h-3.5 w-3.5" aria-hidden />
+                      </a>
+                    </dd>
+                  )}
+                </div>
               </div>
             )}
           </dl>
 
-          {evento.descripcion === null ? null : (
+          {tieneMapa && (
+            <div className="flex flex-col gap-1.5">
+              <h3 className="font-heading text-lg font-bold text-[#191c1e]">¿Dónde se hace?</h3>
+              <EventoMapa
+                nombre={evento.nombre}
+                lugar={evento.lugarRecinto ?? evento.direccion ?? evento.localidad ?? evento.nombre}
+                localidad={evento.localidad}
+                latitud={evento.latitud as number}
+                longitud={evento.longitud as number}
+              />
+            </div>
+          )}
+
+          {evento.descripcion !== null && (
             <>
               <Separator />
-              <p className="leading-relaxed">{evento.descripcion}</p>
+              <p className="leading-relaxed text-[#3f484e]">{evento.descripcion}</p>
             </>
           )}
 
-          {evento.imagenes.length === 0 ? null : (
+          {evento.imagenes.length > 0 && (
             <>
               <Separator />
               <ul className="grid gap-3 sm:grid-cols-2">
@@ -134,13 +281,16 @@ export function EventoDetailPage() {
         </CardContent>
 
         <CardFooter className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-sm text-muted-foreground">
-            {formatLocalDate(evento.fechaInicio)} · evento #{evento.id}
+          <span className="text-sm text-[#3f484e]">
+            {formatLocalDate(evento.fechaInicio)} · evento #{evento.id} ·{' '}
+            {estadoLabel(evento.estadoPropuesta)}
           </span>
           <EventoActions
             id={evento.id}
             nombre={evento.nombre}
             publicadorId={evento.publicadorId}
+            imagen={imagen}
+            fecha={formatDateRange(evento.fechaInicio, evento.fechaFin)}
           />
         </CardFooter>
       </Card>
@@ -152,11 +302,27 @@ function Volver() {
   return (
     <Button asChild variant="ghost" size="sm" className="self-start">
       <Link to="/">
-        <ArrowLeftIcon data-icon="inline-start" aria-hidden />
+        <ArrowLeftIcon className="h-4 w-4" aria-hidden />
         Volver al listado
       </Link>
     </Button>
   )
+}
+
+/** `1500` → `$ 1.500,00`. El backend garantiza que no es null cuando el evento es arancelado. */
+function formatArancel(monto: number | null): string {
+  if (monto === null) return 'Arancelado'
+  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(monto)
+}
+
+function estadoKey(estado: EstadoPropuesta | EstadoPropuestaObj | null): EstadoPropuesta {
+  const key = typeof estado === 'object' && estado !== null ? estado.nombre : estado
+  return key ?? 'INICIADO'
+}
+
+/** `null` (evento viejo o sin estado) cae en el label de `INICIADO` para no mostrar nada raro. */
+function estadoLabel(estado: EstadoPropuesta | EstadoPropuestaObj | null): string {
+  return ESTADO_PROPUESTA_LABELS[estadoKey(estado)]
 }
 
 function IdInvalido() {

@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
@@ -33,8 +34,13 @@ import com.viajesazo.turismo_backend.dto.request.EventoRequest;
 import com.viajesazo.turismo_backend.dto.response.EventoResponse;
 import com.viajesazo.turismo_backend.exception.ResourceNotFoundException;
 import com.viajesazo.turismo_backend.exception.BusinessRuleException;
-import com.viajesazo.turismo_backend.model.Categoria;
-import com.viajesazo.turismo_backend.service.EventoService;
+import com.viajesazo.turismo_backend.model.EstadoPropuesta;
+import com.viajesazo.turismo_backend.model.InteresCategoria;
+import com.viajesazo.turismo_backend.model.Modalidad;
+import com.viajesazo.turismo_backend.model.TipoAcceso;
+import com.viajesazo.turismo_backend.model.TipoPropuesta;
+import com.viajesazo.turismo_backend.model.TipoRegistro;
+import com.viajesazo.turismo_backend.service.PropuestaService;
 
 @WebMvcTest(EventoController.class)
 // @WebMvcTest es un slice: solo carga beans web, así que el Clock que inyecta
@@ -47,8 +53,12 @@ class EventoControllerTest {
 			  "nombre": "Festival de Folklore",
 			  "descripcion": "Encuentro de syrigamis",
 			  "categoria": "CULTURA",
+			  "tipoAcceso": "DE_PAGO",
+			  "montoEstimado": 25000,
+			  "sitioOficial": "https://festivaldecosquin.com",
+			  "lugarRecinto": "Plaza Próspero Molina",
 			  "localidad": "Cosquín",
-			  "direccion": "Plaza Pringles",
+			  "direccion": "Av. San Martín 800, Cosquín",
 			  "fechaInicio": "2026-10-01",
 			  "fechaFin": "2026-10-03",
 			  "horarioInicio": "20:00:00",
@@ -62,12 +72,12 @@ class EventoControllerTest {
 	private MockMvc mockMvc;
 
 	@MockitoBean
-	private EventoService eventoService;
+	private PropuestaService propuestaService;
 
 	@Test
 	@DisplayName("US1: registra el evento y responde 201 con el evento creado")
 	void createsEvent() throws Exception {
-		when(eventoService.create(any(EventoRequest.class))).thenReturn(response());
+		when(propuestaService.create(any(EventoRequest.class))).thenReturn(response());
 
 		mockMvc.perform(post("/api/eventos").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
 				.andExpect(status().isCreated())
@@ -133,7 +143,7 @@ class EventoControllerTest {
 	@Test
 	@DisplayName("un publicador inexistente devuelve 404")
 	void returns404WhenPublisherNotFound() throws Exception {
-		when(eventoService.create(any(EventoRequest.class)))
+		when(propuestaService.create(any(EventoRequest.class)))
 				.thenThrow(new ResourceNotFoundException("No existe el publicador con id 1"));
 
 		mockMvc.perform(post("/api/eventos").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
@@ -145,7 +155,7 @@ class EventoControllerTest {
 	@Test
 	@DisplayName("un rango de fechas inválido devuelve 400")
 	void returns400WhenRangeInvalid() throws Exception {
-		when(eventoService.create(any(EventoRequest.class)))
+		when(propuestaService.create(any(EventoRequest.class)))
 				.thenThrow(new BusinessRuleException("la fecha de finalización no puede ser anterior a la de inicio"));
 
 		mockMvc.perform(post("/api/eventos").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
@@ -156,7 +166,7 @@ class EventoControllerTest {
 	@Test
 	@DisplayName("US2: modifica el evento y responde 200")
 	void updatesEvent() throws Exception {
-		when(eventoService.update(eq(7L), any(EventoRequest.class))).thenReturn(response());
+		when(propuestaService.update(eq(7L), any(EventoRequest.class))).thenReturn(response());
 
 		mockMvc.perform(put("/api/eventos/7").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
 				.andExpect(status().isOk())
@@ -166,7 +176,7 @@ class EventoControllerTest {
 	@Test
 	@DisplayName("US2: modificar un evento inexistente devuelve 404")
 	void returns404WhenUpdating() throws Exception {
-		when(eventoService.update(eq(404L), any(EventoRequest.class)))
+		when(propuestaService.update(eq(404L), any(EventoRequest.class)))
 				.thenThrow(new ResourceNotFoundException("No existe el evento con id 404"));
 
 		mockMvc.perform(put("/api/eventos/404").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
@@ -179,14 +189,14 @@ class EventoControllerTest {
 		mockMvc.perform(delete("/api/eventos/7"))
 				.andExpect(status().isNoContent());
 
-		verify(eventoService).delete(7L);
+		verify(propuestaService).delete(7L);
 	}
 
 	@Test
 	@DisplayName("US3: dar de baja un evento inexistente devuelve 404")
 	void returns404WhenDeleting() throws Exception {
 		doThrow(new ResourceNotFoundException("No existe el evento con id 404"))
-				.when(eventoService).delete(404L);
+				.when(propuestaService).delete(404L);
 
 		mockMvc.perform(delete("/api/eventos/404"))
 				.andExpect(status().isNotFound());
@@ -195,7 +205,7 @@ class EventoControllerTest {
 	@Test
 	@DisplayName("US4: consulta el evento y responde 200")
 	void findsEvent() throws Exception {
-		when(eventoService.findById(7L)).thenReturn(response());
+		when(propuestaService.findById(7L)).thenReturn(response());
 
 		mockMvc.perform(get("/api/eventos/7"))
 				.andExpect(status().isOk())
@@ -206,7 +216,7 @@ class EventoControllerTest {
 	@Test
 	@DisplayName("US4: consultar un evento inexistente devuelve 404")
 	void returns404WhenFinding() throws Exception {
-		when(eventoService.findById(404L))
+		when(propuestaService.findById(404L))
 				.thenThrow(new ResourceNotFoundException("No existe el evento con id 404"));
 
 		mockMvc.perform(get("/api/eventos/404"))
@@ -216,7 +226,7 @@ class EventoControllerTest {
 	@Test
 	@DisplayName("US7: devuelve el listado completo de eventos, paginado")
 	void returnsAllEvents() throws Exception {
-		when(eventoService.findAll(any(Pageable.class)))
+		when(propuestaService.findAll(any(Pageable.class)))
 				.thenReturn(new PageImpl<>(List.of(response()), PageRequest.of(0, 20), 1));
 
 		mockMvc.perform(get("/api/eventos"))
@@ -231,7 +241,7 @@ class EventoControllerTest {
 	@Test
 	@DisplayName("US7: ?page y ?size llegan al service y la respuesta los reporta de vuelta")
 	void mapsQueryParamsToPageable() throws Exception {
-		when(eventoService.findAll(any(Pageable.class))).thenAnswer(invocation -> {
+		when(propuestaService.findAll(any(Pageable.class))).thenAnswer(invocation -> {
 			Pageable pageable = invocation.getArgument(0);
 			return new PageImpl<>(List.of(), pageable, 45);
 		});
@@ -247,7 +257,7 @@ class EventoControllerTest {
 	@Test
 	@DisplayName("US7: no hay eventos cargados y devuelve una página vacía con 200, no un 404")
 	void returnsEmptyPageWhenNoEvents() throws Exception {
-		when(eventoService.findAll(any(Pageable.class)))
+		when(propuestaService.findAll(any(Pageable.class)))
 				.thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
 		mockMvc.perform(get("/api/eventos"))
@@ -257,8 +267,12 @@ class EventoControllerTest {
 	}
 
 	private EventoResponse response() {
-		return new EventoResponse(7L, "Festival de Folklore", "Encuentro de syrigamis", Categoria.CULTURA,
-				"Cosquín", "Plaza Pringles", LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-03"),
+		return new EventoResponse(7L, TipoRegistro.EVENTO, "Festival de Folklore", "Encuentro de syrigamis", TipoPropuesta.FESTIVAL,
+				InteresCategoria.CULTURA, Modalidad.PEDESTRE,
+				TipoAcceso.DE_PAGO, new EstadoPropuesta(1L, "INICIADO", "Propuesta iniciada"), new BigDecimal("25000"), null,
+				"https://festivaldecosquin.com", "Plaza Próspero Molina", "Cosquín", "Av. San Martín 800, Cosquín",
+				new BigDecimal("-31.41350000"), new BigDecimal("-64.49470000"),
+				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-03"),
 				LocalTime.of(20, 0), LocalTime.of(23, 30),
 				List.of("https://cdn.cordoba.gob.ar/folklore.jpg"), 1L, "Turismo Córdoba");
 	}

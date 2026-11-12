@@ -15,36 +15,56 @@ import com.viajesazo.turismo_backend.dto.response.EventoResponse;
 import com.viajesazo.turismo_backend.exception.BusinessRuleException;
 import com.viajesazo.turismo_backend.exception.ResourceNotFoundException;
 import com.viajesazo.turismo_backend.mapper.EventoMapper;
+import com.viajesazo.turismo_backend.model.EstadoPropuesta;
 import com.viajesazo.turismo_backend.model.Evento;
 import com.viajesazo.turismo_backend.model.Publicador;
+import com.viajesazo.turismo_backend.model.TipoAcceso;
+import com.viajesazo.turismo_backend.model.Ubicacion;
 import com.viajesazo.turismo_backend.repository.EventoRepository;
+import com.viajesazo.turismo_backend.repository.EstadoPropuestaRepository;
 import com.viajesazo.turismo_backend.repository.PublicadorRepository;
+import com.viajesazo.turismo_backend.repository.UbicacionRepository;
 
 import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
-public class EventoService {
+public class PropuestaService {
 
 	private final EventoRepository eventoRepository;
 	private final PublicadorRepository publicadorRepository;
+	private final EstadoPropuestaRepository estadoPropuestaRepository;
+	private final UbicacionRepository ubicacionRepository;
 	private final Clock clock;
 	private final EventoMapper mapper;
+	private final GeocodingService geocodingService;
 
 	@Transactional
 	public EventoResponse create(EventoRequest request) {
 		validateRange(request);
+		validateAcceso(request);
 		Evento evento = mapper.toEntity(request);
+		evento.setTipoAcceso(request.tipoAcceso() == null ? TipoAcceso.GRATUITO : request.tipoAcceso());
+		evento.setEstadoPropuesta(getInitialState());
 		evento.setPublicador(getPublicadorOrThrow(request.publicadorId()));
+		applyUbicacion(evento, request);
+		evento.validarInvariantes();
 		return mapper.toResponse(eventoRepository.save(evento));
 	}
 
 	@Transactional
 	public EventoResponse update(Long id, EventoRequest request) {
 		validateRange(request);
+		validateAcceso(request);
 		Evento evento = getOrThrow(id);
+		evento.validarEditable();
 		mapper.updateEntity(request, evento);
+		if (request.tipoAcceso() != null) {
+			evento.setTipoAcceso(request.tipoAcceso());
+		}
 		evento.setPublicador(getPublicadorOrThrow(request.publicadorId()));
+		applyUbicacion(evento, request);
+		evento.validarInvariantes();
 		return mapper.toResponse(eventoRepository.save(evento));
 	}
 
@@ -102,6 +122,12 @@ public class EventoService {
 						"No existe el publicador con id " + publicadorId));
 	}
 
+	private EstadoPropuesta getInitialState() {
+		return estadoPropuestaRepository.findByNombre("INICIADO")
+				.orElseThrow(() -> new IllegalStateException(
+						"No existe el estado de propuesta inicial INICIADO"));
+	}
+
 	private void validateRange(EventoRequest request) {
 		if (request.fechaFin().isBefore(request.fechaInicio())) {
 			throw new BusinessRuleException("la fecha de finalización no puede ser anterior a la de inicio");
@@ -110,6 +136,42 @@ public class EventoService {
 				&& !request.horarioFin().isAfter(request.horarioInicio())) {
 			throw new BusinessRuleException("el horario de finalización debe ser posterior al de inicio");
 		}
+	}
+
+	/**
+	 * Un evento arancelado exige monto y link al sitio oficial. La validación vive acá y no en
+	 * Bean Validation porque solo aplica cuando {@code tipoAcceso == DE_PAGO}.
+	 */
+	private void validateAcceso(EventoRequest request) {
+		if (request.tipoAcceso() != TipoAcceso.DE_PAGO) {
+			return;
+		}
+		if (request.montoEstimado() == null) {
+			throw new BusinessRuleException("el monto estimado es obligatorio para un evento arancelado");
+		}
+		if (request.sitioOficial() == null || request.sitioOficial().isBlank()) {
+			throw new BusinessRuleException("el link al sitio oficial es obligatorio para un evento arancelado");
+		}
+	}
+
+	/**
+	 * Resuelve las coordenadas del evento contra Nominatim. Si la dirección no existe se rechaza
+	 * el alta/modificación con 400, según lo acordado: un evento sin ubicación no se puede mostrar
+	 * en el mapa.
+	 */
+	private void applyUbicacion(Evento evento, EventoRequest request) {
+		GeocodingService.Coordenadas coordenadas = geocodingService
+				.geocode(request.lugarRecinto(), request.localidad(), request.direccion())
+				.orElseThrow(() -> new BusinessRuleException(
+						"no se encontró la ubicación del evento: revisá el lugar, la ciudad y la dirección"));
+		Ubicacion ubicacion = Ubicacion.builder()
+				.ciudad(request.localidad())
+				.localidad(request.localidad())
+				.direccion(request.direccion())
+				.latitud(coordenadas.latitud())
+				.longitud(coordenadas.longitud())
+				.build();
+		evento.setUbicacion(ubicacionRepository.save(ubicacion));
 	}
 
 }

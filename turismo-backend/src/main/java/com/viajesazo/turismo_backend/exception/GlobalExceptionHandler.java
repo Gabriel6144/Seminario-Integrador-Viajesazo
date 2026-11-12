@@ -2,17 +2,25 @@ package com.viajesazo.turismo_backend.exception;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import jakarta.validation.ConstraintViolationException;
 
@@ -34,6 +42,46 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(BusinessRuleException.class)
 	public ResponseEntity<ErrorResponse> handleBusinessRule(BusinessRuleException ex) {
 		return build(HttpStatus.BAD_REQUEST, ex.getMessage());
+	}
+
+	@ExceptionHandler(ConfirmationRequiredException.class)
+	public ResponseEntity<ErrorResponse> handleConfirmationRequired(ConfirmationRequiredException ex) {
+		return build(HttpStatus.CONFLICT, ex.getMessage());
+	}
+
+	@ExceptionHandler(CircuitoDataMissingException.class)
+	public ResponseEntity<ErrorResponseWithMissingData> handleCircuitDataMissing(
+			CircuitoDataMissingException ex) {
+		ErrorResponseWithMissingData body = new ErrorResponseWithMissingData(
+				HttpStatus.UNPROCESSABLE_ENTITY.value(), HttpStatus.UNPROCESSABLE_ENTITY.getReasonPhrase(),
+				ex.getMessage(), ex.datosFaltantes(), LocalDateTime.now(clock));
+		return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(body);
+	}
+
+	/**
+	 * El agregado quedaría en un estado inconsistente. Se responde con el formato estándar
+	 * {@code application/problem+json} (RFC 7807) porque es un error de semántica del dominio, no
+	 * un dato mal formado. Los errores históricos siguen usando {@link ErrorResponse}; migrar el
+	 * resto queda fuera de este sprint.
+	 */
+	@ExceptionHandler(InvariantViolationException.class)
+	public ResponseEntity<ProblemDetail> handleInvariantViolation(InvariantViolationException ex) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
+		problem.setTitle("Regla de dominio incumplida");
+		return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(problem);
+	}
+
+	/**
+	 * Dos ediciones concurrentes sobre la misma propuesta: la segunda choca contra el
+	 * {@code @Version} y Hibernate lanza una excepción de bloqueo optimista. El cliente tiene que
+	 * recargar y reintentar, así que 409 Conflict es más preciso que un 500.
+	 */
+	@ExceptionHandler(OptimisticLockingFailureException.class)
+	public ResponseEntity<ProblemDetail> handleOptimisticLock(OptimisticLockingFailureException ex) {
+		ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT,
+				"la propuesta fue modificada por otra persona; recargala e intentá de nuevo");
+		problem.setTitle("Conflicto de concurrencia");
+		return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
 	}
 
 	/** Violaciones del {@code @Valid} sobre el body de la petición. */
@@ -65,22 +113,74 @@ public class GlobalExceptionHandler {
 	}
 
 	/**
-	 * Violación de integridad al escribir. El único {@code UNIQUE} del esquema es
-	 * {@code publicador.email}, así que en la práctica esto es un email repetido que se coló por la
-	 * carrera de dos altas simultáneas: las dos pasan el pre-chequeo de
-	 * {@code PublicadorService} y sólo la segunda rompe la constraint.
+	 * Falta un query param obligatorio (p. ej. {@code GET /api/viajes} sin {@code usuario}). Sin
+	 * este handler caería en el catch-all y respondería 500 en lugar de 400.
+	 */
+	@ExceptionHandler(MissingServletRequestParameterException.class)
+	public ResponseEntity<ErrorResponse> handleMissingParameter(MissingServletRequestParameterException ex) {
+		return build(HttpStatus.BAD_REQUEST, "falta el parámetro obligatorio '" + ex.getParameterName() + "'");
+	}
+
+	/**
+	 * Un path variable o query param con el tipo equivocado (p. ej. {@code /api/viajes/abc}). Sin
+	 * este handler caería en el catch-all y respondería 500 en lugar de 400.
+	 */
+	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+	public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+		return build(HttpStatus.BAD_REQUEST, "el parámetro '" + ex.getName() + "' tiene un formato inválido");
+	}
+
+	/**
+	 * Violación de integridad al escribir. Hoy hay dos {@code UNIQUE} relevantes:
+	 * {@code publicador.email} y {@code circuito.viaje_id}. El primero se anticipa en
+	 * {@code PublicadorService}; el segundo es la carrera de dos generaciones simultáneas del
+	 * mismo viaje. La causa se inspecciona solo para elegir el mensaje: el texto crudo de
+	 * Hibernate no sale del servidor.
 	 *
 	 * <p>Sin este handler caería en el catch-all y el cliente recibiría un 500 genérico, cuando
-	 * lo único que hay que corregir es un campo del formulario.
-	 *
-	 * <p>El mensaje es fijo a propósito. {@code ex.getMessage()} trae el SQL de la sentencia y los
-	 * valores de la fila, y eso no sale del servidor; el detalle va al log, igual que en el
-	 * catch-all.
+	 * en realidad es un conflicto de datos que se corrige reintentando o usando otro viaje.
 	 */
 	@ExceptionHandler(DataIntegrityViolationException.class)
 	public ResponseEntity<ErrorResponse> handleIntegrityViolation(DataIntegrityViolationException ex) {
-		logger.warn("Violación de integridad al escribir: probablemente email duplicado", ex);
-		return build(HttpStatus.BAD_REQUEST, "ya existe un publicador con ese email");
+		logger.warn("Violación de integridad al escribir", ex);
+		String cause = ex.getMostSpecificCause().getMessage();
+		String normalized = cause == null ? "" : cause.toLowerCase(Locale.ROOT);
+		if (normalized.contains("email") || normalized.contains("publicador")) {
+			return build(HttpStatus.BAD_REQUEST, "ya existe un publicador con ese email");
+		}
+		if (normalized.contains("circuito") || normalized.contains("viaje_id")) {
+			return build(HttpStatus.CONFLICT, "el circuito del viaje ya fue generado");
+		}
+		return build(HttpStatus.BAD_REQUEST, "no se pudo guardar por un conflicto de datos");
+	}
+
+	/**
+	 * El request multipart supera el tope del contenedor
+	 * ({@code spring.servlet.multipart.max-file-size}). Sin este handler caería en el catch-all y
+	 * respondería 500, cuando en realidad es un problema del archivo que subió el usuario.
+	 */
+	@ExceptionHandler(MaxUploadSizeExceededException.class)
+	public ResponseEntity<ErrorResponse> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
+		return build(HttpStatus.BAD_REQUEST, "la imagen supera el tamaño máximo permitido (5 MB)");
+	}
+
+	/**
+	 * Falta la parte {@code archivo} en un request multipart. Sin este handler caería en el
+	 * catch-all y respondería 500 en lugar de 400.
+	 */
+	@ExceptionHandler(MissingServletRequestPartException.class)
+	public ResponseEntity<ErrorResponse> handleMissingPart(MissingServletRequestPartException ex) {
+		return build(HttpStatus.BAD_REQUEST, "falta el archivo a subir");
+	}
+
+	/**
+	 * Un recurso estático inexistente (una imagen subida que se borró, o una URL vieja en la base).
+	 * Lo lanza el resource handler de {@code WebConfig}. Sin este handler cae en el catch-all y
+	 * responde 500; en realidad la respuesta correcta es 404.
+	 */
+	@ExceptionHandler(NoResourceFoundException.class)
+	public ResponseEntity<ErrorResponse> handleMissingResource(NoResourceFoundException ex) {
+		return build(HttpStatus.NOT_FOUND, "no existe el recurso solicitado");
 	}
 
 	/**

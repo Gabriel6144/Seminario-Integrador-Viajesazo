@@ -28,6 +28,16 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true,
       },
+      // El buscador de ubicación del formulario pega a Nominatim (OpenStreetMap) desde el
+      // navegador. Se proxea igual que /api para que la request sea same-origin en dev y no
+      // dependa de CORS. La fuente de verdad de las coordenadas sigue siendo el backend, que
+      // geocodifica al guardar; esto es solo ayuda de la UX. En producción hace falta un proxy
+      // inverso con un User-Agent identificable, como exige la política de uso de Nominatim.
+      '/nominatim': {
+        target: 'https://nominatim.openstreetmap.org',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/nominatim/, ''),
+      },
     },
   },
   test: {

@@ -1,12 +1,21 @@
 import { screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { EventoDetailPage } from './evento-detail-page'
-import { FOLKLORE, errorBody } from '../test/fixtures'
+import { FOLKLORE, GASTRONOMIA_ESTANCIA, errorBody } from '../test/fixtures'
 import { findEvento, resetStore } from '../test/store'
 import { server } from '../test/server'
 import { renderRoute, user } from '../test/utils'
+
+/**
+ * Leaflet no se banca jsdom: no hay layout ni tiles. El detalle se testea con el mapa mockeado y
+ * el componente real tiene su propio test. Acá lo que importa es que el detalle lo monte cuando
+ * el evento tiene coordenadas y que no lo haga cuando no las tiene.
+ */
+vi.mock('@/components/evento-mapa', () => ({
+  EventoMapa: ({ nombre }: { nombre: string }) => <div>Mapa de {nombre}</div>,
+}))
 
 function renderDetalle(id: string) {
   return renderRoute({
@@ -30,10 +39,12 @@ describe('EventoDetailPage', () => {
   it('muestra el evento completo', async () => {
     renderDetalle('1')
 
-    expect(await screen.findByRole('heading', { name: FOLKLORE.nombre })).toBeInTheDocument()
+    expect(await screen.findByText(FOLKLORE.nombre)).toBeInTheDocument()
     expect(screen.getByText(FOLKLORE.descripcion as string)).toBeInTheDocument()
-    expect(screen.getByText(FOLKLORE.localidad as string)).toBeInTheDocument()
-    expect(screen.getByText(FOLKLORE.direccion as string)).toBeInTheDocument()
+    // La ubicación aparece en el hero image y en la ficha: se espera al menos una coincidencia.
+    expect((await screen.findAllByText(FOLKLORE.localidad as string)).length).toBeGreaterThan(0)
+    // El lugar aparece en el hero image y en la ficha: se espera al menos una coincidencia.
+    expect((await screen.findAllByText(FOLKLORE.lugarRecinto as string)).length).toBeGreaterThan(0)
   })
 
   it('muestra el rango horario recortado a HH:mm', async () => {
@@ -41,6 +52,39 @@ describe('EventoDetailPage', () => {
     renderDetalle('1')
 
     expect(await screen.findByText('20:00 a 23:30')).toBeInTheDocument()
+  })
+
+  it('muestra el tipo de acceso del evento', async () => {
+    renderDetalle('1')
+
+    expect(await screen.findByText('Gratuito')).toBeInTheDocument()
+  })
+
+  it('muestra el arancel y el link al sitio oficial de un evento arancelado', async () => {
+    renderDetalle('3')
+
+    expect(await screen.findByText('Arancelado')).toBeInTheDocument()
+    // `Intl.NumberFormat` de es-AR: 1500 → "$ 1.500,00".
+    expect(screen.getByText(/1\.500,00/)).toBeInTheDocument()
+    expect(screen.getByText(/Entrada general/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Sitio oficial de entradas/ })).toHaveAttribute(
+      'href',
+      GASTRONOMIA_ESTANCIA.sitioOficial,
+    )
+  })
+
+  it('muestra el mapa cuando el evento tiene coordenadas', async () => {
+    renderDetalle('1')
+
+    expect(await screen.findByText(/Mapa de Festival de Doma/)).toBeInTheDocument()
+  })
+
+  it('omite el mapa cuando el evento no tiene coordenadas', async () => {
+    // `SIN_CATEGORIA` (id 4) viene con lat/long en null.
+    renderDetalle('4')
+
+    await screen.findByRole('heading', { name: 'Encuentro de la comunidad' })
+    expect(screen.queryByText(/Mapa de/)).not.toBeInTheDocument()
   })
 
   it('enlaza al publicador', async () => {
@@ -113,7 +157,7 @@ describe('EventoDetailPage', () => {
 describe('borrado de eventos desde el detalle', () => {
   it('no borra nada hasta que se confirma en el diálogo', async () => {
     renderDetalle('1')
-    await user().click(await screen.findByRole('button', { name: 'Borrar' }))
+    await user().click(await screen.findByRole('button', { name: 'Dar de baja' }))
     await user().click(await screen.findByRole('button', { name: 'Cancelar' }))
 
     // Cancelar tiene que cerrar el diálogo sin mandarle un DELETE a la API.
@@ -123,8 +167,8 @@ describe('borrado de eventos desde el detalle', () => {
 
   it('borra el evento al confirmar', async () => {
     renderDetalle('1')
-    await user().click(await screen.findByRole('button', { name: 'Borrar' }))
-    await user().click(await screen.findByRole('button', { name: 'Sí, borrar' }))
+    await user().click(await screen.findByRole('button', { name: 'Dar de baja' }))
+    await user().click(await screen.findByRole('button', { name: 'Confirmar baja' }))
 
     // El handler responde 204 sin cuerpo: si `apiDelete` intentara parsearlo, fallaría acá.
     await waitFor(() => expect(findEvento(1)).toBeUndefined())
@@ -135,8 +179,8 @@ describe('borrado de eventos desde el detalle', () => {
     // error más confuso posible después de borrar: la app parece haber fallado cuando todo salió
     // bien.
     const { unmount } = renderDetalle('1')
-    await user().click(await screen.findByRole('button', { name: 'Borrar' }))
-    await user().click(await screen.findByRole('button', { name: 'Sí, borrar' }))
+    await user().click(await screen.findByRole('button', { name: 'Dar de baja' }))
+    await user().click(await screen.findByRole('button', { name: 'Confirmar baja' }))
 
     unmount()
   })

@@ -11,9 +11,20 @@ Tesis de facultad: API REST que centraliza la información turística de la prov
   son subcarpetas del mismo repo git, no repos separados. Se puede tocar el backend y el frontend
   en el mismo commit, y es lo normal: la API y el cliente se cambian juntos. El `.gitignore` de la
   raíz es el que manda.
-- Estado actual: Sprint 1 (gestión de eventos) completo, con **83 tests en verde**. Incluye
-  paginación, CRUD de eventos, alta de publicadores, seed de datos y mapeo con MapStruct.
-  Pendientes: `Viaje`, `Actividad`, `Itinerario`, `Usuario`, `Preferencia` y rutas/traslados.
+- Estado actual: Sprints 1–4 completos (eventos, viajes, agenda VZ-18, circuitos VZ-25, consulta
+  seleccionada VZ-26, eliminación de paradas VZ-29 y reemplazo de paradas VZ-28), con **263
+  tests: 261 en verde y 2 fallos preexistentes por fechas fijas ya vencidas (`ViajeMapperTest`,
+  `ViajeTest`)**. Incluye
+  paginación, CRUD de eventos, alta de publicadores, CRUD de viajes con baja lógica, listado
+  unificado de propuestas (eventos + actividades), **agenda filtrable por
+  fecha/tipo/categoría/ubicación/acceso**, **generación y selección única de tres alternativas de
+  circuito con distancias estimadas**, **consulta del circuito seleccionado agrupado por día**,
+  **eliminación de paradas con confirmación y recálculo de métricas**, **reemplazo de paradas por
+  alternativas compatibles con el bloque horario y los traslados**, seed de datos, mapeo con
+  MapStruct,
+  **geocodificación de la ubicación del evento con OpenStreetMap (Nominatim)** y **subida de
+  imágenes a disco con servido estático**. Pendientes: `Itinerario` editable (VZ-27), `Usuario`,
+  `Preferencia` y ruteo real (OSRM).
 - Para probar los endpoints a mano ver **`PRUEBAS-MANUALES.md`**: levantar, curl de cada ruta,
   casos de error, el detalle de los acentos y los bordes conocidos sin cubrir.
 
@@ -56,7 +67,7 @@ Esta es la regla que más fácil se rompe, porque el dominio va en español y el
 | Entidades: nombre de clase y sus campos | **español** | `Evento.fechaInicio` |
 | DTO: nombre del record y sus campos | **español** | `EventoResponse.nombre()` |
 | Rutas, tablas y `spring.application.name` | **español** | `/api/eventos`, `evento`, `turismo-backend` |
-| Constantes del enum `Categoria` | **español** | `CULTURA`, `NATURALEZA` |
+| Constantes del enum `InteresCategoria` | **español** | `CULTURA`, `NATURALEZA` |
 | Mensajes de excepción, validaciones, `@DisplayName`, javadoc | **español** | `"No existe el evento con id 7"` |
 
 Dos excepciones explícitas al patrón inglés, decididas a propósito: **`AgendaController`** y
@@ -76,11 +87,12 @@ Los nombres de starters cambiaron respecto a Boot 3:
   **No existe `spring-boot-starter-test`** en este proyecto.
 - Base de datos: `com.h2database:h2` con scope `runtime`. **No declarar `<version>`**: el BOM
   4.1.1 ya gestiona H2 (2.4.240), Hibernate (7.4.5), Flyway y los drivers.
-- Faltan y habrá que agregar explícitamente: `spring-boot-starter-security`,
-  `spring-boot-starter-restclient` y `spring-boot-starter-test` (solo si hacen falta
-  utilidades compartidas; hoy cada slice ya trae lo suyo).
+- Faltan y habrá que agregar explícitamente: `spring-boot-starter-security` y
+  `spring-boot-starter-test` (solo si hacen falta utilidades compartidas; hoy cada slice ya trae
+  lo suyo).
 - En Boot 4, `RestClient` **no** está en `spring-boot-starter-webmvc`: hace falta
-  `spring-boot-starter-restclient` para llamar a OSRM/Mapa desde el service.
+  `spring-boot-starter-restclient` para llamar a servicios externos. **Ya está agregado**, y lo
+  usa `GeocodingService` para pegarle a Nominatim.
 - Jackson 3 (`tools.jackson.core`), no Jackson 2. `spring-boot-starter-json` ahora es
   `spring-boot-starter-jackson`.
 
@@ -126,8 +138,18 @@ Consecuencias que hay que tener presentes:
 
 ### Seed: `data.sql`
 
-`src/main/resources/data.sql` siembra 3 publicadores, 7 eventos y 5 imágenes. Como
-`ddl-auto=create-drop` borra todo en cada arranque, sin el script la app levanta vacía.
+`src/main/resources/data.sql` siembra 3 publicadores, 57 eventos (todos con imagen), 7 actividades
+(todas con imagen), 55 ubicaciones y 5 viajes. Como `ddl-auto=create-drop` borra todo en cada
+arranque, sin el script la app levanta vacía. Los eventos del seed traen `tipo_acceso`,
+`estado_propuesta` y `latitud`/`longitud` de ejemplo (ya calculadas, sin pasar por Nominatim en el
+arranque). El bloque VZ-25 agrega 15 eventos futuros (tres por zona, incluida una propuesta
+nocturna) y el bloque de propuestas ampliadas agrega 34 eventos y 5 actividades más, todos con
+fechas relativas para que el demo de circuitos llene el tope diario en cualquier momento.
+
+Nota de Sprint 2: los viajes se siembran **después** de las ubicaciones, porque `zonaInteres` es
+una FK a `ubicacion`. Todos van con `estado='PLANIFICADO'` a propósito: VZ-22 lista con
+`estado <> 'CANCELADO'`, y una fila con `estado` en NULL quedaría fuera de la comparación
+(`NULL <> 'CANCELADO'` no es verdadero).
 
 Tres propiedades hacen que funcione, y las tres hacen falta:
 
@@ -141,10 +163,11 @@ Tres propiedades hacen que funcione, y las tres hacen falta:
   solo se ve en desarrollo; en Linux el default ya es UTF-8 y pasa desapercibido. Si aparecen
   mojibake en los datos, es esto primero.
 
-El seed usa fechas **relativas a `CURRENT_DATE`** a propósito (`DATEADD('DAY', -2, CURRENT_DATE)`,
-etc.), sembrando una semana hacia atrás y dos hacia adelante: la agenda consulta de hoy al domingo
-de la semana, así que con fechas fijas el demo dejaría de tener eventos en pantalla ni un mes
-después de escribirlo. Al agregar filas, mantener esa propiedad.
+Los **viajes** y las **propuestas del bloque VZ-25** usan fechas **relativas a hoy** a propósito
+(`DATEADD('DAY', 7, CURRENT_DATE)`, etc.), así el demo siempre tiene viajes y circuitos futuros
+sin importar cuándo se levante. Al agregar filas para el demo, mantener esa propiedad. Los **8
+eventos originales** siguen con fechas **fijas** 2026/2027; si se quiere que también aparezcan en
+la agenda vigente, hay que pasarlos a `DATEADD('DAY', n, CURRENT_DATE)`.
 
 ### El seed no debe correr en los tests
 
@@ -161,25 +184,50 @@ tests fallarían sin que el código esté mal.
 
 ## Modelo de dominio
 
-Nombres y campos tomados de los requerimientos de la tesis. **Solo existen `Publicador` y
-`Evento` (más el enum `Categoria`)** — el resto son tipos que hay que crear. La nomenclatura del
-dominio va en español (ver "Convenciones de nombres").
+Nombres y campos tomados de los requerimientos de la tesis. **Ya existen `Publicador`, `Evento`,
+`Ubicacion` y `Viaje`** (más los enums `InteresCategoria`, `TipoRitmo` y `EstadoViaje`) — el
+resto son tipos que hay que crear. La nomenclatura del dominio va en español (ver "Convenciones
+de nombres").
 
-- `Categoria` — **ya existe**: gastronomía, familia, cultura, naturaleza, aventura. Persiste como
-  `STRING`, así que en `data.sql` va el nombre de la constante en mayúsculas (`CULTURA`).
+- `InteresCategoria` — **ya existe** (antes se llamaba `Categoria`; se renombró porque ahora la
+  comparten `Evento` y `Viaje`): `NATURALEZA`, `GASTRONOMIA`, `CULTURA`, `HISTORIA`, `AVENTURA`,
+  `VIDA_NOCTURNA`, `MUSICA`, `COMPRAS`, `FAMILIAR_Y_RELAX`. Persiste como `STRING`, así que en
+  `data.sql` va el nombre de la constante en mayúsculas (`CULTURA`).
 - `Publicador` — **ya existe**: nombre, email (único), teléfono. Relación unidireccional
   `Evento → Publicador`; `Publicador` no tiene `List<Evento>` a propósito, se consulta por repositorio.
-- `Evento` — **ya existe**: nombre, descripción, categoría, localidad, dirección, fecha inicio/fin,
-  horario inicio/fin, `imagenes` como `@ElementCollection` de URLs (`LAZY`), y `publicador` (`LAZY`,
-  obligatorio). **No tiene latitud/longitud**: eso llega con el sprint de mapas.
-- `Viaje` — destino, fecha de inicio y fin (de ahí se calcula la duración), preferencias asociadas.
+- `Evento` — **ya existe**: nombre, descripción, categoría, tipo de acceso (`TipoAcceso`),
+  estado de la propuesta (`EstadoPropuesta`), lugar/recinto, localidad, dirección, latitud/longitud
+  (`BigDecimal`, las calcula el backend), arancel (monto estimado, descripción y link al sitio
+  oficial, solo para eventos arancelados), fecha inicio/fin, horario inicio/fin, `imagenes` como
+  `@ElementCollection` de URLs (`LAZY`), y `publicador` (`LAZY`, obligatorio). Ver
+  "Geocodificación y acceso" más abajo.
+- `TipoAcceso` — **ya existe** (`model/TipoAcceso.java`): `GRATUITO`, `DE_PAGO`. Persiste como
+  `STRING`. `Evento.tipoAcceso` tiene default `GRATUITO`.
+- `EstadoPropuesta` — **ya existe** (`model/EstadoPropuesta.java`): `INICIADO`, `REPROGRAMADO`,
+  `CANCELADO`, `FINALIZADO`. Persiste como `STRING` con default `INICIADO`. **No lo manda el
+  cliente**: lo setea `EventoService` al registrar y solo cambia por reglas de negocio (a definir).
+- `Ubicacion` — **ya existe** (`model/Ubicacion.java`): `ciudad`, `localidad`, `latitud`/`longitud`
+  (`BigDecimal` con `precision`/`scale`). Es la zona de interés del viaje.
+- `Viaje` — **ya existe** (`model/Viaje.java`): `nombre`, `zonaInteres` (`@ManyToOne` a `Ubicacion`
+  por `zona_interes_id`, obligatoria), `rangoInteresKm` (`double`), `fechaInicio`/`fechaFin`
+  (`LocalDateTime`), `ritmo` (`TipoRitmo`), `interesesCategoria` (`@ElementCollection` de
+  `InteresCategoria`) y `usuario` (`String`). La baja lógica se modela con `estado` (`EstadoViaje`),
+  **no** con un `activo` booleano (ver "API del Sprint 2").
+- `EstadoViaje` — **ya existe**: `BORRADOR`, `PLANIFICADO`, `EN_CURSO`, `FINALIZADO`, `CANCELADO`.
+  Las transiciones válidas viven en el enum (`puedeTransicionarA`); `FINALIZADO` y `CANCELADO` son
+  terminales. `CANCELADO` se usa para la baja lógica tanto de viajes como de borradores.
+- `TipoRitmo` — **ya existe**: `TRANQUILO`, `EQUILIBRADO`, `INTENSIVO`.
 - `Preferencia` / nivel de interés por categoría — se apoya en `Categoria`.
 - `Actividad` — descripción, categoría, ubicación, horarios de disponibilidad, duración estimada,
   imágenes, publicada por un `Publicador`.
-- `Itinerario` — se genera a partir de viaje + preferencias + disponibilidad; admite edición manual
-  (agregar, eliminar, reorganizar) y regeneración.
+- `Circuito` — **ya existe** (VZ-25): tres alternativas generadas a partir de viaje + propuestas +
+  disponibilidad, guardadas como snapshot. `CircuitoAlternativa` agrupa los ítems y
+  `CircuitoItem` guarda la parada con fecha, orden, horario y traslado.
+- `Itinerario` editable — **pendiente (VZ-27)**: agregar, eliminar, reorganizar y regenerar
+  paradas sobre el circuito ya generado.
 - `Usuario` — registro, modificación, baja, inicio de sesión.
-- Rutas y traslados — distancia entre puntos, duración estimada, visualización en mapa.
+- Rutas y traslados — hoy Haversine con velocidad media; falta ruteo real (OSRM) y visualización
+  en mapa.
 
 `imagenes` está en `LAZY` porque es un `@ElementCollection`: con `EAGER` cada consulta de evento
 se traía todas las imágenes de la tabla entera.
@@ -209,11 +257,14 @@ Decisiones que no son obvias y conviene no deshacer sin motivo:
   lunes al martes entraría igual y la agenda mostraría algo que ya pasó. Ambos comportamientos
   están cubiertos por `EventoRepositoryTest`.
 - **`GET /api/eventos` no filtra por fecha.** Es el listado completo, así que trae también lo ya
-  terminado y lo que todavía no empieza; la única vista con ventana temporal es la agenda semanal.
+  terminado y lo que todavía no empieza; las vistas con ventana temporal son `/api/agenda`
+  (filtrable) y `/api/agenda/semanal` (semana en curso).
 - **El orden va en el nombre del método del repository**, no en el `Pageable`: `findAllBy...`,
   `findByPublicadorIdOrderByFechaInicioAsc` y el `@Query` de la agenda. El orden es parte del
   contrato de la API, no una preferencia del cliente. Los dos listados completos ordenan por
   fecha de inicio (y hora de inicio como desempate) y por nombre de publicador, respectivamente.
+  **Excepción:** `/api/agenda` (VZ-18) arma su orden fijo en `PropuestaQueryService.AGENDA_SORT`
+  y descarta el `Sort` del cliente.
 - **La baja es física**, como se decidió. Cuando exista `Itinerario`, un itinerario que
   referencie un evento dado de baja va a quedar con referencia colgante: hay que decidir si
   el `DELETE` valida itinerarios asociados. Pendiente para el sprint de `Itinerario`.
@@ -234,7 +285,7 @@ Decisiones que no son obvias y conviene no deshacer sin motivo:
 
 ### Paginación
 
-Los cuatro listados (`/api/eventos`, `/api/publicadores`, `/api/agenda/semanal` y
+Los cinco listados (`/api/eventos`, `/api/publicadores`, `/api/agenda`, `/api/agenda/semanal` y
 `/api/publicadores/{id}/eventos`) devuelven `PagedModel` con `?page` y `?size`. El JSON tiene
 esta forma:
 
@@ -250,6 +301,150 @@ Configurado en `application.properties`: `spring.data.web.pageable.default-page-
 (publicador sin eventos, o la base recién arrancada sin nada cargado) devuelve una página vacía
 con 200, no un 404.
 
+## API del Sprint 2 — Viajes
+
+Base `/api`. Mismas convenciones que el Sprint 1 (rutas y JSON en español, paginación con
+`PagedModel` anidado).
+
+| Método | Ruta | Caso de uso |
+| --- | --- | --- |
+| POST | `/api/viajes` | VZ-19 — registrar viaje |
+| PUT | `/api/viajes/{id}` | VZ-21 — modificar |
+| GET | `/api/viajes?usuario=&page=&size=` | VZ-22 — listar viajes activos del turista |
+| DELETE | `/api/viajes/{id}` | VZ-23 — baja **lógica** |
+| GET | `/api/viajes/{id}` | soporte (detalle para editar) |
+
+Decisiones que no son obvias y conviene no deshacer sin motivo:
+
+- **La baja es lógica** (VZ-23). A diferencia de `Evento`, cuya baja es **física**, `DELETE
+  /api/viajes/{id}` marca `estado = CANCELADO` y responde **204**. No "corregirla" a física: es
+  la primera baja lógica del proyecto y está pedida así.
+- **"Activo" = `estado <> CANCELADO`**, no un campo `activo` booleano. El listado y el detalle usan
+  `findByUsuarioAndEstadoNotOrderByFechaInicioAsc` y `findByIdAndEstadoNot`; un viaje cancelado
+  deja de existir para la API (el listado no lo muestra, `GET /{id}` → 404, `PUT` → 404).
+- **"Mis viajes" filtra por `usuario` (String), no por `turistaId`.** No hay entidad `Usuario`
+  todavía; es deuda. `GET /api/viajes` **exige** `?usuario=` y sin él responde **400** (lo maneja
+  `handleMissingParameter`).
+- **La API expone `LocalDate`; la entidad guarda `LocalDateTime`.** `ViajeMapper` convierte con
+  helpers `default` (medianoche). El tipo de persistencia no se filtra al contrato de la API.
+- **`POST` fuerza `estado = PLANIFICADO`** e ignora el `estado` que viniera en el body; `PUT`
+  tampoco permite cambiarlo (el mapeo de update lo ignora). Los cambios de `estado` los hacen las
+  transiciones de dominio (`completar borrador`, `DELETE`) y el scheduler de fechas; el cliente
+  nunca manda el estado.
+- **La confirmación previa de VZ-23 CA1 es de la UI** (AlertDialog); el backend solo expone el
+  `DELETE`.
+
+Deuda conocida: `usuario` es un `String` sin FK, igual que el `email` de `Publicador`. Cuando
+exista `Usuario`/autenticación hay que migrar a una relación real.
+
+## API del Sprint 3 — Agenda turística (VZ-18)
+
+| Método | Ruta | Caso de uso |
+| --- | --- | --- |
+| GET | `/api/agenda?fechaDesde=&fechaHasta=&tipoPropuesta=&categoria=&ubicacion=&tipoAcceso=&page=&size=` | VZ-18 — agenda filtrable, ordenada por fecha y con detalle en `/api/eventos/{id}` |
+
+Decisiones que no son obvias:
+
+- **`/api/agenda` es distinta de `/api/agenda/semanal`.** La semanal (US6) conserva su contrato:
+  ventana de hoy al domingo, sin filtros y con `EventoResponse`. La nueva agenda acepta filtros y
+  devuelve `PropuestaResumenResponse`, pero **siempre solo eventos** (`tipo = EVENTO`).
+- **El orden es fijo y lo pone el backend**: `fechaInicio ASC, horarioInicio ASC`. El `Pageable` del
+  cliente se ignora a propósito; no es una preferencia del usuario. El orden vive en
+  `PropuestaQueryService.AGENDA_SORT`, no en el nombre del método del repository.
+- **Sin `fechaDesde` la ventana arranca hoy** (`LocalDate.now(clock)`), así los eventos terminados
+  no aparecen. La comparación es por **solapamiento**: `fechaFin >= fechaDesde` y
+  `fechaInicio <= fechaHasta`, igual que la agenda semanal.
+- **Se excluyen los `CANCELADO`** con `PropuestaSpecifications.notCancelled()`. No se excluyen los
+  `FINALIZADO` por nombre de estado: los saca la ventana de fechas.
+- **`ubicacion` es texto libre** sobre `localidad`, `lugarRecinto` y `direccion`, sin distinguir
+  mayúsculas ni tildes. La normalización se hace en Java (`Normalizer`) y en SQL/H2 con
+  `translate(...)`; `localidad` exacta usa la misma normalización. Agregar tildes nuevas obliga a
+  extender `ACCENTED`/`UNACCENTED` en `PropuestaSpecifications`.
+- **El detalle reutiliza `GET /api/eventos/{id}`**; no hay endpoint de detalle de agenda.
+- **`/api/propuestas` también acepta `ubicacion`** (mismo criterio), además de los filtros que ya
+  tenía.
+
+## API del Sprint 3/4 – Circuitos automáticos (VZ-25/VZ-26/VZ-28/VZ-29)
+
+| Método | Ruta | Caso de uso |
+| --- | --- | --- |
+| POST | `/api/viajes/{id}/circuito` | Genera y persiste las tres alternativas (**201**); con `?reemplazar=true` reemplaza y responde **200** |
+| GET | `/api/viajes/{id}/circuito` | Devuelve el circuito guardado (404 si no existe) |
+| POST | `/api/viajes/{id}/circuito/seleccion` | Selecciona una alternativa (200) |
+| GET | `/api/viajes/{id}/circuito/seleccionado` | Devuelve el circuito seleccionado agrupado por día (**200**); **404** si no hay viaje, circuito o selección |
+| DELETE | `/api/viajes/{id}/circuito/seleccionado/items/{itemId}?confirmar=true` | Elimina la parada y devuelve el circuito actualizado (**200**); **409** sin confirmar; **404** si el ítem no pertenece a la alternativa seleccionada |
+| GET | `/api/viajes/{id}/circuito/seleccionado/items/{itemId}/alternativas` | Lista reemplazos compatibles (**200**); si no hay, devuelve `alternativas: []` y un `mensaje`; **404** si la parada no pertenece a la alternativa seleccionada |
+| PUT | `/api/viajes/{id}/circuito/seleccionado/items/{itemId}` | Reemplaza la parada por `{ "propuestaId": 123 }` y devuelve el circuito actualizado (**200**); **400** sin `propuestaId`; **404** de ítem; **422** si la propuesta no encaja |
+
+Las alternativas son `CERCANIA`, `INTERESES` y `DESCUBRIMIENTO`. Se guardan como instantánea:
+regenerar sin `?reemplazar=true` devuelve **409** y no modifica nada; con el flag reemplaza las
+alternativas e intenta conservar la estrategia seleccionada. Una segunda selección devuelve `400`.
+La selección queda expuesta en `GET /api/viajes/{id}` dentro de `circuito`; el `GET` del circuito no
+persiste nada al refrescar disponibilidad.
+
+Decisiones y trampas:
+
+- **El motor (`circuit/CircuitGenerator`) no conoce Spring ni JPA.** Recibe candidatos, ritmo e
+  intereses, y devuelve alternativas. `CircuitoService` arma los candidatos y persiste el snapshot.
+- **Ventana diaria `06:00–23:59`.** Las actividades se agendan en el horario exacto de su franja;
+  el traslado tiene que caber antes del inicio. Un evento sin horario ocupa `09:00–18:00`.
+- **Compactación por día.** Después de la pasada por estrategia, si el día no llegó al tope, se
+  insertan propuestas no usadas en los huecos respetando solapamientos y traslados; luego se
+  reordena por horario, se renumera `orden` y se recalculan traslados y `distanciaTotalKm`. Así el
+  seed llena el tope aunque la estrategia elija primero una propuesta nocturna.
+- **Las distancias son Haversine** (`HaversineDistanceProvider`, 30 km/h), no OSRM. La respuesta
+  trae `distanciasEstimadas=true`.
+- **El snapshot guarda `descripcion` y `categoria`**, no solo el id: si la propuesta cambia o se
+  da de baja, el circuito sigue mostrando lo que se generó, marcando `disponible=false`. También
+  guarda `imagenes`, `ciudad`, `localidad`, `direccion`, `lugarRecinto`, `latitud`, `longitud`,
+  `tipoAcceso`, `montoEstimado`, `descripcionArancel`, `sitioOficial` y `duracionMinutos`, para que
+  el detalle y los mapas del frontend no dependan de otra consulta.
+- **`CircuitoAlternativa.items` usa `@OrderBy("orden ASC")`, nunca `@OrderColumn`.** El campo
+  `CircuitoItem.orden` ya es una columna real; un `@OrderColumn(name = "orden")` la duplicaba y al
+  releer la lista llegaban `null`, con NPE en `toResponse`/`refreshAvailability`. Lo cubre
+  `CircuitoRepositoryTest`.
+- **`data.sql` necesita subconsultas únicas para la zona del viaje.** Las ubicaciones de eventos
+  comparten `ciudad`, así que buscar solo por ciudad devuelve varias filas; en el seed se agrega
+  `AND direccion IS NULL` para Córdoba y La Cumbrecita.
+- **Errores de generación**: `404` si el viaje no existe (o está cancelado); `422` con
+  `datosFaltantes[]` si falta algún dato obligatorio o si no hay candidatos compatibles; `409` si
+  ya existe un circuito y no se mandó `?reemplazar=true`; `400` si el viaje no tiene días. Los
+  estados terminales no se pueden generar.
+- **Intereses estrictos y radio**: todo candidato debe pertenecer a `interesesCategoria` y estar
+  dentro de `rangoInteresKm`. Las estrategias solo ordenan ese conjunto, no lo amplían.
+- **Snapshot de generación**: `Circuito` guarda fechas, zona, radio, ritmo e intereses. El cálculo
+  de `desactualizado` y `motivosDesactualizacion` (`FECHAS`, `PREFERENCIAS`, `ZONA`, `RITMO`) usa
+  ese snapshot contra el viaje actual; no regenera automáticamente.
+- **Las coordenadas del snapshot se comparan con `compareTo`, no con `Objects.equals`.** Las
+  columnas de `Circuito` usan `scale=8` (igual que `Ubicacion`); aun así, `BigDecimal.equals`
+  compara la escala y marcaba `ZONA` como desactualizada al instante. Lo cubre
+  `CircuitoServiceTest.doesNotMarkZoneAsOutdatedWhenOnlyTheDecimalScaleDiffers`.
+- **`selectedDetail` (VZ-26) exige viaje, circuito y alternativa seleccionada**: primero valida con
+  `findTrip` (mismo `404` para inexistente/cancelado), luego circuito, estrategia y alternativa. Los
+  días salen del snapshot `fechaInicio/fechaFin` (fallback al mínimo/máximo de los ítems y, si no
+  hay, a las fechas del viaje) e incluyen **días vacíos** con `items: []`. Los ítems se ordenan por
+  `horaInicio` ascendente (sin hora al final) y luego por `orden`; el DTO expone `itemId` y
+  `propuestaId` para las acciones de VZ-27/VZ-28.
+- **La eliminación (VZ-29) valida primero y confirma después**: viaje, circuito y pertenencia del
+  `itemId` a la alternativa seleccionada se resuelven antes del flag, así un ítem de otra
+  alternativa da **404** y no un `409` engañoso. La baja es física sobre la colección
+  (`orphanRemoval`), renumera `orden` por día, recalcula solo el traslado del ítem siguiente (o lo
+  deja en 0 si pasa a ser el primero) y vuelve a calcular `distanciaTotalKm` (suma de traslados),
+  `afinidadIntereses` (ítems con categoría del snapshot de intereses / total) y
+   `categoriasCubiertas`. Un día vacío se devuelve igual y el circuito no se borra.
+- **El reemplazo (VZ-28) reutiliza el motor de candidatos.** `replacementOptions` arma candidatos
+  con `isEligible` (estado activo, coordenadas, interés estricto y radio) y luego filtra por:
+  bloque completo dentro de `horaInicio..horaFin` del ítem original, sin solaparse con otros
+  ítems del día, disponibilidad válida y traslados factibles desde el anterior y hacia el
+  siguiente. Excluye propuestas ya presentes en la alternativa (incluida la reemplazada) y deja
+  una opción por propuesta con el primer bloque compatible, ordenadas por nombre.
+- **`PUT` valida antes de mutar.** La propuesta se busca de nuevo, se vuelve a chequear el bloque
+  y los traslados, y recién entonces `applyCandidate` pisa la parada y
+  `recalculateTransfersAround` recalcula el traslado siguiente y las métricas. Una propuesta
+  inválida lanza `InvariantViolationException` (**422**) y deja la parada intacta; sin
+  `propuestaId` responde **400**. `GET .../alternativas` devuelve **200** con `alternativas: []`
+  y `mensaje` cuando no hay opciones.
+
 ## Servicios
 
 `EventoService` y `PublicadorService` usan Lombok `@RequiredArgsConstructor` (todos los collaborators
@@ -257,7 +452,7 @@ son `final`), y `@Transactional` **granular**:
 
 - `@Transactional` en las escrituras (`create`, `update`, `delete`).
 - `@Transactional(readOnly = true)` en las lecturas (`findById`, `findByPublicadorId`,
-  `findWeeklyAgenda`).
+  `findWeeklyAgenda`, `searchAgenda`).
 
 No poner `@Transactional` a nivel de clase: se mixte con la granularidad de solo lectura. Y como
 `open-in-view=false`, el service mapea entidad → DTO **dentro** de la transacción, antes de
@@ -275,6 +470,11 @@ devolver; si el mapeo se hiciera afuera, cualquier acceso a una relación `LAZY`
 | `handleConstraintViolation` | 400 | path variables y query params |
 | `handleUnreadableBody` | 400 | JSON mal formado, categoría inexistente, fecha inválida |
 | `handleDataIntegrityViolation` | 400 | violación de unicidad que llega de la base (email duplicado) |
+| `handleMissingParameter` | 400 | falta un query param obligatorio (`GET /api/viajes` sin `usuario`) |
+| `handleTypeMismatch` | 400 | path variable o query param con el tipo equivocado (`/api/viajes/abc`) |
+| `handleMaxUploadSize` | 400 | la imagen subida supera los 5 MB (`MaxUploadSizeExceededException`) |
+| `handleMissingPart` | 400 | falta la parte `archivo` en el multipart (`MissingServletRequestPartException`) |
+| `handleMissingResource` | 404 | imagen/estático inexistente bajo `app.imagenes.url-base` (`NoResourceFoundException`) |
 | `handleUnexpectedError` | 500 | catch-all; **no filtra el mensaje al cliente** |
 
 Tres detalles a no romper:
@@ -287,17 +487,97 @@ Tres detalles a no romper:
   y el valor que chocó,   y eso es un mapa de la base para cualquiera que podría llamar al alta.
 - El `Clock` llega por inyección (`AppConfig.clock()`), no por `LocalDateTime.now()`. Los tests de
   la semana ISO fijan el reloj y así no dependen del día en que corren. Por el mismo motivo, los
-  tres `@WebMvcTest` hacen `@Import(AppConfig.class)`: un slice no carga los beans de `config/` y
-  sin ese import el `Clock` no existiría.
+  `@WebMvcTest` (`EventoControllerTest`, `PublicadorControllerTest`, `AgendaControllerTest`,
+  `ViajeControllerTest`, `ImagenControllerTest` y `ImagenServingTest`) hacen
+  `@Import(AppConfig.class)`: un slice no carga los beans de `config/` y sin ese import el `Clock`
+  no existiría.
 
-## Servicios externos: decisión pendiente
+Dos handlers del Sprint 2 evitan un 500 en casos de borde de la API de viajes:
+`handleMissingParameter` (`GET /api/viajes` sin `?usuario` → 400) y `handleTypeMismatch`
+(`GET /api/viajes/abc` con id no numérico → 400).
 
-No hay nada cableado para mapas ni ruteo, y el repo **no tiene dónde colocar claves de API**
-(sin variables de entorno, sin `.env`, sin profiles de configuración).
+## Imágenes de eventos (subida a disco + servido estático)
 
-Antes de implementar "distancia entre puntos", "duración estimada de traslado" y "visualizar
-itinerario sobre un mapa", hay que decidir entre un servicio con clave (Mapbox, Google Maps) y
-uno sin clave (OpenStreetMap + OSRM). **No hardcodear claves en `application.properties`.**
+`Evento.imagenes` sigue siendo un `@ElementCollection` de URLs: **no se tocó la entidad, ni el
+`EventoRequest/Response`, ni el mapper**. Lo que cambió es cómo el publicador puebla esos strings:
+además de pegar una URL externa, ahora puede **subir un archivo**, que queda en disco y se sirve
+como estático. Flujo: subida **previa** (`POST /api/imagenes` devuelve `{ "url": ... }`) y luego se
+crea el evento con esa URL, igual que con las externas.
+
+| Método | Ruta | Qué hace |
+| --- | --- | --- |
+| POST | `/api/imagenes` | multipart, parte `archivo`; guarda y devuelve **201** `{ "url": "/api/archivos/<uuid>.<ext>" }` |
+| GET | `/api/archivos/**` | sirve el archivo subido como estático (lo registra `WebConfig`) |
+| DELETE | `/api/imagenes/{nombre}` | borra un archivo; **204** |
+
+Piezas: `ImagenService` (`guardar`/`borrar`, valida **magic bytes** de JPEG/PNG/GIF/WEBP, tope
+`MAX_BYTES = 5 MB`, nombre UUID y anti *path traversal*), `ImagenResponse` (`{url}`),
+`ImagenController` y `WebConfig`. Config en `application.properties`: `app.imagenes.dir=./data/imagenes`
+(carpeta en disco, **no versionada**: el `.gitignore` de la raíz ignora `data/`) y
+`app.imagenes.url-base`, más `spring.servlet.multipart.max-file-size=5MB` / `max-request-size=6MB`.
+
+Decisiones y trampas a no repetir:
+
+- **El prefijo de servido (`app.imagenes.url-base`) NO puede solaparse con el del controller.**
+  El default es `/api/archivos`, distinto de `/api/imagenes`. Con el prefijo viejo (`/api/imagenes`),
+  un `GET /api/imagenes/{archivo}` hacía match con el `@DeleteMapping("/{nombre}")` y Spring lanzaba
+  una excepción de método no soportado **antes** de llegar al resource handler (y como el catch-all
+  la convertía en 500, la imagen subida no se veía nunca). Si se cambia `url-base`, verificar que
+  ningún controller mapee ese prefijo. Lo cubre `ImagenServingTest`.
+- **El servido cuelga de `/api` a propósito**: así lo reenvía el proxy de Vite y el navegador lo ve
+  *same-origin*, sin CORS. No moverlo a `/uploads` u otra ruta fuera de `/api` sin resolver el proxy.
+- **`handleMissingResource` es necesario** porque el resource handler lanza `NoResourceFoundException`
+  para archivos inexistentes (una URL vieja en la base): sin ese handler el catch-all respondería 500
+  en lugar de 404.
+- **El alcance de borrado es el archivo suelto**, no las URLs guardadas en eventos: un evento que
+  referencie un archivo borrado simplemente muestra el placeholder en el frontend.
+- **Limitación conocida**: con `ddl-auto=create-drop` la base se vacía en cada arranque pero
+  `data/imagenes/` no, así que los archivos subidos quedan **huérfanos**. Si molesta, migrar a
+  `jdbc:h2:file:./data/turismo` + `ddl-auto=update`, o barrer huérfanos al arrancar.
+- La subida es **previa** al `POST /api/eventos`: si el evento no se llega a crear, el archivo ya
+  subido queda en disco (sin limpieza automática). Es una simplificación aceptada.
+
+## Geocodificación y acceso (OpenStreetMap)
+
+La ubicación del evento se resuelve **en el backend** con **Nominatim** (el geocoder de
+OpenStreetMap), que **no requiere clave de API**.
+
+- `GeocodingConfig` arma un bean `RestClient` (`nominatimRestClient`) con la base URL y el header
+  `User-Agent`. `GeocodingService.geocode(lugarRecinto, localidad, direccion)` arma una query
+  (`"lugar, dirección, localidad, Córdoba, Argentina"`) y devuelve `Optional<Coordenadas>`
+  (`latitud`/`longitud` como `BigDecimal`).
+- **La query se deduplica** (`GeocodingService.buildQuery`): se descartan los campos vacíos y los
+  que repiten a otro (sin distinguir mayúsculas, en cualquier sentido). El cliente suele mandar la
+  misma localidad en los tres campos —o el `display_name` entero de Nominatim en `direccion`— y
+  una query con el término repetido devuelve `[]` en el buscador free-form. Con el dedup, `"
+  Villa Carlos Paz"` en los tres campos colapsa a `"Villa Carlos Paz, Córdoba, Argentina"`.
+  Cubierto por `GeocodingServiceTest` (unit test del armado, sin red).
+- **Nominatim exige un `User-Agent` identificable** (política de uso). Va en
+  `application.properties`: `geocoding.nominatim.base-url` y `geocoding.nominatim.user-agent`. Si
+  se cambia el servicio, primero mirar su política de uso (límite ~1 request/segundo).
+- **Tolerante a fallos de red**: un error de conexión devuelve `Optional.empty()`; un fallo del
+  query es lo mismo que "no encontrado". La red no debe tirar un 500.
+- `EventoService.applyUbicacion` corre en `create` y `update`: si geocodifica, guarda
+  `latitud`/`longitud` en el `Evento`; si no encuentra la dirección, lanza
+  `BusinessRuleException` → **400** y **el evento no se guarda**. Es una decisión explícita: un
+  evento sin ubicación no sirve para el mapa.
+- `EventoRequest` exige `lugarRecinto`, `localidad` y `direccion` (`@NotBlank`): son la entrada
+  del geocoding.
+- En `update`, si no se pudo geocodificar, la transacción revienta antes de tocar la entidad, así
+  que las coordenadas viejas quedan intactas.
+
+Reglas de arancel (`EventoService.validateAcceso`): un evento `DE_PAGO` **exige** `montoEstimado`
+(`@PositiveOrZero`) y `sitioOficial` (`@Pattern` de URL `http(s)`); la `descripcionArancel` es
+opcional. Un `GRATUITO` ignora los tres campos. El estado (`EstadoPropuesta`) y el tipo de acceso
+por defecto los fija el service, no el JSON.
+
+## Ruteo / distancias
+
+`GeocodingService` cubre el "dónde queda" del evento. Para los circuitos, `DistanceProvider` usa
+**Haversine** con una velocidad media de 30 km/h: alcanza para comparar alternativas y estimar
+traslados, pero **no es un ruteo real**. Si se necesita respetar calles, la opción natural es
+**OSRM** (sin clave, sobre OpenStreetMap), en línea con la decisión de Nominatim. **No hardcodear
+claves en `application.properties`.**
 
 ## Tests: imports distintos a los de Boot 3
 
@@ -312,18 +592,38 @@ Las anotaciones de test **cambiaron de package**. Importar desde el package viej
 `@MockBean` ya no existe. Para tests unitarios con Mockito alcanza con
 `@ExtendWith(MockitoExtension.class)` + `@Mock`, sin contexto de Spring.
 
-Reparto actual (83 tests):
+Reparto actual (263 tests; 2 fallos preexistentes por fechas fijas ya vencidas en `ViajeMapperTest`
+y `ViajeTest`):
 
 | Archivo | Tests | Cubre |
 | --- | --- | --- |
-| `EventoServiceTest` | 18 | US1–US5, US7, reglas de negocio |
+| `PropuestaServiceTest` | 23 | US1–US5, US7, reglas de negocio, arancel, estado, geocoding |
+| `PropuestaRepositoryTest` | 18 | listado unificado, filtros, orden, **agenda VZ-18 (orden, solapamiento, cancelados, ubicación sin tildes)** |
+| `ViajeControllerTest` | 17 | VZ-19/VZ-21/VZ-22/VZ-23, 400/404, `?usuario` obligatorio |
+| `CircuitoControllerTest` | 17 | **VZ-25/VZ-26/VZ-28/VZ-29: 201/200/400/409/422, consulta, selección, `seleccionado`, alternativas, `PUT` de reemplazo y `DELETE` con confirmación/404** |
 | `EventoRepositoryTest` | 16 | solapamiento, bordes, orden, paginación, filtro por publicador, listado completo |
 | `EventoControllerTest` | 15 | US1–US4, US7, errores 400/404, cuerpo inválido |
+| `PropuestaTuristicaTest` | 11 | invariantes del modelo base |
+| `ViajeTest` | 11 | modelo de viaje, transiciones y validaciones (**1 fallo preexistente por fecha fija**) |
+| `ViajeServiceTest` | 11 | VZ-19–VZ-23, baja lógica, fecha invertida, 404 |
 | `PublicadorControllerTest` | 10 | validación, ruta anidada, página vacía, US7, **email duplicado → 400** |
+| `ActividadServiceTest` | 9 | reglas de actividad |
+| `ActividadControllerTest` | 8 | CRUD de `/api/actividades`, validación, 400/404 |
+| `AgendaControllerTest` | 7 | `/api/agenda` (filtros, orden fijo, 400) y `/api/agenda/semanal` (paginación, tope de `size`) |
 | `AgendaSemanalTest` | 7 | límites de la semana ISO, paginación |
+| `CircuitGeneratorTest` | 12 | **VZ-25: ventana 06:00–23:59, agenda, ritmo, estrategias, traslados, compactación y borde de medianoche** |
+| `CircuitoServiceTest` | 26 | **VZ-25/VZ-26/VZ-28/VZ-29: generación, snapshot, regeneración/desactualizado, intereses estrictos, selección única, agrupación por días, eliminación con renumeración/recálculo, alternativas filtradas, reemplazo y errores; incluye la regresión de escala decimal** |
 | `PublicadorServiceTest` | 7 | alta, consulta, 404, US7, **pre-chequeo de email** |
-| `AgendaControllerTest` | 4 | forma del JSON paginado, `?page`/`?size`, tope de `size` |
+| `ImagenServiceTest` | 6 | **guardar/borrar, magic bytes, tope 5 MB, anti path traversal (`@TempDir`)** |
+| `GeocodingServiceTest` | 5 | **dedup de la query de Nominatim, campos vacíos, provincia** |
 | `PublicadorRepositoryTest` | 5 | orden alfabético, paginación, página vacía, **derived query + constraint de unicidad** |
+| `ViajeMapperTest` | 4 | mapeo entidad↔DTO, fechas `LocalDate`↔`LocalDateTime` (**1 fallo preexistente por fecha fija**) |
+| `ViajeRepositoryTest` | 4 | activos por usuario, exclusión de cancelados, orden |
+| `CircuitoRepositoryTest` | 1 | **VZ-25: recarga el circuito con ítems ordenados y sin `null`** |
+| `ImagenControllerTest` | 4 | **POST/DELETE de `/api/imagenes`, parte faltante y archivo vacío → 400** |
+| `PropuestaControllerTest` | 3 | listado unificado, filtros (incluida `ubicacion`), 400 |
+| `EstadoViajeTest` | 3 | transiciones válidas e inválidas |
+| `ImagenServingTest` | 2 | **sirve la imagen subida bajo `/api/archivos`; inexistente → 404** |
 | `TurismoBackendApplicationTests` | 1 | `contextLoads` |
 
 Convenciones de los tests: los **identificadores** van en inglés (métodos, constantes, locales,
@@ -364,5 +664,5 @@ granular, no exponer entidades) coincide con lo que ya hace el código.
   (`í` = `0xC3 0xAD`; doblemente codificado sería `0xC3 0x83 0xC2 0xAD`). La consola de
   PowerShell tampoco renderiza acentos: un `?` en la salida no implica que el dato esté mal.
 - Commits con [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `chore:`, `docs:`.
-- El repositorio **todavía no es un repositorio git**: hay que hacer `git init` antes de poder
-  commitear.
+- El repositorio **es un repo git único** con los dos proyectos como subcarpetas; se commitea
+  desde la raíz, con el `.gitignore` de la raíz.

@@ -22,16 +22,34 @@ import type { Page } from '@/types/api'
  * `string[]`, que es lo que rompería el type-checking de `queryKey`.
  */
 export const queryKeys = {
-  agenda: (page: number, size: number) => ['agenda', { page, size }] as const,
+  agenda: (page: number, size: number, filters?: Record<string, string>) =>
+    filters && Object.keys(filters).length > 0
+      ? (['agenda', { page, size, ...filters }] as const)
+      : (['agenda', { page, size }] as const),
   agendaAll: () => ['agenda'] as const,
   eventos: (page: number, size: number) => ['eventos', { page, size }] as const,
   eventosAll: () => ['eventos'] as const,
   evento: (id: number) => ['evento', id] as const,
+  propuestas: (page: number, size: number, tipo?: string) =>
+    tipo ? (['propuestas', { page, size, tipo }] as const) : (['propuestas', { page, size }] as const),
+  propuestasAll: () => ['propuestas'] as const,
+  actividad: (id: number) => ['actividad', id] as const,
+  actividadesAll: () => ['actividades'] as const,
   publicadores: (page: number, size: number) => ['publicadores', { page, size }] as const,
   publicadoresAll: () => ['publicadores'] as const,
   publicador: (id: number) => ['publicador', id] as const,
   publicadorEventos: (id: number, page: number, size: number) =>
     ['publicador', id, 'eventos', { page, size }] as const,
+  borradores: (page: number, size: number) => ['borradores', { page, size }] as const,
+  borradoresAll: () => ['borradores'] as const,
+  borrador: (id: number) => ['borrador', id] as const,
+  viajes: (page: number, size: number) => ['viajes', { page, size }] as const,
+  viajesAll: () => ['viajes'] as const,
+  circuito: (viajeId: number) => ['circuito', viajeId] as const,
+  circuitoSeleccionado: (viajeId: number) => ['circuito', viajeId, 'seleccionado'] as const,
+  alternativasReemplazo: (viajeId: number, itemId: number) =>
+    ['circuito', viajeId, 'seleccionado', 'items', itemId, 'alternativas'] as const,
+  circuitosAll: () => ['circuito'] as const,
   /**
    * Prefijo de los eventos de un publicador. No es `['publicador', id]` a propósito: eso
    * matchearía también el detalle del publicador, que no tiene por qué refetchearse cuando

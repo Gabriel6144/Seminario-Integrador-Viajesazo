@@ -11,7 +11,7 @@ export class ApiError extends Error {
   readonly body: ApiErrorResponse | null
 
   constructor(status: number, body: ApiErrorResponse | null) {
-    super(body?.message ?? `HTTP ${status}`)
+    super(body?.message ?? body?.detail ?? `HTTP ${status}`)
     this.name = 'ApiError'
     this.status = status
     this.body = body
@@ -31,6 +31,7 @@ export function toUserMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status >= 500) return GENERIC_MESSAGE
     if (error.body?.message) return error.body.message
+    if (error.body?.detail) return error.body.detail
     return `No se pudo completar la petición (${error.status}).`
   }
   if (error instanceof TypeError) {
@@ -82,11 +83,38 @@ export function apiPut<TResponse, TRequest>(
 }
 
 /**
- * Baja. El backend responde **204 sin cuerpo**, así que no se espera ningún valor: el
- * `null` de la firma está explícito para que no se intente leer nada de la respuesta.
+ * Baja. Por defecto el backend responde **204 sin cuerpo**, así que no se espera ningún valor: el
+ * `null` de la firma está explícito para que no se intente leer nada de la respuesta. Algunas
+ * bajas sí devuelven el recurso actualizado (por ejemplo, eliminar una parada del circuito), y
+ * para esos casos se pasa el tipo de respuesta.
  */
-export function apiDelete(path: string, signal?: AbortSignal): Promise<null> {
-  return write<null>('DELETE', path, undefined, signal)
+export function apiDelete<TResponse = null>(path: string, signal?: AbortSignal): Promise<TResponse> {
+  return write<TResponse>('DELETE', path, undefined, signal)
+}
+
+/**
+ * Alta con `multipart/form-data` (subida de archivos).
+ *
+ * Va aparte de {@link write} a propósito: **no** se fija `Content-Type`. El navegador tiene que
+ * ponerlo para incluir el `boundary` del multipart; si se setea `application/json` o un
+ * `multipart/form-data` sin boundary, el servidor no puede parsear el body y responde 400.
+ */
+export function apiPostForm<TResponse>(
+  path: string,
+  formData: FormData,
+  signal?: AbortSignal,
+): Promise<TResponse> {
+  return fetch(path, {
+    method: 'POST',
+    signal,
+    headers: { Accept: 'application/json' },
+    body: formData,
+  }).then(async (response) => {
+    if (!response.ok) {
+      throw new ApiError(response.status, await readErrorBody(response))
+    }
+    return readBody<TResponse>(response)
+  })
 }
 
 function write<TResponse>(
