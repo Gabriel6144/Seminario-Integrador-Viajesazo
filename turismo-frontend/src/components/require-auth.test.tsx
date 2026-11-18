@@ -8,6 +8,7 @@ import { AuthProvider } from '@/components/auth-provider'
 import {
   HomeEntry,
   RequireAuth,
+  RequireGuest,
   RequireNotAdmin,
   RequireNotPublicadorTour,
   RequireRole,
@@ -68,6 +69,10 @@ function renderGuarded({
                 </HomeEntry>
               }
             />
+            <Route path="/propuestas" element={<div>Inicio</div>} />
+            <Route element={<RequireGuest />}>
+              <Route path="/sobre-nosotros" element={<div>Sobre nosotros</div>} />
+            </Route>
             <Route path="/admin" element={<div>Dashboard admin</div>} />
             <Route element={<RequireNotAdmin />}>
               <Route element={<RequireNotPublicadorTour />}>
@@ -123,6 +128,16 @@ describe('RequireAuth / RequireRole', () => {
 
   it('deja al publicador ver propuestas en index', () => {
     renderGuarded({ user: PUBLICADOR, initialEntry: '/' })
+    expect(screen.getByText('Inicio')).toBeInTheDocument()
+  })
+
+  it('deja ver Sobre nosotros a un visitante', () => {
+    renderGuarded({ user: null, initialEntry: '/sobre-nosotros' })
+    expect(screen.getByText('Sobre nosotros')).toBeInTheDocument()
+  })
+
+  it('redirige Sobre nosotros al home si hay sesión', () => {
+    renderGuarded({ user: TURISTA, initialEntry: '/sobre-nosotros' })
     expect(screen.getByText('Inicio')).toBeInTheDocument()
   })
 

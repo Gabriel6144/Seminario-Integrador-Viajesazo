@@ -323,7 +323,7 @@ function ActividadActions({
         onSuccess: () => {
           setIsOpen(false)
           toast.success('Actividad eliminada')
-          navigate('/')
+          navigate('/propuestas')
         },
         onError: (error) => {
           setIsOpen(false)
@@ -413,7 +413,7 @@ function ActividadActions({
 function Volver() {
   return (
     <Button asChild variant="ghost" size="sm" className="self-start">
-      <Link to="/">
+      <Link to="/propuestas">
         <ArrowLeftIcon className="h-4 w-4" aria-hidden />
         Volver al listado
       </Link>

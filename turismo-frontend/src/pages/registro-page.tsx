@@ -50,7 +50,7 @@ export function RegistroPage() {
   if (isAuthenticated) {
     if (hasRole('ADMINISTRADOR')) return <Navigate to="/admin" replace />
     if (hasRole('PUBLICADOR')) return <Navigate to="/publicador" replace />
-    return <Navigate to="/" replace />
+    return <Navigate to="/propuestas" replace />
   }
 
   const { register, control, formState, handleSubmit } = form
@@ -85,7 +85,7 @@ export function RegistroPage() {
                 ? '¡Cuenta de publicador creada!'
                 : '¡Cuenta creada! Ya podés planificar tu viaje.',
             )
-            navigate(values.rol === 'PUBLICADOR' ? '/publicador' : '/', { replace: true })
+            navigate(values.rol === 'PUBLICADOR' ? '/publicador' : '/propuestas', { replace: true })
           } catch (error) {
             setServerError(toUserMessage(error))
           }

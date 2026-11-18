@@ -57,7 +57,7 @@ export function BottomNavBar() {
             ),
           },
           {
-            to: '/',
+            to: '/propuestas',
             label: 'Mis Propuestas',
             icon: (
               <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
@@ -102,7 +102,7 @@ export function BottomNavBar() {
               ]
             : []),
           {
-            to: '/',
+            to: '/propuestas',
             label: 'Propuestas',
             icon: (
               <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>

@@ -25,9 +25,16 @@ acoplados de build: cada uno tiene su `package.json` / `pom.xml` y sus propios c
   Una cuenta = un rol. Registro elige TURISTA o PUBLICADOR. Guards:
   `RequireAuth` / `RequireRole` / `RequireNotAdmin` / `RequireNotPublicadorTour`.
   Shells: admin `/admin`+`/usuarios`; publicador `/publicador` + `/publicador/agenda`
-  (sin Inscriptos ni agenda turística/planificar/mis viajes). En **Propuestas** (`/`)
+  (sin Inscriptos ni agenda turística/planificar/mis viajes). En **Propuestas** (`/propuestas`)
   el publicador solo ve las suyas (`?publicadorId=`); turista/admin ven el catálogo.
   Contrato: `../docs/seguridad/AUTENTICACION-Y-AUTORIZACION.md`.
+- **Páginas públicas:** `/` es **Inicio** y `/sobre-nosotros` la historia institucional. Viven
+  fuera del `Layout` operativo (no anidan `<main>`) y reutilizan `TopAppBar` (logo y clima) con
+  `ViajezasoLayout showHeader={false}`. **Sobre nosotros es solo para visitantes:** con sesión
+  iniciada, `RequireGuest` redirige a `/propuestas` y el enlace se oculta en el header y en el
+  índice de la portada. El listado pasó de `/` a **`/propuestas`**; todo enlace de
+  "volver al listado" apunta ahí. El personaje es **Rumbi** (antes Rumin) en textos, clases y
+  assets (`rumbi-*.png`). Las demos de agenda/circuito usan datos locales y no escriben la API.
 - Para la API ver el `AGENTS.md` y el `PRUEBAS-MANUALES.md` de `../turismo-backend`.
 
 ## Comandos
