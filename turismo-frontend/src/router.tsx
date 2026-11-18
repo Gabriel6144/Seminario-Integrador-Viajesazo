@@ -1,6 +1,7 @@
 import { createBrowserRouter } from 'react-router-dom'
 
 import { Layout } from '@/components/layout'
+import { PublicLayout } from '@/components/public-layout'
 import {
   HomeEntry,
   RequireAuth,
@@ -33,82 +34,114 @@ import { UsuariosPage } from '@/pages/usuarios-page'
 /**
  * Rutas de la app.
  *
+ * - Público: `/` (Inicio) y `/sobre-nosotros` con layout sin `<main>` propio.
  * - ADMINISTRADOR: `/admin` + `/usuarios` (+ alta publicador).
- * - PUBLICADOR: Mis propuestas + panel/agenda; sin catálogo Publicadores ni agenda turística/viajes.
- * - TURISTA / guest: catálogo Publicadores; turista además planificar + mis viajes + agenda.
+ * - PUBLICADOR: Mis propuestas (`/propuestas`) + panel/agenda.
+ * - TURISTA / guest: catálogo en `/propuestas`; turista además planificar + mis viajes + agenda.
  */
 export const router = createBrowserRouter([
   {
     path: '/',
-    Component: Layout,
     children: [
       {
-        index: true,
-        element: (
-          <HomeEntry>
-            <EventosPage />
-          </HomeEntry>
-        ),
-      },
-      { path: 'login', Component: LoginPage },
-      { path: 'registro', Component: RegistroPage },
-
-      {
-        Component: RequireNotAdmin,
+        Component: PublicLayout,
         children: [
-          { path: 'eventos/:id', Component: EventoDetailPage },
-          { path: 'actividades/:id', Component: ActividadDetailPage },
           {
-            Component: RequireNotPublicadorTour,
-            children: [
-              { path: 'publicadores', Component: PublicadoresPage },
-              { path: 'publicadores/:id', Component: PublicadorDetailPage },
-            ],
+            index: true,
+            lazy: async () => {
+              const { InicioPage } = await import('@/pages/inicio-page')
+              return { Component: InicioPage }
+            },
+          },
+          {
+            path: 'sobre-nosotros',
+            lazy: async () => {
+              const { SobreNosotrosPage } = await import(
+                '@/pages/sobre-nosotros-page'
+              )
+              return { Component: SobreNosotrosPage }
+            },
           },
         ],
       },
-
       {
-        Component: RequireAuth,
+        Component: Layout,
         children: [
+          {
+            path: 'propuestas',
+            element: (
+              <HomeEntry>
+                <EventosPage />
+              </HomeEntry>
+            ),
+          },
+          { path: 'login', Component: LoginPage },
+          { path: 'registro', Component: RegistroPage },
+
           {
             Component: RequireNotAdmin,
             children: [
+              { path: 'eventos/:id', Component: EventoDetailPage },
+              { path: 'actividades/:id', Component: ActividadDetailPage },
               {
                 Component: RequireNotPublicadorTour,
                 children: [
-                  { path: 'agenda', Component: AgendaPage },
-                  { path: 'borradores', Component: BorradoresPage },
-                  { path: 'planificar', Component: PlanificadorPage },
-                  { path: 'viajes/:id/circuito', Component: CircuitoPage },
+                  { path: 'publicadores', Component: PublicadoresPage },
+                  { path: 'publicadores/:id', Component: PublicadorDetailPage },
+                ],
+              },
+            ],
+          },
+
+          {
+            Component: RequireAuth,
+            children: [
+              {
+                Component: RequireNotAdmin,
+                children: [
+                  {
+                    Component: RequireNotPublicadorTour,
+                    children: [
+                      { path: 'agenda', Component: AgendaPage },
+                      { path: 'borradores', Component: BorradoresPage },
+                      { path: 'planificar', Component: PlanificadorPage },
+                      { path: 'viajes/:id/circuito', Component: CircuitoPage },
+                    ],
+                  },
+                  {
+                    element: <RequireRole roles={['PUBLICADOR']} />,
+                    children: [
+                      { path: 'publicador', Component: PublicadorDashboardPage },
+                      {
+                        path: 'publicador/agenda',
+                        Component: PublicadorAgendaPage,
+                      },
+                      { path: 'propuestas/nueva', Component: EventoNuevoPage },
+                      { path: 'eventos/nuevo', Component: EventoNuevoPage },
+                      { path: 'eventos/:id/editar', Component: EventoEditarPage },
+                      {
+                        path: 'actividades/:id/editar',
+                        Component: ActividadEditarPage,
+                      },
+                    ],
+                  },
                 ],
               },
               {
-                element: <RequireRole roles={['PUBLICADOR']} />,
+                element: <RequireRole roles={['ADMINISTRADOR']} />,
                 children: [
-                  { path: 'publicador', Component: PublicadorDashboardPage },
-                  { path: 'publicador/agenda', Component: PublicadorAgendaPage },
-                  { path: 'propuestas/nueva', Component: EventoNuevoPage },
-                  { path: 'eventos/nuevo', Component: EventoNuevoPage },
-                  { path: 'eventos/:id/editar', Component: EventoEditarPage },
-                  { path: 'actividades/:id/editar', Component: ActividadEditarPage },
+                  { path: 'admin', Component: AdminDashboardPage },
+                  { path: 'publicadores/nuevo', Component: PublicadorNuevoPage },
+                  { path: 'usuarios', Component: UsuariosPage },
+                  { path: 'usuarios/nuevo', Component: UsuarioNuevoPage },
                 ],
               },
             ],
           },
-          {
-            element: <RequireRole roles={['ADMINISTRADOR']} />,
-            children: [
-              { path: 'admin', Component: AdminDashboardPage },
-              { path: 'publicadores/nuevo', Component: PublicadorNuevoPage },
-              { path: 'usuarios', Component: UsuariosPage },
-              { path: 'usuarios/nuevo', Component: UsuarioNuevoPage },
-            ],
-          },
+
+          { path: '*', Component: NotFoundPage },
         ],
       },
-
-      { path: '*', Component: NotFoundPage },
     ],
   },
 ])

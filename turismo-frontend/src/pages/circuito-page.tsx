@@ -52,6 +52,7 @@ const RHYTHM_LABELS: Record<TipoRitmo, string> = {
   TRANQUILO: 'Tranquilo',
   EQUILIBRADO: 'Equilibrado',
   INTENSIVO: 'Intensivo',
+  MANUAL: 'Manual',
 }
 
 function locationLabel(

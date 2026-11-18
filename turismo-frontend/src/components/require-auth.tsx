@@ -73,8 +73,8 @@ export function RequireNotPublicadorTour() {
 }
 
 /**
- * Index `/`: admin → dashboard. PUBLICADOR y TURISTA ven el listado de propuestas
- * (el panel del publicador vive en `/publicador`).
+ * Index de propuestas (`/propuestas`): admin → dashboard. PUBLICADOR y TURISTA ven el
+ * listado (el panel del publicador vive en `/publicador`). `/` queda como portada pública.
  */
 export function HomeEntry({ children }: { children: ReactNode }) {
   const { hasRole, isBootstrapping, isAuthenticated } = useAuth()
@@ -93,5 +93,5 @@ export function HomeEntry({ children }: { children: ReactNode }) {
 function homeForRoles(hasRole: (...roles: RolUsuario[]) => boolean): string {
   if (hasRole('ADMINISTRADOR')) return '/admin'
   if (hasRole('PUBLICADOR')) return '/publicador'
-  return '/'
+  return '/propuestas'
 }

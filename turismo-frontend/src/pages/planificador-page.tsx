@@ -463,7 +463,7 @@ export function PlanificadorPage() {
 
   const handleDiscardExit = () => {
     setIsExitModalOpen(false)
-    navigate('/')
+    navigate('/propuestas')
   }
 
   return (

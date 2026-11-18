@@ -45,7 +45,7 @@ function safeNext(raw: string | null): string {
 function homeForUser(roles: string[] | undefined): string {
   if (roles?.includes('ADMINISTRADOR')) return '/admin'
   if (roles?.includes('PUBLICADOR')) return '/publicador'
-  return '/'
+  return '/propuestas'
 }
 
 export function LoginPage() {

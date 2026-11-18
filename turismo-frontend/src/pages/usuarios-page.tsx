@@ -98,7 +98,7 @@ export function UsuariosPage() {
       <header className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Link
-            to="/"
+            to="/admin"
             className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-sky-700"
             title="Volver"
           >

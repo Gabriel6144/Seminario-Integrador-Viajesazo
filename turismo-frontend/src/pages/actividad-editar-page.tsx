@@ -91,7 +91,7 @@ export function ActividadEditarPage() {
 function Volver() {
   return (
     <Button asChild variant="ghost" size="sm" className="self-start">
-      <Link to="/">Volver al listado</Link>
+      <Link to="/propuestas">Volver al listado</Link>
     </Button>
   )
 }

@@ -50,7 +50,7 @@ export function EventoActions({ id, nombre, publicadorId, imagen, fecha }: Event
           toast.success('Evento eliminado')
           // Se vuelve al listado y no al detalle: el detalle ya no existe y quedarse ahí
           // mostraría un error de 404 justo después de una operación exitosa.
-          navigate('/')
+          navigate('/propuestas')
         },
         onError: (error) => {
           setIsOpen(false)

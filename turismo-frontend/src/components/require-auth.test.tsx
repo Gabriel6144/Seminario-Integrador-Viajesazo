@@ -68,6 +68,7 @@ function renderGuarded({
                 </HomeEntry>
               }
             />
+            <Route path="/propuestas" element={<div>Inicio</div>} />
             <Route path="/admin" element={<div>Dashboard admin</div>} />
             <Route element={<RequireNotAdmin />}>
               <Route element={<RequireNotPublicadorTour />}>
