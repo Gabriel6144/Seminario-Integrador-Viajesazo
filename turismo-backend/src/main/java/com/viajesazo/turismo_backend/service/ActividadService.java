@@ -5,6 +5,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 
@@ -39,7 +40,7 @@ public class ActividadService {
 	private final UbicacionRepository ubicacionRepository;
 	private final ActividadMapper mapper;
 	private final GeocodingService geocodingService;
-	private final PublicadorAgendaService publicadorAgendaService;
+	private final Clock clock;
 
 	@Transactional
 	public ActividadResponse create(ActividadRequest request) {
@@ -49,8 +50,6 @@ public class ActividadService {
 		actividad.setEstadoPropuesta(getInitialState());
 		Publicador publicador = resolvePublicadorForWrite(request.publicadorId(), null);
 		actividad.setPublicador(publicador);
-		publicadorAgendaService.assertSinSolapamiento(
-				publicador.getId(), request.fechaInicio(), request.fechaFin(), null, null);
 		applyUbicacion(actividad, request);
 		actividad.validarInvariantes();
 		return mapper.toResponse(actividadRepository.save(actividad));
@@ -68,8 +67,6 @@ public class ActividadService {
 		}
 		Publicador publicador = resolvePublicadorForWrite(request.publicadorId(), actividad.getPublicador());
 		actividad.setPublicador(publicador);
-		publicadorAgendaService.assertSinSolapamiento(
-				publicador.getId(), request.fechaInicio(), request.fechaFin(), null, id);
 		applyUbicacion(actividad, request);
 		actividad.validarInvariantes();
 		return mapper.toResponse(actividadRepository.save(actividad));
@@ -92,8 +89,10 @@ public class ActividadService {
 		long dias = ChronoUnit.DAYS.between(fechaAnteriorInicio, fechaAnteriorFin);
 		LocalDate nuevaInicio = request.fechaInicio();
 		LocalDate nuevaFin = nuevaInicio.plusDays(dias);
-		publicadorAgendaService.assertSinSolapamiento(
-				actividad.getPublicador().getId(), nuevaInicio, nuevaFin, null, id);
+		// No se puede reprogramar a un día anterior a hoy (misma regla que el DnD del frontend).
+		if (nuevaInicio.isBefore(LocalDate.now(clock))) {
+			throw new BusinessRuleException("no se puede reprogramar a un día anterior a hoy");
+		}
 		actividad.setFechaInicio(nuevaInicio);
 		actividad.setFechaFin(nuevaFin);
 		actividad.validarInvariantes();

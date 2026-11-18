@@ -14,6 +14,7 @@ public record PublicadorAgendaItemResponse(
 		Modalidad modalidad,
 		String imagenUrl,
 		LocalTime horarioInicio,
-		LocalTime horarioFin
+		LocalTime horarioFin,
+		String descripcion
 ) {
 }

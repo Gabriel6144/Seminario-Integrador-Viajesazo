@@ -134,6 +134,7 @@ export function resetStore(): void {
       imagenUrl: null,
       horarioInicio: null,
       horarioFin: null,
+      descripcion: 'Caminata por senderos de las sierras.',
     },
     {
       propuestaId: 9002,
@@ -145,6 +146,7 @@ export function resetStore(): void {
       imagenUrl: null,
       horarioInicio: null,
       horarioFin: null,
+      descripcion: 'Aprende recetas regionales.',
     },
   ]
   const seleccionadoViaje2 = structuredClone(CIRCUITO_SELECCIONADO)

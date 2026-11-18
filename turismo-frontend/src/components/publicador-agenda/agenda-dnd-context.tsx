@@ -15,6 +15,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { toast } from 'sonner'
 
 import { useReprogramarActividad } from '@/api/actividades'
 import { useReprogramarEvento, useReprogramarPreview } from '@/api/eventos'
@@ -35,8 +36,10 @@ import type { LocalDate, PublicadorAgendaItemResponse } from '@/types/api'
 import { AgendaEventCard } from './agenda-event-card'
 import {
   durationOffsetDays,
+  isAgendaDayPast,
   isValidAgendaDrop,
   parseDraggableEventoId,
+  toIsoLocalDate,
 } from './agenda-layout'
 
 interface PendingDrop {
@@ -69,7 +72,7 @@ interface AgendaDndProviderProps {
 
 /**
  * DnD del calendario: silueta, celdas inválidas, modal de confirmación y PATCH reprogramar.
- * Sin toasts/notificaciones.
+ * Toast solo al intentar soltar en un día pasado.
  */
 export function AgendaDndProvider({ items, children }: AgendaDndProviderProps) {
   const reprogramarEvento = useReprogramarEvento()
@@ -91,8 +94,11 @@ export function AgendaDndProvider({ items, children }: AgendaDndProviderProps) {
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
   )
 
+  const today = toIsoLocalDate(new Date())
   const isOverValid =
-    activeItem != null && overDay != null && isValidAgendaDrop(items, activeItem, overDay)
+    activeItem != null &&
+    overDay != null &&
+    isValidAgendaDrop(items, activeItem, overDay, today)
 
   const value = useMemo<AgendaDndContextValue>(
     () => ({ items, activeItem, overDay, isOverValid }),
@@ -136,8 +142,12 @@ export function AgendaDndProvider({ items, children }: AgendaDndProviderProps) {
     if (item == null || overId == null) return
     const target = String(overId)
     if (!/^\d{4}-\d{2}-\d{2}$/.test(target)) return
-    // Destino ocupado → snap-back (no modal).
-    if (!isValidAgendaDrop(items, item, target)) return
+    // Destino pasado → feedback claro y snap-back.
+    if (isAgendaDayPast(target, today)) {
+      toast.error('No podés mover una propuesta a un día anterior a hoy.')
+      return
+    }
+    if (!isValidAgendaDrop(items, item, target, today)) return
 
     setPending({
       item,

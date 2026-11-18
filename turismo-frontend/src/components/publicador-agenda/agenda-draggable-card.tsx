@@ -3,6 +3,7 @@ import { useDraggable } from '@dnd-kit/core'
 import type { LocalDate, PublicadorAgendaItemResponse } from '@/types/api'
 
 import { AgendaEventCard } from './agenda-event-card'
+import { AgendaEventHoverCard } from './agenda-event-hover-card'
 import { useAgendaDnd } from './agenda-dnd-context'
 import { draggableIdForEvento } from './agenda-layout'
 
@@ -29,21 +30,25 @@ export function AgendaDraggableCard({
     data: { propuestaId: item.propuestaId, tipo: item.tipo, dayIso },
   })
 
+  const card = <AgendaEventCard item={item} compact={compact} />
+
   if (!canDrag) {
-    return <AgendaEventCard item={item} compact={compact} />
+    return <AgendaEventHoverCard item={item}>{card}</AgendaEventHoverCard>
   }
 
   // Silueta = DragOverlay; todas las celdas del mismo ítem quedan atenuadas.
   const hidden = isDragging || activeItem?.propuestaId === item.propuestaId
 
   return (
-    <div
-      ref={setNodeRef}
-      className={`cursor-grab touch-none active:cursor-grabbing ${hidden ? 'opacity-30' : ''}`}
-      {...listeners}
-      {...attributes}
-    >
-      <AgendaEventCard item={item} compact={compact} />
-    </div>
+    <AgendaEventHoverCard item={item}>
+      <div
+        ref={setNodeRef}
+        className={`cursor-grab touch-none active:cursor-grabbing ${hidden ? 'opacity-30' : ''}`}
+        {...listeners}
+        {...attributes}
+      >
+        {card}
+      </div>
+    </AgendaEventHoverCard>
   )
 }

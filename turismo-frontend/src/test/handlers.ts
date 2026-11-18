@@ -258,6 +258,7 @@ export const handlers = [
       imagenUrl: evento.imagenes[0] ?? null,
       horarioInicio: evento.horarioInicio,
       horarioFin: evento.horarioFin,
+      descripcion: evento.descripcion,
     }))
     return HttpResponse.json([...eventos, ...allAgendaActividades()])
   }),
@@ -268,6 +269,14 @@ export const handlers = [
     if (!body.fechaInicio) {
       return HttpResponse.json(
         { status: 400, message: 'la fecha de inicio es obligatoria' },
+        { status: 400 },
+      )
+    }
+    const today = new Date()
+    const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    if (body.fechaInicio < todayIso) {
+      return HttpResponse.json(
+        { status: 400, message: 'no se puede reprogramar a un día anterior a hoy' },
         { status: 400 },
       )
     }
@@ -304,6 +313,14 @@ export const handlers = [
     if (!body.fechaInicio) {
       return HttpResponse.json(
         { status: 400, message: 'la fecha de inicio es obligatoria' },
+        { status: 400 },
+      )
+    }
+    const today = new Date()
+    const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    if (body.fechaInicio < todayIso) {
+      return HttpResponse.json(
+        { status: 400, message: 'no se puede reprogramar a un día anterior a hoy' },
         { status: 400 },
       )
     }

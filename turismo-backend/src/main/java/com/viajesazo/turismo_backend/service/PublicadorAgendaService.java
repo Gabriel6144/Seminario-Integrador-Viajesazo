@@ -47,7 +47,8 @@ public class PublicadorAgendaService {
 					evento.getModalidad(),
 					firstImage(evento.getImagenes()),
 					evento.getHorarioInicio(),
-					evento.getHorarioFin()));
+					evento.getHorarioFin(),
+					evento.getDescripcion()));
 		}
 		for (Actividad actividad : actividadRepository.findAllByPublicadorId(publicadorId)) {
 			items.add(new PublicadorAgendaItemResponse(
@@ -59,7 +60,8 @@ public class PublicadorAgendaService {
 					actividad.getModalidad(),
 					firstImage(actividad.getImagenes()),
 					null,
-					null));
+					null,
+					actividad.getDescripcion()));
 		}
 		items.sort(Comparator
 				.comparing(PublicadorAgendaItemResponse::fechaInicio)
@@ -105,30 +107,6 @@ public class PublicadorAgendaService {
 				eventos.size() + actividades.size(),
 				proximas,
 				inscriptos);
-	}
-
-	/**
-	 * Rechaza si el rango se solapa con otro evento o actividad del mismo publicador.
-	 *
-	 * @param excludeEventoId    id de evento a ignorar (edición) o null
-	 * @param excludeActividadId id de actividad a ignorar (edición) o null
-	 */
-	@Transactional(readOnly = true)
-	public void assertSinSolapamiento(Long publicadorId, LocalDate inicio, LocalDate fin,
-			Long excludeEventoId, Long excludeActividadId) {
-		if (inicio == null || fin == null) {
-			return;
-		}
-		if (fin.isBefore(inicio)) {
-			throw new BusinessRuleException("la fecha de finalización no puede ser anterior a la de inicio");
-		}
-		boolean overlapEvento = eventoRepository.existsOverlapping(publicadorId, inicio, fin, excludeEventoId);
-		boolean overlapActividad = actividadRepository.existsOverlapping(publicadorId, inicio, fin,
-				excludeActividadId);
-		if (overlapEvento || overlapActividad) {
-			throw new BusinessRuleException(
-					"ya tenés una propuesta agendada que se solapa con ese rango de fechas");
-		}
 	}
 
 	private Long requirePublicadorId() {

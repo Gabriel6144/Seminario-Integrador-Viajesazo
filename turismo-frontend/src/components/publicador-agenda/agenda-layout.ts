@@ -16,6 +16,11 @@ export function toIsoLocalDate(date: Date): LocalDate {
   return `${y}-${m}-${d}`
 }
 
+/** True si el día ISO es anterior a hoy (calendario local). */
+export function isAgendaDayPast(day: LocalDate, today: LocalDate = toIsoLocalDate(new Date())): boolean {
+  return day < today
+}
+
 /** Lunes de la semana ISO-like (lunes = inicio) que contiene `anchor`. */
 export function startOfWeekMonday(anchor: LocalDate): LocalDate {
   const [y, m, d] = anchor.split('-').map(Number)
@@ -77,19 +82,32 @@ export function monthCellDays(year: number, monthIndex: number): Array<LocalDate
   return cells
 }
 
-/** A lo sumo un ítem por día (regla de dominio). */
+function compareAgendaItems(a: PublicadorAgendaItemResponse, b: PublicadorAgendaItemResponse): number {
+  const aStart = a.horarioInicio ?? ''
+  const bStart = b.horarioInicio ?? ''
+  if (aStart !== bStart) return aStart < bStart ? -1 : 1
+  return a.nombre.localeCompare(b.nombre, 'es')
+}
+
+/** Agrupa propuestas por cada día del rango (permite varios el mismo día). */
 export function indexItemsByDay(
   items: PublicadorAgendaItemResponse[],
-): Map<LocalDate, PublicadorAgendaItemResponse> {
-  const map = new Map<LocalDate, PublicadorAgendaItemResponse>()
+): Map<LocalDate, PublicadorAgendaItemResponse[]> {
+  const map = new Map<LocalDate, PublicadorAgendaItemResponse[]>()
   for (const item of items) {
     let day = item.fechaInicio
     while (day <= item.fechaFin) {
-      if (!map.has(day)) {
-        map.set(day, item)
+      const list = map.get(day)
+      if (list) {
+        list.push(item)
+      } else {
+        map.set(day, [item])
       }
       day = addDaysLocalDate(day, 1)
     }
+  }
+  for (const list of map.values()) {
+    list.sort(compareAgendaItems)
   }
   return map
 }
@@ -123,36 +141,19 @@ export function durationOffsetDays(item: PublicadorAgendaItemResponse): number {
 }
 
 /**
- * True si el rango [nuevaInicio, nuevaInicio+offset] choca con otra propuesta
- * (excluyendo `excludePropuestaId`, p.ej. el evento que se está moviendo).
+ * Destino válido para DnD: EVENTO/ACTIVIDAD, distinto del inicio actual,
+ * y no anterior a hoy.
  */
-export function rangeWouldOverlap(
-  items: PublicadorAgendaItemResponse[],
-  excludePropuestaId: number,
-  nuevaInicio: LocalDate,
-  offsetDays: number,
-): boolean {
-  const nuevaFin = addDaysLocalDate(nuevaInicio, offsetDays)
-  const byDay = indexItemsByDay(items)
-  let day = nuevaInicio
-  while (day <= nuevaFin) {
-    const occupant = byDay.get(day)
-    if (occupant != null && occupant.propuestaId !== excludePropuestaId) {
-      return true
-    }
-    day = addDaysLocalDate(day, 1)
-  }
-  return false
-}
-
 export function isValidAgendaDrop(
-  items: PublicadorAgendaItemResponse[],
+  _items: PublicadorAgendaItemResponse[],
   item: PublicadorAgendaItemResponse,
   targetDay: LocalDate,
+  today: LocalDate = toIsoLocalDate(new Date()),
 ): boolean {
   if (item.tipo !== 'EVENTO' && item.tipo !== 'ACTIVIDAD') return false
   if (targetDay === item.fechaInicio) return false
-  return !rangeWouldOverlap(items, item.propuestaId, targetDay, durationOffsetDays(item))
+  if (isAgendaDayPast(targetDay, today)) return false
+  return true
 }
 
 /**
@@ -171,4 +172,21 @@ export function parseDraggableEventoId(id: string | number): number | null {
   const propuestaPart = rest.split('-')[0]
   const n = Number(propuestaPart)
   return Number.isFinite(n) ? n : null
+}
+
+export function agendaDetailPath(item: PublicadorAgendaItemResponse): string {
+  return item.tipo === 'ACTIVIDAD'
+    ? `/actividades/${item.propuestaId}`
+    : `/eventos/${item.propuestaId}`
+}
+
+export function truncateAgendaDescription(
+  text: string | null | undefined,
+  max = 120,
+): string | null {
+  if (!text) return null
+  const trimmed = text.trim()
+  if (trimmed.length === 0) return null
+  if (trimmed.length <= max) return trimmed
+  return `${trimmed.slice(0, max - 1).trimEnd()}…`
 }

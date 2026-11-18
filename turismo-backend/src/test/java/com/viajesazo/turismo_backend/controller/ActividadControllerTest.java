@@ -2,7 +2,6 @@ package com.viajesazo.turismo_backend.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -186,10 +185,10 @@ class ActividadControllerTest {
 	}
 
 	@Test
-	@DisplayName("reprogramar con solape responde 400")
-	void reprogramOverlap() throws Exception {
+	@DisplayName("reprogramar a fecha pasada responde 400")
+	void reprogramPastDate() throws Exception {
 		when(actividadService.reprogramar(eq(7L), any(ReprogramarEventoRequest.class)))
-				.thenThrow(new BusinessRuleException("ya hay una propuesta en esa fecha"));
+				.thenThrow(new BusinessRuleException("no se puede reprogramar a un día anterior a hoy"));
 
 		mockMvc.perform(patch("/api/actividades/7/reprogramar")
 						.contentType(MediaType.APPLICATION_JSON)
@@ -197,7 +196,7 @@ class ActividadControllerTest {
 								{ "fechaInicio": "2026-11-01" }
 								"""))
 				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.message").value("ya hay una propuesta en esa fecha"));
+				.andExpect(jsonPath("$.message").value("no se puede reprogramar a un día anterior a hoy"));
 	}
 
 	@Test

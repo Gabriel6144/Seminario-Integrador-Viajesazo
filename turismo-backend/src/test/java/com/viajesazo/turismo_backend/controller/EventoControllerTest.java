@@ -225,17 +225,17 @@ class EventoControllerTest {
 	}
 
 	@Test
-	@DisplayName("reprogramar con solapamiento responde 400")
-	void reprogramOverlapReturns400() throws Exception {
+	@DisplayName("reprogramar a fecha pasada responde 400")
+	void reprogramPastDateReturns400() throws Exception {
 		when(propuestaService.reprogramar(eq(7L), any(ReprogramarEventoRequest.class)))
-				.thenThrow(new BusinessRuleException(
-						"ya tenés una propuesta agendada que se solapa con ese rango de fechas"));
+				.thenThrow(new BusinessRuleException("no se puede reprogramar a un día anterior a hoy"));
 
 		mockMvc.perform(patch("/api/eventos/7/reprogramar")
 				.contentType(MediaType.APPLICATION_JSON)
 				.content("{\"fechaInicio\":\"2026-12-01\"}"))
 				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.status").value(400));
+				.andExpect(jsonPath("$.status").value(400))
+				.andExpect(jsonPath("$.message").value("no se puede reprogramar a un día anterior a hoy"));
 	}
 
 	@Test

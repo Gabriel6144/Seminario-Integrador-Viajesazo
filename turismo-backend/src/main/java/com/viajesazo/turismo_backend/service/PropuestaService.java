@@ -42,7 +42,6 @@ public class PropuestaService {
 	private final Clock clock;
 	private final EventoMapper mapper;
 	private final GeocodingService geocodingService;
-	private final PublicadorAgendaService publicadorAgendaService;
 	private final NotificacionService notificacionService;
 
 	@Transactional
@@ -54,8 +53,6 @@ public class PropuestaService {
 		evento.setEstadoPropuesta(getInitialState());
 		Publicador publicador = resolvePublicadorForWrite(request.publicadorId(), null);
 		evento.setPublicador(publicador);
-		publicadorAgendaService.assertSinSolapamiento(
-				publicador.getId(), request.fechaInicio(), request.fechaFin(), null, null);
 		applyUbicacion(evento, request);
 		evento.validarInvariantes();
 		return mapper.toResponse(eventoRepository.save(evento));
@@ -74,8 +71,6 @@ public class PropuestaService {
 		}
 		Publicador publicador = resolvePublicadorForWrite(request.publicadorId(), evento.getPublicador());
 		evento.setPublicador(publicador);
-		publicadorAgendaService.assertSinSolapamiento(
-				publicador.getId(), request.fechaInicio(), request.fechaFin(), id, null);
 		applyUbicacion(evento, request);
 		evento.validarInvariantes();
 		return mapper.toResponse(eventoRepository.save(evento));
@@ -105,8 +100,10 @@ public class PropuestaService {
 		long dias = java.time.temporal.ChronoUnit.DAYS.between(fechaAnteriorInicio, fechaAnteriorFin);
 		LocalDate nuevaInicio = request.fechaInicio();
 		LocalDate nuevaFin = nuevaInicio.plusDays(dias);
-		publicadorAgendaService.assertSinSolapamiento(
-				evento.getPublicador().getId(), nuevaInicio, nuevaFin, id, null);
+		// No se puede reprogramar a un día anterior a hoy (misma regla que el DnD del frontend).
+		if (nuevaInicio.isBefore(LocalDate.now(clock))) {
+			throw new BusinessRuleException("no se puede reprogramar a un día anterior a hoy");
+		}
 		evento.setFechaInicio(nuevaInicio);
 		evento.setFechaFin(nuevaFin);
 		evento.validarInvariantes();

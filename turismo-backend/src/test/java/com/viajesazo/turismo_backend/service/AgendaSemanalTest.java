@@ -54,9 +54,6 @@ class AgendaSemanalTest {
 	private GeocodingService geocodingService;
 
 	@Mock
-	private PublicadorAgendaService publicadorAgendaService;
-
-	@Mock
 	private NotificacionService notificacionService;
 
 	@Test
@@ -161,7 +158,7 @@ class AgendaSemanalTest {
 	private PropuestaService serviceAt(String today) {
 		Clock fixed = Clock.fixed(LocalDate.parse(today).atStartOfDay(ZONE).toInstant(), ZONE);
 		return new PropuestaService(eventoRepository, publicadorRepository, estadoPropuestaRepository, ubicacionRepository, fixed, new EventoMapperImpl(),
-				geocodingService, publicadorAgendaService, notificacionService);
+				geocodingService, notificacionService);
 	}
 
 	private Evento testEvent() {

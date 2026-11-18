@@ -469,6 +469,7 @@ export interface PublicadorAgendaItemResponse {
   imagenUrl: string | null
   horarioInicio: LocalTime | null
   horarioFin: LocalTime | null
+  descripcion: string | null
 }
 
 /** Espejo de `dto/request/ReprogramarEventoRequest.java`. */

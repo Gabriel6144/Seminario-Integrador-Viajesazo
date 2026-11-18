@@ -4,10 +4,9 @@ import { toast } from 'sonner'
 
 import { useCrearActividad } from '@/api/actividades'
 import { useCrearEvento } from '@/api/eventos'
-import { usePublicadorFechasOcupadas } from '@/api/publicador-portal'
 import { useAuth } from '@/components/auth-provider'
 import { EventoForm } from '@/components/evento-form'
-import { ErrorState, GridSkeleton } from '@/components/query-state'
+import { ErrorState } from '@/components/query-state'
 import { toUserMessage } from '@/lib/http'
 import { EVENTO_FORM_DEFAULT, toActividadRequest, toEventoRequest } from '@/lib/schemas'
 import type { PublicadorResponse } from '@/types/api'
@@ -24,8 +23,6 @@ export function EventoNuevoPage() {
   const crearEvento = useCrearEvento()
   const crearActividad = useCrearActividad()
   const [serverError, setServerError] = useState<string | null>(null)
-
-  const fechasOcupadasQuery = usePublicadorFechasOcupadas(Boolean(user?.publicadorId))
 
   const publicadores = useMemo((): PublicadorResponse[] => {
     if (user?.publicadorId == null) return []
@@ -60,45 +57,39 @@ export function EventoNuevoPage() {
       <div className="flex flex-col gap-1">
         <h2 className="text-xl font-semibold tracking-tight">Nueva propuesta turística</h2>
         <p className="text-sm text-muted-foreground">
-          Primero elegí las fechas de agenda. Los días ya ocupados quedan deshabilitados. Después
-          completá si es un evento o una actividad.
+          Primero elegí las fechas de agenda (desde hoy en adelante). Podés agendar más de una
+          propuesta el mismo día. Después completá si es un evento o una actividad.
         </p>
       </div>
 
-      {fechasOcupadasQuery.isPending ? <GridSkeleton /> : null}
-      {fechasOcupadasQuery.isError ? <ErrorState error={fechasOcupadasQuery.error} /> : null}
-
-      {!fechasOcupadasQuery.isPending && !fechasOcupadasQuery.isError ? (
-        <EventoForm
-          defaultValues={defaultValues}
-          publicadores={publicadores}
-          fechasOcupadas={fechasOcupadasQuery.data ?? []}
-          submitLabel="Crear propuesta"
-          cancelTo="/publicador"
-          isPending={crearEvento.isPending || crearActividad.isPending}
-          serverError={serverError}
-          onSubmit={(values) => {
-            setServerError(null)
-            crearEvento.mutate(toEventoRequest(values), {
-              onSuccess: () => {
-                toast.success('Evento creado y agregado a tu agenda')
-                navigate('/publicador/agenda')
-              },
-              onError: (error) => setServerError(toUserMessage(error)),
-            })
-          }}
-          onSubmitActividad={(values) => {
-            setServerError(null)
-            crearActividad.mutate(toActividadRequest(values), {
-              onSuccess: () => {
-                toast.success('Actividad creada y agregada a tu agenda')
-                navigate('/publicador/agenda')
-              },
-              onError: (error) => setServerError(toUserMessage(error)),
-            })
-          }}
-        />
-      ) : null}
+      <EventoForm
+        defaultValues={defaultValues}
+        publicadores={publicadores}
+        submitLabel="Crear propuesta"
+        cancelTo="/publicador"
+        isPending={crearEvento.isPending || crearActividad.isPending}
+        serverError={serverError}
+        onSubmit={(values) => {
+          setServerError(null)
+          crearEvento.mutate(toEventoRequest(values), {
+            onSuccess: () => {
+              toast.success('Evento creado y agregado a tu agenda')
+              navigate('/publicador/agenda')
+            },
+            onError: (error) => setServerError(toUserMessage(error)),
+          })
+        }}
+        onSubmitActividad={(values) => {
+          setServerError(null)
+          crearActividad.mutate(toActividadRequest(values), {
+            onSuccess: () => {
+              toast.success('Actividad creada y agregada a tu agenda')
+              navigate('/publicador/agenda')
+            },
+            onError: (error) => setServerError(toUserMessage(error)),
+          })
+        }}
+      />
     </div>
   )
 }

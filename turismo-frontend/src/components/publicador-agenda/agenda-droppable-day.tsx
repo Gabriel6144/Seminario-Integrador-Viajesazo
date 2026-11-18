@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import type { LocalDate } from '@/types/api'
 
 import { useAgendaDnd } from './agenda-dnd-context'
-import { isValidAgendaDrop } from './agenda-layout'
+import { isAgendaDayPast, isValidAgendaDrop, toIsoLocalDate } from './agenda-layout'
 
 interface AgendaDroppableDayProps {
   iso: LocalDate
@@ -13,21 +13,23 @@ interface AgendaDroppableDayProps {
 }
 
 /**
- * Celda/columna droppable. Marca inválido (rojo) si el destino solapa otra propuesta.
+ * Celda/columna droppable. Marca inválido (rojo) si el destino es pasado u otro caso inválido.
  */
 export function AgendaDroppableDay({ iso, className = '', children }: AgendaDroppableDayProps) {
+  const today = toIsoLocalDate(new Date())
+  const past = isAgendaDayPast(iso, today)
   const { setNodeRef, isOver } = useDroppable({ id: iso })
   const { activeItem, items } = useAgendaDnd()
 
   const invalid =
     isOver &&
     activeItem != null &&
-    !isValidAgendaDrop(items, activeItem, iso)
+    !isValidAgendaDrop(items, activeItem, iso, today)
 
   const validHint =
     isOver &&
     activeItem != null &&
-    isValidAgendaDrop(items, activeItem, iso)
+    isValidAgendaDrop(items, activeItem, iso, today)
 
   return (
     <div
@@ -40,6 +42,7 @@ export function AgendaDroppableDay({ iso, className = '', children }: AgendaDrop
             : ''
       }`}
       data-day={iso}
+      data-past={past || undefined}
       data-drop-invalid={invalid || undefined}
     >
       {children}

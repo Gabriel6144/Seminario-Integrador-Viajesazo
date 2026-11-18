@@ -71,9 +71,6 @@ class PropuestaServiceTest {
 	private GeocodingService geocodingService;
 
 	@Mock
-	private PublicadorAgendaService publicadorAgendaService;
-
-	@Mock
 	private NotificacionService notificacionService;
 
 	private PropuestaService service;
@@ -85,7 +82,7 @@ class PropuestaServiceTest {
 		Clock clock = Clock.fixed(LocalDate.parse("2026-09-23").atStartOfDay(ZoneId.of("America/Argentina/Buenos_Aires")).toInstant(),
 				ZoneId.of("America/Argentina/Buenos_Aires"));
 		service = new PropuestaService(eventoRepository, publicadorRepository, estadoPropuestaRepository, ubicacionRepository, clock, new EventoMapperImpl(),
-				geocodingService, publicadorAgendaService, notificacionService);
+				geocodingService, notificacionService);
 		// La mayoría de los tests no ejercita el camino de la geocodificación; queda lenient para
 		// que los que fallan antes (validaciones) no rompan por strict stubs.
 		lenient().when(geocodingService.geocode(any(), any(), any())).thenReturn(Optional
@@ -117,12 +114,6 @@ class PropuestaServiceTest {
 		assertThat(result.nombre()).isEqualTo("Festival de Folklore");
 		assertThat(result.categoria()).isEqualTo(InteresCategoria.CULTURA);
 		assertThat(result.publicadorId()).isEqualTo(1L);
-		verify(publicadorAgendaService).assertSinSolapamiento(
-				eq(1L),
-				eq(LocalDate.parse("2026-10-01")),
-				eq(LocalDate.parse("2026-10-03")),
-				eq(null),
-				eq(null));
 		verify(eventoRepository).save(any(Evento.class));
 	}
 
@@ -294,12 +285,6 @@ class PropuestaServiceTest {
 
 		assertThat(result.fechaInicio()).isEqualTo(LocalDate.parse("2026-12-01"));
 		assertThat(result.fechaFin()).isEqualTo(LocalDate.parse("2026-12-02"));
-		verify(publicadorAgendaService).assertSinSolapamiento(
-				eq(1L),
-				eq(LocalDate.parse("2026-12-01")),
-				eq(LocalDate.parse("2026-12-02")),
-				eq(7L),
-				eq(null));
 		verify(notificacionService).notificarReprogramacion(
 				any(Evento.class),
 				eq(LocalDate.parse("2026-09-25")),
@@ -308,17 +293,13 @@ class PropuestaServiceTest {
 	}
 
 	@Test
-	@DisplayName("reprogramar propaga solapamiento como BusinessRuleException")
-	void reprogramPropagatesOverlap() {
+	@DisplayName("reprogramar a un día anterior a hoy responde BusinessRuleException")
+	void reprogramRejectsPastDate() {
 		when(eventoRepository.findById(7L)).thenReturn(Optional.of(persistedEvent()));
-		org.mockito.Mockito.doThrow(new BusinessRuleException(
-				"ya tenés una propuesta agendada que se solapa con ese rango de fechas"))
-				.when(publicadorAgendaService)
-				.assertSinSolapamiento(any(), any(), any(), any(), any());
 
-		assertThatThrownBy(() -> service.reprogramar(7L, new ReprogramarEventoRequest(LocalDate.parse("2026-12-01"))))
+		assertThatThrownBy(() -> service.reprogramar(7L, new ReprogramarEventoRequest(LocalDate.parse("2026-09-22"))))
 				.isInstanceOf(BusinessRuleException.class)
-				.hasMessageContaining("solapa");
+				.hasMessageContaining("anterior a hoy");
 		verify(eventoRepository, never()).save(any(Evento.class));
 	}
 

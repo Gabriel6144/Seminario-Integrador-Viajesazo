@@ -96,8 +96,9 @@ export function PublicadorAgendaPage() {
           Mi agenda de propuestas
         </h2>
         <p className="text-sm text-[#3f484e]">
-          Listado a la izquierda y calendario a la derecha. Arrastrá un evento o actividad a un día
-          libre para reprogramarlo (se pide confirmación).
+          Listado a la izquierda y calendario a la derecha. Arrastrá un evento o actividad a otro
+          día (desde hoy en adelante) para reprogramarlo; se pide confirmación. Podés tener varias
+          propuestas el mismo día.
         </p>
       </div>
 

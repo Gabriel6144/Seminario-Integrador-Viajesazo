@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { PlusIcon, Trash2Icon } from 'lucide-react'
 import { Controller, useFieldArray, useForm, type FieldError as RhfFieldError } from 'react-hook-form'
 import { Link } from 'react-router-dom'
-import { useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
+import { useEffect, useRef, useState, type ComponentProps } from 'react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -25,7 +25,6 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { ImagenUploader } from '@/components/imagen-uploader'
 import { UbicacionSelector } from '@/components/ubicacion-selector'
-import { eachLocalDateInclusive } from '@/lib/dates'
 import {
   crearPropuestaSchema,
   formatValidationMessage,
@@ -61,8 +60,6 @@ interface EventoFormProps {
   cancelTo: string
   /** Coordenadas del evento en edición, para que el mapa del selector arranque centrado. */
   ubicacionInicial?: { latitud: number | null; longitud: number | null }
-  /** Días ISO ya ocupados por el publicador (alta): se muestran y se validan. */
-  fechasOcupadas?: string[]
 }
 
 /**
@@ -88,7 +85,6 @@ export function EventoForm({
   submitLabel,
   cancelTo,
   ubicacionInicial,
-  fechasOcupadas = [],
 }: EventoFormProps) {
   const [tipoRegistro, setTipoRegistro] = useState<TipoRegistro>(tipoFijo ?? 'EVENTO')
   const esActividad =
@@ -105,11 +101,10 @@ export function EventoForm({
   // En alta (sin fecha precargada) se exige que la fecha de inicio sea de hoy en adelante, igual que en Planificar.
   const esAlta = defaultValues.fechaInicio === ''
   const minFechaInicio = esAlta ? todayStr : undefined
-  const ocupadas = useMemo(() => new Set(fechasOcupadas), [fechasOcupadas])
 
   const form = useForm<EventoFormValues>({
     resolver: zodResolver(
-      crearPropuestaSchema(esActividad ? 'ACTIVIDAD' : 'EVENTO', minFechaInicio, fechasOcupadas),
+      crearPropuestaSchema(esActividad ? 'ACTIVIDAD' : 'EVENTO', minFechaInicio),
     ),
     defaultValues,
     // Errores al enviar, y de ahí en adelante mientras se corrige. Validar en cada tecla desde
@@ -198,21 +193,10 @@ export function EventoForm({
     ? { type: 'server', message: formatValidationMessage(activeServerError) }
     : undefined
 
-  const rangoTocaOcupado =
-    fechaInicio &&
-    fechaFin &&
-    fechaFin >= fechaInicio &&
-    eachLocalDateInclusive(fechaInicio, fechaFin).some((day) => ocupadas.has(day))
-
   const errorFechaInicio: RhfFieldError | undefined =
     minFechaInicio && fechaInicio && fechaInicio < minFechaInicio
       ? { type: 'validate', message: 'La fecha de inicio no puede ser anterior a la fecha actual.' }
-      : rangoTocaOcupado
-        ? {
-            type: 'validate',
-            message: 'Ese rango incluye un día en el que ya tenés una propuesta agendada.',
-          }
-        : errors.fechaInicio
+      : errors.fechaInicio
 
   const errorFechaFin: RhfFieldError | undefined =
     fechaInicio && fechaFin && fechaFin < fechaInicio
@@ -320,15 +304,9 @@ export function EventoForm({
           }
         >
           <FieldDescription>
-            Elegí el rango de fechas para agendar el evento o la actividad. Los días en los que ya
-            tenés propuestas quedan bloqueados.
+            Elegí el rango de fechas para agendar el evento o la actividad. Podés tener más de una
+            propuesta el mismo día.
           </FieldDescription>
-          {fechasOcupadas.length > 0 ? (
-            <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              Días ocupados: {fechasOcupadas.slice(0, 12).join(', ')}
-              {fechasOcupadas.length > 12 ? ` (+${fechasOcupadas.length - 12} más)` : ''}
-            </p>
-          ) : null}
           <FieldGroup>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <TextField

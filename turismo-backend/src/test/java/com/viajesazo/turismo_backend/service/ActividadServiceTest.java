@@ -3,16 +3,17 @@ package com.viajesazo.turismo_backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -72,17 +73,17 @@ class ActividadServiceTest {
 	@Mock
 	private GeocodingService geocodingService;
 
-	@Mock
-	private PublicadorAgendaService publicadorAgendaService;
-
 	private ActividadService service;
 
 	@BeforeEach
 	void setUp() {
 		Usuario admin = Usuario.builder().id(99L).nombre("Admin").email("admin@test.com").contrasena("hash").build();
 		TestSecuritySupport.authenticate(admin, null, Rol.ADMINISTRADOR);
+		Clock clock = Clock.fixed(
+				LocalDate.parse("2026-09-23").atStartOfDay(ZoneId.of("America/Argentina/Buenos_Aires")).toInstant(),
+				ZoneId.of("America/Argentina/Buenos_Aires"));
 		service = new ActividadService(actividadRepository, publicadorRepository, estadoPropuestaRepository,
-				ubicacionRepository, new ActividadMapperImpl(), geocodingService, publicadorAgendaService);
+				ubicacionRepository, new ActividadMapperImpl(), geocodingService, clock);
 		lenient().when(geocodingService.geocode(any(), any(), any())).thenReturn(Optional
 				.of(new GeocodingService.Coordenadas(new BigDecimal("-31.41350000"), new BigDecimal("-64.49470000"))));
 		lenient().when(estadoPropuestaRepository.findByNombre("INICIADO"))
@@ -121,8 +122,6 @@ class ActividadServiceTest {
 		ArgumentCaptor<Actividad> captor = ArgumentCaptor.forClass(Actividad.class);
 		verify(actividadRepository).save(captor.capture());
 		assertThat(captor.getValue().getDuracionMinutos()).isEqualTo(90);
-		verify(publicadorAgendaService).assertSinSolapamiento(
-				eq(1L), any(), any(), eq(null), eq(null));
 	}
 
 	@Test
@@ -235,12 +234,19 @@ class ActividadServiceTest {
 
 		assertThat(result.fechaInicio()).isEqualTo(LocalDate.parse("2026-11-01"));
 		assertThat(result.fechaFin()).isEqualTo(LocalDate.parse("2027-01-31"));
-		verify(publicadorAgendaService).assertSinSolapamiento(
-				eq(1L),
-				eq(LocalDate.parse("2026-11-01")),
-				eq(LocalDate.parse("2027-01-31")),
-				eq(null),
-				eq(5L));
+	}
+
+	@Test
+	@DisplayName("reprogramar actividad a un día anterior a hoy responde BusinessRuleException")
+	void reprogramRejectsPastDate() {
+		when(actividadRepository.findById(5L)).thenReturn(Optional.of(storedActivity(state("INICIADO"))));
+
+		assertThatThrownBy(() -> service.reprogramar(5L,
+				new com.viajesazo.turismo_backend.dto.request.ReprogramarEventoRequest(
+						LocalDate.parse("2026-09-22"))))
+				.isInstanceOf(BusinessRuleException.class)
+				.hasMessageContaining("anterior a hoy");
+		verify(actividadRepository, never()).save(any(Actividad.class));
 	}
 
 	private ActividadRequest request(int duracion, TipoPropuesta tipoPropuesta, TipoAcceso tipoAcceso,

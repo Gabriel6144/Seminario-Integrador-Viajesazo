@@ -1,6 +1,5 @@
 import { z } from 'zod'
 
-import { addDaysLocalDate } from '@/lib/dates'
 import {
   CATEGORIAS,
   DIAS_SEMANA,
@@ -359,47 +358,21 @@ export const actividadSchema = z
     },
   )
 
-function withOccupiedDates<T extends z.ZodTypeAny>(schema: T, fechasOcupadas?: string[]) {
-  if (!fechasOcupadas || fechasOcupadas.length === 0) return schema
-  const occupied = new Set(fechasOcupadas)
-  return schema.superRefine((values: { fechaInicio?: string; fechaFin?: string }, ctx) => {
-    const inicio = values.fechaInicio?.trim() ?? ''
-    const fin = values.fechaFin?.trim() ?? ''
-    if (!ISO_DATE.test(inicio) || !ISO_DATE.test(fin) || fin < inicio) return
-    let day = inicio
-    while (day <= fin) {
-      if (occupied.has(day)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Ese rango incluye un día en el que ya tenés una propuesta agendada.',
-          path: ['fechaInicio'],
-        })
-        return
-      }
-      day = addDaysLocalDate(day, 1)
-    }
-  })
-}
-
 export function crearPropuestaSchema(
   tipoRegistro: TipoRegistro,
   minFechaInicio?: string,
-  fechasOcupadas?: string[],
 ) {
   if (tipoRegistro === 'ACTIVIDAD') {
-    const base =
-      minFechaInicio === undefined
-        ? actividadSchema
-        : actividadSchema.refine(
-            (values) => values.fechaInicio.length === 0 || values.fechaInicio >= minFechaInicio,
-            {
-              message: 'La fecha de inicio no puede ser anterior a la fecha actual.',
-              path: ['fechaInicio'],
-            },
-          )
-    return withOccupiedDates(base, fechasOcupadas)
+    if (minFechaInicio === undefined) return actividadSchema
+    return actividadSchema.refine(
+      (values) => values.fechaInicio.length === 0 || values.fechaInicio >= minFechaInicio,
+      {
+        message: 'La fecha de inicio no puede ser anterior a la fecha actual.',
+        path: ['fechaInicio'],
+      },
+    )
   }
-  return withOccupiedDates(crearEventoSchema(minFechaInicio), fechasOcupadas)
+  return crearEventoSchema(minFechaInicio)
 }
 
 export function toActividadRequest(values: EventoFormValues): ActividadRequest {
