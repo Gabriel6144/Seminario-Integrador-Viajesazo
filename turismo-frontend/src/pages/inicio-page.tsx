@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { AgendaDemo } from "@/components/viajezaso/agenda-demo";
+import { useAuth } from "@/components/auth-provider";
 import { CircuitGuide } from "@/components/viajezaso/circuit-guide";
 import { VIAJEZASO_PATHS, VIAJEZASO_SOCIALS } from "@/components/viajezaso/config";
 import {
@@ -36,6 +37,7 @@ export function InicioPage() {
 
 function InicioContent() {
   const { copy, asset, paths } = useViajezaso();
+  const { isAuthenticated } = useAuth();
   const { hash } = useLocation();
   const root = useRef<HTMLElement>(null);
   const circuitTab = useRef<HTMLButtonElement>(null);
@@ -174,10 +176,12 @@ function InicioContent() {
               <span>II</span>
               <span>{copy.indexTourist}</span>
             </a>
-            <AppLink to={paths.sobreNosotros}>
-              <span>III</span>
-              <span>{copy.indexIdea}</span>
-            </AppLink>
+            {!isAuthenticated ? (
+              <AppLink to={paths.sobreNosotros}>
+                <span>III</span>
+                <span>{copy.indexIdea}</span>
+              </AppLink>
+            ) : null}
           </div>
         </section>
         <PublisherSection {...sectionProps} />

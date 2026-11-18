@@ -5,6 +5,7 @@ import { PublicLayout } from '@/components/public-layout'
 import {
   HomeEntry,
   RequireAuth,
+  RequireGuest,
   RequireNotAdmin,
   RequireNotPublicadorTour,
   RequireRole,
@@ -54,13 +55,18 @@ export const router = createBrowserRouter([
             },
           },
           {
-            path: 'sobre-nosotros',
-            lazy: async () => {
-              const { SobreNosotrosPage } = await import(
-                '@/pages/sobre-nosotros-page'
-              )
-              return { Component: SobreNosotrosPage }
-            },
+            Component: RequireGuest,
+            children: [
+              {
+                path: 'sobre-nosotros',
+                lazy: async () => {
+                  const { SobreNosotrosPage } = await import(
+                    '@/pages/sobre-nosotros-page'
+                  )
+                  return { Component: SobreNosotrosPage }
+                },
+              },
+            ],
           },
         ],
       },

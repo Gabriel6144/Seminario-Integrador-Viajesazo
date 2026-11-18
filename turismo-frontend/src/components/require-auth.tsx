@@ -73,6 +73,24 @@ export function RequireNotPublicadorTour() {
 }
 
 /**
+ * Solo visitantes sin sesión. Sobre nosotros es una vista de marketing: un usuario
+ * logueado no la ve y vuelve al home operativo.
+ */
+export function RequireGuest() {
+  const { isAuthenticated, isBootstrapping } = useAuth()
+
+  if (isBootstrapping) {
+    return <GridSkeleton />
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/propuestas" replace />
+  }
+
+  return <Outlet />
+}
+
+/**
  * Index de propuestas (`/propuestas`): admin → dashboard. PUBLICADOR y TURISTA ven el
  * listado (el panel del publicador vive en `/publicador`). `/` queda como portada pública.
  */

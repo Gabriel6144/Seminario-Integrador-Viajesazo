@@ -154,13 +154,15 @@ export function TopAppBar() {
                 Propuestas
               </NavLink>
 
-              <NavLink to="/sobre-nosotros" className={navClass}>
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
-                  <circle cx="12" cy="7" r="3" />
-                  <path d="M5 21v-3a7 7 0 0 1 14 0v3Z" />
-                </svg>
-                Sobre nosotros
-              </NavLink>
+              {!isAuthenticated ? (
+                <NavLink to="/sobre-nosotros" className={navClass}>
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
+                    <circle cx="12" cy="7" r="3" />
+                    <path d="M5 21v-3a7 7 0 0 1 14 0v3Z" />
+                  </svg>
+                  Sobre nosotros
+                </NavLink>
+              ) : null}
 
               {isAuthenticated ? (
                 <NavLink to="/agenda" className={navClass}>
