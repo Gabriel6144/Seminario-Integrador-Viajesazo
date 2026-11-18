@@ -1,15 +1,28 @@
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 
 import { BottomNavBar } from '@/components/bottom-nav-bar'
 import { TopAppBar } from '@/components/top-app-bar'
 
+const AUTH_FULL_BLEED_PATHS = new Set(['/login', '/registro'])
+
 /**
  * Estructura de navegación con TopAppBar (sticky) y BottomNavBar (fixed, mobile).
  *
- * El `Outlet` es donde se renderiza la ruta activa. En mobile se agrega padding
- * inferior para que el contenido no quede oculto detrás del BottomNavBar.
+ * En `/login` y `/registro` se renderiza solo el Outlet a pantalla completa
+ * (sin chrome ni `max-w-7xl`) para el layout split de auth.
  */
 export function Layout() {
+  const { pathname } = useLocation()
+  const isAuthFullBleed = AUTH_FULL_BLEED_PATHS.has(pathname)
+
+  if (isAuthFullBleed) {
+    return (
+      <div className="min-h-screen bg-[#0f1418] text-[#191c1e]">
+        <Outlet />
+      </div>
+    )
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-[#f7f9fb] text-[#191c1e]">
       <TopAppBar />

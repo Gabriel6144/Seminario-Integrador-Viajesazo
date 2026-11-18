@@ -3,6 +3,7 @@ package com.viajesazo.turismo_backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -10,10 +11,12 @@ import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -39,14 +42,17 @@ import com.viajesazo.turismo_backend.model.EstadoPropuesta;
 import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.model.Modalidad;
 import com.viajesazo.turismo_backend.model.Publicador;
+import com.viajesazo.turismo_backend.model.Rol;
 import com.viajesazo.turismo_backend.model.TipoAcceso;
 import com.viajesazo.turismo_backend.model.TipoPropuesta;
 import com.viajesazo.turismo_backend.model.TipoRegistro;
 import com.viajesazo.turismo_backend.model.Ubicacion;
+import com.viajesazo.turismo_backend.model.Usuario;
 import com.viajesazo.turismo_backend.repository.ActividadRepository;
 import com.viajesazo.turismo_backend.repository.EstadoPropuestaRepository;
 import com.viajesazo.turismo_backend.repository.PublicadorRepository;
 import com.viajesazo.turismo_backend.repository.UbicacionRepository;
+import com.viajesazo.turismo_backend.security.TestSecuritySupport;
 
 @ExtendWith(MockitoExtension.class)
 class ActividadServiceTest {
@@ -66,18 +72,28 @@ class ActividadServiceTest {
 	@Mock
 	private GeocodingService geocodingService;
 
+	@Mock
+	private PublicadorAgendaService publicadorAgendaService;
+
 	private ActividadService service;
 
 	@BeforeEach
 	void setUp() {
+		Usuario admin = Usuario.builder().id(99L).nombre("Admin").email("admin@test.com").contrasena("hash").build();
+		TestSecuritySupport.authenticate(admin, null, Rol.ADMINISTRADOR);
 		service = new ActividadService(actividadRepository, publicadorRepository, estadoPropuestaRepository,
-				ubicacionRepository, new ActividadMapperImpl(), geocodingService);
+				ubicacionRepository, new ActividadMapperImpl(), geocodingService, publicadorAgendaService);
 		lenient().when(geocodingService.geocode(any(), any(), any())).thenReturn(Optional
 				.of(new GeocodingService.Coordenadas(new BigDecimal("-31.41350000"), new BigDecimal("-64.49470000"))));
 		lenient().when(estadoPropuestaRepository.findByNombre("INICIADO"))
 				.thenReturn(Optional.of(state("INICIADO")));
 		lenient().when(ubicacionRepository.save(any(Ubicacion.class)))
 				.thenAnswer(invocation -> invocation.getArgument(0));
+	}
+
+	@AfterEach
+	void tearDown() {
+		TestSecuritySupport.clear();
 	}
 
 	@Test
@@ -105,6 +121,8 @@ class ActividadServiceTest {
 		ArgumentCaptor<Actividad> captor = ArgumentCaptor.forClass(Actividad.class);
 		verify(actividadRepository).save(captor.capture());
 		assertThat(captor.getValue().getDuracionMinutos()).isEqualTo(90);
+		verify(publicadorAgendaService).assertSinSolapamiento(
+				eq(1L), any(), any(), eq(null), eq(null));
 	}
 
 	@Test
@@ -204,11 +222,33 @@ class ActividadServiceTest {
 		verify(actividadRepository).delete(any(Actividad.class));
 	}
 
+	@Test
+	@DisplayName("reprograma la actividad preservando la duración del rango")
+	void reprogramsPreservingDuration() {
+		Actividad actividad = storedActivity(state("INICIADO"));
+		when(actividadRepository.findById(5L)).thenReturn(Optional.of(actividad));
+		when(actividadRepository.save(any(Actividad.class))).thenAnswer(inv -> inv.getArgument(0));
+
+		ActividadResponse result = service.reprogramar(5L,
+				new com.viajesazo.turismo_backend.dto.request.ReprogramarEventoRequest(
+						LocalDate.parse("2026-11-01")));
+
+		assertThat(result.fechaInicio()).isEqualTo(LocalDate.parse("2026-11-01"));
+		assertThat(result.fechaFin()).isEqualTo(LocalDate.parse("2027-01-31"));
+		verify(publicadorAgendaService).assertSinSolapamiento(
+				eq(1L),
+				eq(LocalDate.parse("2026-11-01")),
+				eq(LocalDate.parse("2027-01-31")),
+				eq(null),
+				eq(5L));
+	}
+
 	private ActividadRequest request(int duracion, TipoPropuesta tipoPropuesta, TipoAcceso tipoAcceso,
 			List<DisponibilidadRequest> disponibilidades) {
 		return new ActividadRequest("Visita guiada", "Recorrido por el centro", InteresCategoria.CULTURA,
 				Modalidad.PEDESTRE, tipoPropuesta, tipoAcceso, "Cabildo", "Cosquín", "Av. San Martín 800",
-				duracion, disponibilidades, List.of("https://cdn.cordoba.gob.ar/cabildo.jpg"), 1L);
+				duracion, LocalDate.parse("2026-10-01"), LocalDate.parse("2026-12-31"),
+				disponibilidades, List.of("https://cdn.cordoba.gob.ar/cabildo.jpg"), 1L);
 	}
 
 	private Actividad storedActivity(EstadoPropuesta estado) {
@@ -221,6 +261,8 @@ class ActividadServiceTest {
 		actividad.setModalidad(Modalidad.PEDESTRE);
 		actividad.setTipoAcceso(TipoAcceso.GRATUITO);
 		actividad.setDuracionMinutos(90);
+		actividad.setFechaInicio(LocalDate.parse("2026-10-01"));
+		actividad.setFechaFin(LocalDate.parse("2026-12-31"));
 		actividad.setEstadoPropuesta(estado);
 		actividad.setPublicador(publisher());
 		actividad.setUbicacion(ubicacion());

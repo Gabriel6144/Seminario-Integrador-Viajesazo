@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -11,11 +12,11 @@ import static org.mockito.Mockito.when;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,29 +38,45 @@ import com.viajesazo.turismo_backend.model.EstadoViaje;
 import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.model.TipoRitmo;
 import com.viajesazo.turismo_backend.model.Ubicacion;
+import com.viajesazo.turismo_backend.model.Usuario;
 import com.viajesazo.turismo_backend.model.Viaje;
+import com.viajesazo.turismo_backend.repository.UsuarioRepository;
 import com.viajesazo.turismo_backend.repository.ViajeRepository;
+import com.viajesazo.turismo_backend.security.TestSecuritySupport;
 
 @ExtendWith(MockitoExtension.class)
 class ViajeServiceTest {
 
 	private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-10-15T12:00:00Z"), ZoneOffset.UTC);
+	private static final String EMAIL = "turista@test.com";
 
 	@Mock
 	private ViajeRepository viajeRepository;
 
 	@Mock
+	private UsuarioRepository usuarioRepository;
+
+	@Mock
 	private CircuitoService circuitoService;
 
+	private Usuario owner;
 	private ViajeService service;
 
 	@BeforeEach
 	void setUp() {
-		service = new ViajeService(viajeRepository, new ViajeMapperImpl(), CLOCK, circuitoService);
+		owner = TestSecuritySupport.turista(1L, EMAIL);
+		TestSecuritySupport.authenticateTurista(owner);
+		service = new ViajeService(viajeRepository, usuarioRepository, new ViajeMapperImpl(), CLOCK, circuitoService);
+		lenient().when(usuarioRepository.findByIdAndActivoTrue(1L)).thenReturn(Optional.of(owner));
+	}
+
+	@AfterEach
+	void tearDown() {
+		TestSecuritySupport.clear();
 	}
 
 	@Test
-	@DisplayName("VZ-19: registra el viaje, lo asocia al turista y nace PLANIFICADO")
+	@DisplayName("VZ-19: registra el viaje, lo asocia al turista autenticado y nace PLANIFICADO")
 	void createsTrip() {
 		when(viajeRepository.save(any(Viaje.class))).thenAnswer(invocation -> {
 			Viaje saved = invocation.getArgument(0);
@@ -72,7 +89,8 @@ class ViajeServiceTest {
 		assertThat(result.id()).isEqualTo(7L);
 		assertThat(result.nombre()).isEqualTo("Escapada serrana");
 		assertThat(result.estado()).isEqualTo(EstadoViaje.PLANIFICADO);
-		assertThat(result.usuario()).isEqualTo("turista@test.com");
+		assertThat(result.usuarioId()).isEqualTo(1L);
+		assertThat(result.usuarioEmail()).isEqualTo(EMAIL);
 		assertThat(result.ubicacion().ciudad()).isEqualTo("Villa General Belgrano");
 		assertThat(result.fechaInicio()).isEqualTo(LocalDate.parse("2026-10-20"));
 		verify(viajeRepository).save(any(Viaje.class));
@@ -83,7 +101,7 @@ class ViajeServiceTest {
 	void rejectsInvalidDateRange() {
 		ViajeRequest invalid = new ViajeRequest("Escapada", ubicacion(), 35,
 				LocalDate.parse("2026-10-22"), LocalDate.parse("2026-10-20"),
-				TipoRitmo.EQUILIBRADO, List.of(), "turista@test.com");
+				TipoRitmo.EQUILIBRADO, List.of(), null);
 
 		assertThatThrownBy(() -> service.create(invalid))
 				.isInstanceOf(BusinessRuleException.class)
@@ -100,7 +118,7 @@ class ViajeServiceTest {
 
 		ViajeRequest changed = new ViajeRequest("Nueva escapada", ubicacion(), 40,
 				LocalDate.parse("2026-11-01"), LocalDate.parse("2026-11-03"),
-				TipoRitmo.INTENSIVO, List.of(InteresCategoria.NATURALEZA), "turista@test.com");
+				TipoRitmo.INTENSIVO, List.of(InteresCategoria.NATURALEZA), null);
 		ViajeResponse result = service.update(7L, changed);
 
 		assertThat(result.id()).isEqualTo(7L);
@@ -113,16 +131,30 @@ class ViajeServiceTest {
 	@Test
 	@DisplayName("VZ-21: modificar un viaje inexistente devuelve 404")
 	void failsWhenUpdatingMissingTrip() {
-		when(viajeRepository.findByIdAndEstadoNotIn(404L, List.of(EstadoViaje.BORRADOR, EstadoViaje.CANCELADO))).thenReturn(Optional.empty());
+		when(viajeRepository.findByIdAndEstadoNotIn(404L, List.of(EstadoViaje.BORRADOR, EstadoViaje.CANCELADO)))
+				.thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> service.update(404L, request()))
 				.isInstanceOf(ResourceNotFoundException.class);
 	}
 
 	@Test
+	@DisplayName("un viaje de otro usuario responde 404")
+	void failsWhenTripBelongsToAnotherUser() {
+		Viaje ajeno = persistedTrip();
+		ajeno.setUsuario(TestSecuritySupport.turista(99L, "otro@test.com"));
+		when(viajeRepository.findByIdAndEstadoNotIn(7L, List.of(EstadoViaje.BORRADOR, EstadoViaje.CANCELADO)))
+				.thenReturn(Optional.of(ajeno));
+
+		assertThatThrownBy(() -> service.findById(7L))
+				.isInstanceOf(ResourceNotFoundException.class);
+	}
+
+	@Test
 	@DisplayName("VZ-22: consultar un viaje inexistente o dado de baja devuelve 404")
 	void failsWhenFindingMissingTrip() {
-		when(viajeRepository.findByIdAndEstadoNotIn(404L, List.of(EstadoViaje.BORRADOR, EstadoViaje.CANCELADO))).thenReturn(Optional.empty());
+		when(viajeRepository.findByIdAndEstadoNotIn(404L, List.of(EstadoViaje.BORRADOR, EstadoViaje.CANCELADO)))
+				.thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> service.findById(404L))
 				.isInstanceOf(ResourceNotFoundException.class)
@@ -133,7 +165,8 @@ class ViajeServiceTest {
 	@DisplayName("VZ-23: la baja es lógica, marca CANCELADO y no borra la fila")
 	void deletesLogically() {
 		Viaje persisted = persistedTrip();
-		when(viajeRepository.findByIdAndEstadoNotIn(7L, List.of(EstadoViaje.BORRADOR, EstadoViaje.CANCELADO))).thenReturn(Optional.of(persisted));
+		when(viajeRepository.findByIdAndEstadoNotIn(7L, List.of(EstadoViaje.BORRADOR, EstadoViaje.CANCELADO)))
+				.thenReturn(Optional.of(persisted));
 		when(viajeRepository.save(any(Viaje.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
 		service.delete(7L);
@@ -206,7 +239,7 @@ class ViajeServiceTest {
 	}
 
 	@Test
-	@DisplayName("VZ-22: lista BORRADOR, PLANIFICADO y EN_CURSO, excluyendo estados terminales")
+	@DisplayName("VZ-22: lista BORRADOR, PLANIFICADO y EN_CURSO del usuario autenticado")
 	void listsAllowedTripsOfTourist() {
 		Viaje draft = persistedTrip();
 		draft.setNombre("Borrador");
@@ -217,12 +250,12 @@ class ViajeServiceTest {
 		ongoing.setNombre("En curso");
 		ongoing.setEstado(EstadoViaje.EN_CURSO);
 		when(viajeRepository.findByUsuarioAndEstadoInOrderByFechaInicioAsc(
-				eq("turista@test.com"),
+				eq(owner),
 				eq(List.of(EstadoViaje.BORRADOR, EstadoViaje.PLANIFICADO, EstadoViaje.EN_CURSO)),
 				any(Pageable.class)))
 				.thenReturn(new PageImpl<>(List.of(draft, planned, ongoing), PageRequest.of(0, 10), 3));
 
-		Page<ViajeResponse> result = service.findAll("turista@test.com", PageRequest.of(0, 10));
+		Page<ViajeResponse> result = service.findAll(PageRequest.of(0, 10));
 
 		assertThat(result.getContent()).extracting(ViajeResponse::nombre)
 				.containsExactly("Borrador", "Planificado", "En curso");
@@ -234,7 +267,7 @@ class ViajeServiceTest {
 	private ViajeRequest request() {
 		return new ViajeRequest("Escapada serrana", ubicacion(), 35,
 				LocalDate.parse("2026-10-20"), LocalDate.parse("2026-10-22"),
-				TipoRitmo.EQUILIBRADO, List.of(InteresCategoria.CULTURA), "turista@test.com");
+				TipoRitmo.EQUILIBRADO, List.of(InteresCategoria.CULTURA), null);
 	}
 
 	private UbicacionRequest ubicacion() {
@@ -254,12 +287,12 @@ class ViajeServiceTest {
 						.longitud(new java.math.BigDecimal("-64.55"))
 						.build())
 				.rangoInteresKm(35.0)
-				.fechaInicio(java.time.LocalDate.parse("2026-10-20"))
-				.fechaFin(java.time.LocalDate.parse("2026-10-22"))
+				.fechaInicio(LocalDate.parse("2026-10-20"))
+				.fechaFin(LocalDate.parse("2026-10-22"))
 				.ritmo(TipoRitmo.EQUILIBRADO)
 				.interesesCategoria(new java.util.ArrayList<>(List.of(InteresCategoria.CULTURA)))
 				.estado(EstadoViaje.PLANIFICADO)
-				.usuario("turista@test.com")
+				.usuario(owner)
 				.build();
 	}
 }

@@ -36,8 +36,7 @@ public record ViajeRequest(
 
     @NotEmpty (message = "La lista de intereses de categoría no puede estar vacía")
     List<@NotNull(message = "El interés de categoría no puede ser nulo") InteresCategoria> intereses,
-    
-    @NotBlank(message = "El turista no puede estar vacío")
-    String usuario
+
+    List<@Valid DiaRitmoRequest> diasPlan
 
 ) {}

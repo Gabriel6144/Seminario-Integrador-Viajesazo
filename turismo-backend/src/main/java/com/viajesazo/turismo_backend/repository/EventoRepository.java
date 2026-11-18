@@ -39,4 +39,23 @@ public interface EventoRepository extends JpaRepository<Evento, Long> {
 	Page<Evento> findOverlapping(@Param("from") LocalDate from, @Param("to") LocalDate to,
 			Pageable pageable);
 
+	@Query("""
+			SELECT e FROM Evento e
+			WHERE e.publicador.id = :publicadorId
+			ORDER BY e.fechaInicio ASC, e.nombre ASC
+			""")
+	java.util.List<Evento> findAllByPublicadorId(@Param("publicadorId") Long publicadorId);
+
+	@Query("""
+			SELECT COUNT(e) > 0 FROM Evento e
+			WHERE e.publicador.id = :publicadorId
+			  AND e.fechaFin >= :inicio
+			  AND e.fechaInicio <= :fin
+			  AND (:excludeId IS NULL OR e.id <> :excludeId)
+			""")
+	boolean existsOverlapping(@Param("publicadorId") Long publicadorId,
+			@Param("inicio") LocalDate inicio,
+			@Param("fin") LocalDate fin,
+			@Param("excludeId") Long excludeId);
+
 }

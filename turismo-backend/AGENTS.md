@@ -11,23 +11,16 @@ Tesis de facultad: API REST que centraliza la información turística de la prov
   son subcarpetas del mismo repo git, no repos separados. Se puede tocar el backend y el frontend
   en el mismo commit, y es lo normal: la API y el cliente se cambian juntos. El `.gitignore` de la
   raíz es el que manda.
-- Estado actual: Sprints 1–4 completos (eventos, viajes, agenda VZ-18, circuitos VZ-25, consulta
-  seleccionada VZ-26, eliminación de paradas VZ-29 y reemplazo de paradas VZ-28), con **290
-  tests: 288 en verde y 2 fallos preexistentes por fechas fijas ya vencidas (`ViajeMapperTest`,
-  `ViajeTest`)**. Incluye
-  paginación, CRUD de eventos, alta de publicadores, **registro de usuarios con contraseña
-  hasheada (BCrypt) y baja lógica de la cuenta**, CRUD de viajes con baja lógica, listado
-  unificado de propuestas (eventos + actividades), **agenda filtrable por
-  fecha/tipo/categoría/ubicación/acceso**, **generación y selección única de tres alternativas de
-  circuito con distancias estimadas**, **consulta del circuito seleccionado agrupado por día**,
-  **eliminación de paradas con confirmación y recálculo de métricas**, **reemplazo de paradas por
-  alternativas compatibles con el bloque horario y los traslados**, seed de datos, mapeo con
-  MapStruct,
-  **geocodificación de la ubicación del evento con OpenStreetMap (Nominatim)** y **subida de
-  imágenes a disco con servido estático**. Pendientes: `Itinerario` editable (VZ-27),
-  modificación e inicio de sesión de `Usuario`, `Preferencia` y ruteo real (OSRM).
-- Para probar los endpoints a mano ver **`PRUEBAS-MANUALES.md`**: levantar, curl de cada ruta,
-  casos de error, el detalle de los acentos y los bordes conocidos sin cubrir.
+- Estado actual: Sprints 1–4 + **seguridad JWT/RBAC/ABAC**. Incluye paginación, CRUD de eventos,
+  alta de publicadores, **registro/baja de usuarios (BCrypt)**, **login con JWT access + refresh
+  opaco en cookie HttpOnly**, **un rol por cuenta** (`TURISTA`/`PUBLICADOR`/`ADMINISTRADOR`;
+  registro elige TURISTA o PUBLICADOR y auto-crea `Publicador` si corresponde), ownership de viajes
+  y publicaciones, **`GET /api/admin/dashboard`**, **`/api/publicador/{dashboard,agenda,fechas-ocupadas,inscriptos}`**,
+  actividades con `fechaInicio`/`fechaFin` de agenda, circuitos VZ-25/26/28/29, agenda, seed,
+  MapStruct, Nominatim e imágenes. Pendientes: `Itinerario` editable (VZ-27), modificación de
+  perfil de `Usuario`, `Preferencia` y ruteo OSRM.
+- Contrato de seguridad: **`../docs/seguridad/AUTENTICACION-Y-AUTORIZACION.md`**.
+- Para probar a mano ver **`PRUEBAS-MANUALES.md`** y la sección de auth en el doc de seguridad.
 
 ## Comandos
 
@@ -88,14 +81,8 @@ Los nombres de starters cambiaron respecto a Boot 3:
   **No existe `spring-boot-starter-test`** en este proyecto.
 - Base de datos: `com.h2database:h2` con scope `runtime`. **No declarar `<version>`**: el BOM
   4.1.1 ya gestiona H2 (2.4.240), Hibernate (7.4.5), Flyway y los drivers.
-- Faltan y habrá que agregar explícitamente: `spring-boot-starter-security` y
-  `spring-boot-starter-test` (solo si hacen falta utilidades compartidas; hoy cada slice ya trae
-  lo suyo).
-- `org.springframework.security:spring-security-crypto` **ya está agregado** (sin `<version>`, la
-  gestiona el BOM). Es solo el módulo de criptografía, para hashear la contraseña de `Usuario` con
-  BCrypt. **No es el starter de Security**: no activa la cadena de filtros ni exige login. Cuando
-  se agregue `spring-boot-starter-security` para el inicio de sesión, este artefacto ya viene
-  incluido y se puede quitar del `pom.xml`.
+- `spring-boot-starter-security` **ya está agregado** (cadena de filtros + BCrypt). JWT propio con
+  `jjwt` 0.12.6. Tests: `spring-security-test`. No usar Keycloak/OIDC.
 - En Boot 4, `RestClient` **no** está en `spring-boot-starter-webmvc`: hace falta
   `spring-boot-starter-restclient` para llamar a servicios externos. **Ya está agregado**, y lo
   usa `GeocodingService` para pegarle a Nominatim.
@@ -217,8 +204,8 @@ de nombres").
 - `Viaje` — **ya existe** (`model/Viaje.java`): `nombre`, `zonaInteres` (`@ManyToOne` a `Ubicacion`
   por `zona_interes_id`, obligatoria), `rangoInteresKm` (`double`), `fechaInicio`/`fechaFin`
   (`LocalDateTime`), `ritmo` (`TipoRitmo`), `interesesCategoria` (`@ElementCollection` de
-  `InteresCategoria`) y `usuario` (`String`). La baja lógica se modela con `estado` (`EstadoViaje`),
-  **no** con un `activo` booleano (ver "API del Sprint 2").
+  `InteresCategoria`) y `usuario` (`@ManyToOne` a `Usuario`, columna `usuario_id`). La baja lógica
+  se modela con `estado` (`EstadoViaje`), **no** con un `activo` booleano (ver "API del Sprint 2").
 - `EstadoViaje` — **ya existe**: `BORRADOR`, `PLANIFICADO`, `EN_CURSO`, `FINALIZADO`, `CANCELADO`.
   Las transiciones válidas viven en el enum (`puedeTransicionarA`); `FINALIZADO` y `CANCELADO` son
   terminales. `CANCELADO` se usa para la baja lógica tanto de viajes como de borradores.
@@ -231,11 +218,10 @@ de nombres").
   `CircuitoItem` guarda la parada con fecha, orden, horario y traslado.
 - `Itinerario` editable — **pendiente (VZ-27)**: agregar, eliminar, reorganizar y regenerar
   paradas sobre el circuito ya generado.
-- `Usuario` — **ya existen el registro y la baja** (`model/Usuario.java`): `nombre`, `email`
-  (único), `telefono`, `contrasena` (hash BCrypt, nunca texto plano) y `activo` (baja lógica,
-  default `true`). A diferencia de `Viaje`, la baja lógica de `Usuario` **sí** es un booleano: no
-  hay ciclo de vida con estados, solo activo/inactivo. Ver "API de Usuarios". Pendientes:
-  modificación e inicio de sesión.
+- `Usuario` — registro, baja, login y roles (`model/Usuario.java`): `nombre`, `email` (único),
+  `telefono`, `contrasena` (BCrypt), `activo`, `roles` (`@ElementCollection`) y `publicador`
+  (`@OneToOne` opcional). Ver "API de Usuarios" y el doc de seguridad. Pendiente: modificación de
+  perfil.
 - Rutas y traslados — hoy Haversine con velocidad media; falta ruteo real (OSRM) y visualización
   en mapa.
 
@@ -255,6 +241,7 @@ Base `/api`. Todo en español.
 | POST | `/api/eventos` | US1 — registrar |
 | GET | `/api/eventos` | US7 — listado completo, paginado |
 | PUT | `/api/eventos/{id}` | US2 — modificar |
+| PATCH | `/api/eventos/{id}/reprogramar` | Mueve `fechaInicio`/`fechaFin` preservando duración; valida solapamiento inclusivo (un día no puede tener dos propuestas del mismo publicador) |
 | DELETE | `/api/eventos/{id}` | US3 — baja (**física**, no lógica) |
 | GET | `/api/eventos/{id}` | US4 — consultar |
 | GET | `/api/agenda/semanal` | US6 — agenda de la semana ISO (lun–dom) |
@@ -332,21 +319,13 @@ Decisiones que no son obvias y conviene no deshacer sin motivo:
 - **"Activo" = `estado <> CANCELADO`**, no un campo `activo` booleano. El listado y el detalle usan
   `findByUsuarioAndEstadoNotOrderByFechaInicioAsc` y `findByIdAndEstadoNot`; un viaje cancelado
   deja de existir para la API (el listado no lo muestra, `GET /{id}` → 404, `PUT` → 404).
-- **"Mis viajes" filtra por `usuario` (String), no por `turistaId`.** La entidad `Usuario` ya
-  existe, pero `Viaje` todavía no la referencia; es deuda. `GET /api/viajes` **exige** `?usuario=` y sin él responde **400** (lo maneja
-  `handleMissingParameter`).
-- **La API expone `LocalDate`; la entidad guarda `LocalDateTime`.** `ViajeMapper` convierte con
-  helpers `default` (medianoche). El tipo de persistencia no se filtra al contrato de la API.
-- **`POST` fuerza `estado = PLANIFICADO`** e ignora el `estado` que viniera en el body; `PUT`
-  tampoco permite cambiarlo (el mapeo de update lo ignora). Los cambios de `estado` los hacen las
-  transiciones de dominio (`completar borrador`, `DELETE`) y el scheduler de fechas; el cliente
-  nunca manda el estado.
+- **"Mis viajes" usa el JWT**: `GET /api/viajes` lista los del principal autenticado (sin
+  `?usuario=`). El body de alta/borrador **no** manda dueño: lo fija el service desde
+  `SecurityContext`. Viaje ajeno → **404** (también para admin: sin bypass).
+- **La API expone `LocalDate`.** `ViajeResponse` trae `usuarioId` y `usuarioEmail`.
+- **`POST` fuerza `estado = PLANIFICADO`** e ignora el `estado` del body; `PUT` tampoco lo cambia.
 - **La confirmación previa de VZ-23 CA1 es de la UI** (AlertDialog); el backend solo expone el
   `DELETE`.
-
-Deuda conocida: `usuario` es un `String` sin FK, igual que el `email` de `Publicador`. Ya existe
-la entidad `Usuario` (solo registro); cuando haya autenticación hay que migrar `Viaje.usuario` a un
-`@ManyToOne` con `Usuario` y sacar el `?usuario=` del listado.
 
 ## API del Sprint 3 — Agenda turística (VZ-18)
 
@@ -381,7 +360,7 @@ Decisiones que no son obvias:
 | --- | --- | --- |
 | POST | `/api/viajes/{id}/circuito` | Genera y persiste las tres alternativas (**201**); con `?reemplazar=true` reemplaza y responde **200** |
 | GET | `/api/viajes/{id}/circuito` | Devuelve el circuito guardado (404 si no existe) |
-| POST | `/api/viajes/{id}/circuito/seleccion` | Selecciona una alternativa (200) |
+| POST | `/api/viajes/{id}/circuito/seleccion` | Selecciona una alternativa (**200**) e **inscribe** al turista en las propuestas de esa alternativa (ver abajo) |
 | GET | `/api/viajes/{id}/circuito/seleccionado` | Devuelve el circuito seleccionado agrupado por día (**200**); **404** si no hay viaje, circuito o selección |
 | DELETE | `/api/viajes/{id}/circuito/seleccionado/items/{itemId}?confirmar=true` | Elimina la parada y devuelve el circuito actualizado (**200**); **409** sin confirmar; **404** si el ítem no pertenece a la alternativa seleccionada |
 | GET | `/api/viajes/{id}/circuito/seleccionado/items/{itemId}/alternativas` | Lista reemplazos compatibles (**200**); si no hay, devuelve `alternativas: []` y un `mensaje`; **404** si la parada no pertenece a la alternativa seleccionada |
@@ -392,6 +371,12 @@ regenerar sin `?reemplazar=true` devuelve **409** y no modifica nada; con el fla
 alternativas e intenta conservar la estrategia seleccionada. Una segunda selección devuelve `400`.
 La selección queda expuesta en `GET /api/viajes/{id}` dentro de `circuito`; el `GET` del circuito no
 persiste nada al refrescar disponibilidad.
+
+**Inscriptos (sin tabla aparte):** al confirmar el circuito (`POST .../seleccion`), el turista queda
+contado como inscripto en cada `CircuitoItem.propuestaId` de la alternativa elegida. El conteo es
+`COUNT(DISTINCT usuario)` por propuesta (no se duplica el mismo turista), solo si la propuesta tiene
+`publicador`. El publicador lo ve en `GET /api/publicador/dashboard` (`inscriptosPorPropuesta`) y
+`GET /api/publicador/inscriptos` vía `InscriptosService` + `CircuitoItemRepository`.
 
 Decisiones y trampas:
 
@@ -471,26 +456,15 @@ siquiera el hash**.
 
 Decisiones que no son obvias y conviene no deshacer sin motivo:
 
-- **La contraseña se guarda como hash BCrypt.** El `PasswordEncoder` es un bean de
-  `config/PasswordConfig` y `UsuarioService.create` lo usa antes del `save`. El login futuro debe
-  inyectar el mismo bean y comparar con `matches`, nunca volver a hashear y comparar strings
-  (BCrypt usa un salt aleatorio: el mismo texto da un hash distinto cada vez).
-- **`UsuarioMapper.toEntity` ignora `contrasena` a propósito.** Si el mapper la copiara, un olvido
-  en el service guardaría el texto plano sin que nada fallara. Ignorada, el olvido deja el campo en
-  `null` y la base lo rechaza (`nullable = false`).
-- **El tope de 72 no es arbitrario y se valida dos veces.** El `BCryptPasswordEncoder` de esta
-  versión **lanza `IllegalArgumentException`** si la contraseña supera 72 **bytes** (versiones
-  viejas la truncaban en silencio). `@Size(max = 72)` cuenta **caracteres**, y una tilde o una ñ
-  ocupan 2 bytes en UTF-8: 40 `ñ` pasan el `@Size` y son 80 bytes. Por eso `UsuarioService.create`
-  chequea además `getBytes(UTF_8).length > 72` y responde 400 (`BusinessRuleException`) antes de
-  llamar a `encode`. Sin ese chequeo, esa contraseña terminaba en un **500**. No sacarlo aunque
-  parezca redundante con el `@Size`.
-- **Email único con el mismo esquema que `Publicador`**: pre-chequeo con
-  `UsuarioRepository.existsByEmail` → 400 `"ya existe un usuario con ese email"`, y
-  `GlobalExceptionHandler` cubre la carrera contra la constraint con el mismo mensaje. Valen las
-  mismas limitaciones: es case-sensitive y permite enumerar emails registrados.
-- **Sin autenticación todavía**: `GET /api/usuarios/{id}` lo puede llamar cualquiera. Cuando haya
-  login hay que restringirlo al propio usuario.
+- **La contraseña se guarda como hash BCrypt.** El mismo bean de `PasswordConfig` lo usa el login
+  (`matches`). Nunca re-hashear para comparar.
+- **`UsuarioMapper.toEntity` ignora `contrasena`, `roles` y `publicador`.** El registro asigna solo
+  `TURISTA`. Roles `PUBLICADOR`/`ADMINISTRADOR` y el vínculo a `Publicador` los pone un admin vía
+  `PUT /api/usuarios/{id}/roles` y `PUT /api/usuarios/{id}/publicador`.
+- **El tope de 72 bytes** se valida además del `@Size` (tildes/ñ). No sacarlo.
+- **Email único** con el mismo esquema que `Publicador` (pre-chequeo + handler).
+- **Auth**: `GET /api/usuarios/{id}` solo el propio o admin. Endpoints `/api/auth/*` emiten access
+  JWT + cookie `refresh_token`. Ver `docs/seguridad/AUTENTICACION-Y-AUTORIZACION.md`.
 
 ### Baja de usuario
 
@@ -504,19 +478,12 @@ Decisiones que no son obvias y conviene no deshacer sin motivo:
   → 400 por `@Valid`, antes de todo lo anterior.
 - **Baja lógica con `activo = false`**: la fila se conserva. **Toda lectura por id tiene que usar
   `findByIdAndActivoTrue`**, nunca `findById`: un usuario dado de baja no existe para la API
-  (`GET` → 404, segunda baja → 404). El login futuro también debe filtrar por `activo`.
-- **Cancela los viajes `BORRADOR` y `PLANIFICADO`** del usuario con `Viaje.cancelar()`, en la misma
-  transacción que la baja. Los `EN_CURSO` **quedan como están**: `EstadoViaje` no permite pasar de
-  `EN_CURSO` a `CANCELADO`, y no se cambió la regla del dominio para esta US; el scheduler los
-  finaliza al terminar. Los terminales no se tocan.
-- **Los viajes se asocian por email** (`findByUsuarioAndEstadoIn(usuario.getEmail(), ...)`)
-  porque `Viaje.usuario` todavía es un `String` libre (ver la deuda del Sprint 2). Un viaje cargado
-  con otro identificador (por ejemplo `turista_demo`, como en los fixtures del frontend) no se
-  cancela. Se resuelve al migrar `Viaje.usuario` a un `@ManyToOne` con `Usuario`.
+  (`GET` → 404, segunda baja → 404). Login y refresh filtran por `activo`; la baja revoca refresh
+  tokens.
+- **Cancela los viajes `BORRADOR` y `PLANIFICADO`** del usuario (`usuario_id`) con
+  `Viaje.cancelar()`. Los `EN_CURSO` quedan (el dominio no permite cancelarlos).
 - **El email de una cuenta dada de baja no se puede volver a registrar**: `existsByEmail` incluye
-  a los inactivos y la constraint `UNIQUE` también. El registro responde
-  `"ya existe un usuario con ese email"`. Si se decide permitir el re-registro o reactivar la
-  cuenta, hay que cambiar ambas cosas.
+  inactivos y la constraint `UNIQUE` también.
 
 ## Servicios
 

@@ -32,8 +32,10 @@ import { PlanificadorExitModal } from '@/components/planificador/planificador-ex
 import { PlanificadorHeader } from '@/components/planificador/planificador-header'
 import { PlanificadorRegenerateModal } from '@/components/planificador/planificador-regenerate-modal'
 import type { DestinoSeleccionado, LoadingStep } from '@/components/planificador/types'
+import { toUserMessage } from '@/lib/http'
 import type {
   CircuitStrategy,
+  DiaRitmoPlan,
   GeneracionCircuitoResponse,
   InteresCategoria,
   TipoRitmo,
@@ -45,6 +47,7 @@ const RHYTHM_REVERSE: Record<TipoRitmo, string> = {
   TRANQUILO: 'Tranquilo',
   EQUILIBRADO: 'Equilibrado',
   INTENSIVO: 'Intensivo',
+  MANUAL: 'Manual',
 }
 
 const INTEREST_REVERSE: Partial<Record<InteresCategoria, string>> = Object.fromEntries(
@@ -52,8 +55,7 @@ const INTEREST_REVERSE: Partial<Record<InteresCategoria, string>> = Object.fromE
 ) as Partial<Record<InteresCategoria, string>>
 
 function isAlreadyGenerated(error: unknown): boolean {
-  const message = error instanceof Error ? error.message.toLowerCase() : ''
-  return message.includes('ya fue generado')
+  return toUserMessage(error).toLowerCase().includes('ya fue generado')
 }
 
 export function PlanificadorPage() {
@@ -93,6 +95,7 @@ export function PlanificadorPage() {
   const [radiusKm, setRadiusKm] = useState<number>(8)
   const [interests, setInterests] = useState<string[]>([])
   const [rhythm, setRhythm] = useState<string>('')
+  const [diasPlan, setDiasPlan] = useState<DiaRitmoPlan[]>([])
 
   // Scroll to top whenever step changes
   useEffect(() => {
@@ -144,7 +147,8 @@ export function PlanificadorPage() {
   const isStep5Valid =
     typeof radiusKm === 'number' && radiusKm > 0 && radiusKm <= RADIO_MAX_KM
   const isStep6Valid = interests.length > 0
-  const isStep7Valid = rhythm.trim().length > 0
+  const isStep7Valid =
+    rhythm.trim().length > 0 && (rhythm !== 'Manual' || diasPlan.length > 0)
 
   // Calculate day difference
   const daysCount = (() => {
@@ -155,6 +159,31 @@ export function PlanificadorPage() {
     const diff = Math.ceil(Math.abs(d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24)) + 1
     return isNaN(diff) || diff < 1 ? 0 : diff
   })()
+
+  useEffect(() => {
+    if (rhythm !== 'Manual' || !dateFrom || !dateTo || dateFrom > dateTo) return
+    setDiasPlan((prev) => {
+      const byFecha = new Map(prev.map((d) => [d.fecha, d]))
+      const next: DiaRitmoPlan[] = []
+      const cursor = new Date(`${dateFrom}T12:00:00`)
+      const end = new Date(`${dateTo}T12:00:00`)
+      while (cursor <= end) {
+        const y = cursor.getFullYear()
+        const m = String(cursor.getMonth() + 1).padStart(2, '0')
+        const d = String(cursor.getDate()).padStart(2, '0')
+        const fecha = `${y}-${m}-${d}`
+        next.push(
+          byFecha.get(fecha) ?? {
+            fecha,
+            cantidadEventos: 0,
+            cantidadActividades: 0,
+          },
+        )
+        cursor.setDate(cursor.getDate() + 1)
+      }
+      return next
+    })
+  }, [rhythm, dateFrom, dateTo])
 
   useEffect(() => {
     const d = borradorQuery.data
@@ -169,6 +198,7 @@ export function PlanificadorPage() {
       setInterests(d.interesesCategoria.map((item) => INTEREST_REVERSE[item] ?? item))
     }
     if (d.ritmo) setRhythm(RHYTHM_REVERSE[d.ritmo] ?? rhythm)
+    if (d.diasPlan?.length) setDiasPlan(d.diasPlan)
     if (d.ubicacion) {
       const ubicacion = d.ubicacion
       setDestino({
@@ -305,17 +335,15 @@ export function PlanificadorPage() {
       .catch((error: unknown) => {
         if (intervalRef.current) clearInterval(intervalRef.current)
         if (timeoutRef.current) clearTimeout(timeoutRef.current)
-        showToast(
-          error instanceof Error ? error.message : 'No pudimos generar el circuito',
-        )
+        showToast(toUserMessage(error) || 'No pudimos generar el circuito')
         setStep(8)
       })
   }
 
   const buildDraftPayload = (): ViajeBorradorRequest => ({
     nombre: tripName.trim() || 'Escapada a Córdoba',
-    fechaInicio: dateFrom,
-    fechaFin: dateTo,
+    fechaInicio: dateFrom || null,
+    fechaFin: dateTo || null,
     ubicacion:
       destino === null
         ? null
@@ -325,11 +353,12 @@ export function PlanificadorPage() {
             latitud: destino.latitud,
             longitud: destino.longitud,
           },
-    rangoInteresKm: Number(radiusKm),
-    ritmo: RHYTHM_MAP[rhythm] ?? 'EQUILIBRADO',
+    rangoInteresKm:
+      typeof radiusKm === 'number' && radiusKm > 0 ? Number(radiusKm) : null,
+    ritmo: rhythm.trim().length > 0 ? (RHYTHM_MAP[rhythm] ?? null) : null,
     interesesCategoria: interests.map((item) => INTEREST_MAP[item] ?? 'NATURALEZA'),
     pasoActual: step,
-    usuario: 'turista_demo',
+    diasPlan: rhythm === 'Manual' ? diasPlan : [],
   })
 
   const buildViajeRequest = (): ViajeRequest => {
@@ -349,7 +378,7 @@ export function PlanificadorPage() {
       rangoInteresKm: Number(radiusKm),
       ritmo: RHYTHM_MAP[rhythm] ?? 'EQUILIBRADO',
       intereses: interests.map((item) => INTEREST_MAP[item] ?? 'NATURALEZA'),
-      usuario: 'turista_demo',
+      diasPlan: rhythm === 'Manual' ? diasPlan : [],
     }
   }
 
@@ -368,9 +397,7 @@ export function PlanificadorPage() {
           setShowSuccessModal(true)
         },
         onError: (error) => {
-          showToast(
-            error instanceof Error ? error.message : 'No pudimos guardar el circuito',
-          )
+          showToast(toUserMessage(error) || 'No pudimos guardar el circuito')
         },
       },
     )
@@ -388,9 +415,7 @@ export function PlanificadorPage() {
         showToast('Circuito regenerado correctamente')
       },
       (error: unknown) => {
-        showToast(
-          error instanceof Error ? error.message : 'No pudimos regenerar el circuito',
-        )
+        showToast(toUserMessage(error) || 'No pudimos regenerar el circuito')
       },
     )
   }
@@ -426,7 +451,7 @@ export function PlanificadorPage() {
       setTimeout(() => navigate('/borradores'), 1200)
     }
     const onError = (error: unknown) => {
-      showToast(error instanceof Error ? error.message : 'Error al guardar el borrador')
+      showToast(toUserMessage(error) || 'Error al guardar el borrador')
     }
 
     if (borradorId !== null) {
@@ -513,8 +538,12 @@ export function PlanificadorPage() {
           {step === 7 && (
             <Paso7Ritmo
               rhythm={rhythm}
+              dateFrom={dateFrom}
+              dateTo={dateTo}
+              diasPlan={diasPlan}
               isValid={isStep7Valid}
               onChangeRhythm={setRhythm}
+              onChangeDiasPlan={setDiasPlan}
               onNext={() => handleNextStep(8)}
             />
           )}
@@ -529,6 +558,8 @@ export function PlanificadorPage() {
               radiusKm={radiusKm}
               interests={interests}
               rhythm={rhythm}
+              totalEventos={diasPlan.reduce((sum, d) => sum + d.cantidadEventos, 0)}
+              totalActividades={diasPlan.reduce((sum, d) => sum + d.cantidadActividades, 0)}
               onEditStep={setStep}
               onGenerate={startCircuitGeneration}
             />

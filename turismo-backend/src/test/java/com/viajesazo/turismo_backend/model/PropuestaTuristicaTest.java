@@ -132,6 +132,8 @@ class PropuestaTuristicaTest {
 	void rejectsNonPositiveDuration() {
 		Actividad actividad = actividadValida();
 		actividad.setDuracionMinutos(0);
+		actividad.setFechaInicio(LocalDate.parse("2026-10-01"));
+		actividad.setFechaFin(LocalDate.parse("2026-12-31"));
 
 		assertThatThrownBy(actividad::validarInvariantes)
 				.isInstanceOf(InvariantViolationException.class)
@@ -181,6 +183,8 @@ class PropuestaTuristicaTest {
 		actividad.setPublicador(Publicador.builder().id(1L).nombre("Turismo Córdoba").build());
 		actividad.setUbicacion(Ubicacion.builder().id(1L).localidad("Córdoba").build());
 		actividad.setDuracionMinutos(90);
+		actividad.setFechaInicio(LocalDate.parse("2026-10-01"));
+		actividad.setFechaFin(LocalDate.parse("2026-12-31"));
 		actividad.setDisponibilidades(List.of(Disponibilidad.builder()
 				.diaSemana(DayOfWeek.TUESDAY)
 				.horaInicio(LocalTime.of(9, 0))

@@ -62,6 +62,8 @@ export interface CircuitoChip {
 export interface CircuitoDia {
   number: number
   fecha: string
+  /** Etiqueta visible del tab, p. ej. "Lunes 17". */
+  label: string
   summary: string
 }
 

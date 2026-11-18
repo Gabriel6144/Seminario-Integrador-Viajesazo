@@ -12,50 +12,33 @@ import {
   FieldSet,
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
-import { cn } from '@/lib/utils'
-import { formatValidationMessage, usuarioSchema, type UsuarioFormValues } from '@/lib/schemas'
-import { ROLES_USUARIO, type RolUsuario } from '@/types/api'
+import { formatValidationMessage, registroSchema, type RegistroFormValues } from '@/lib/schemas'
 
 interface UsuarioFormProps {
-  defaultValues: UsuarioFormValues
-  onSubmit: (values: UsuarioFormValues) => void
+  defaultValues: RegistroFormValues
+  onSubmit: (values: RegistroFormValues) => void
   onCancel: () => void
   isPending: boolean
   serverError: string | null
+  submitLabel?: string
 }
 
-const ROLE_META: Record<RolUsuario, { icon: string; desc: string; tone: string; ring: string }> = {
-  TURISTA: {
-    icon: 'travel_explore',
-    desc: 'Explora y arma itinerarios.',
-    tone: 'text-sky-700',
-    ring: 'border-sky-500 bg-sky-50/60',
-  },
-  PUBLICADOR: {
-    icon: 'campaign',
-    desc: 'Carga y edita eventos oficiales.',
-    tone: 'text-emerald-700',
-    ring: 'border-emerald-500 bg-emerald-50/50',
-  },
-  ADMINISTRADOR: {
-    icon: 'admin_panel_settings',
-    desc: 'Control global de plataforma.',
-    tone: 'text-purple-700',
-    ring: 'border-purple-500 bg-purple-50/50',
-  },
-}
-
-export function UsuarioForm({ defaultValues, onSubmit, onCancel, isPending, serverError }: UsuarioFormProps) {
-  const form = useForm<UsuarioFormValues>({
-    resolver: zodResolver(usuarioSchema),
+export function UsuarioForm({
+  defaultValues,
+  onSubmit,
+  onCancel,
+  isPending,
+  serverError,
+  submitLabel = 'Guardar usuario',
+}: UsuarioFormProps) {
+  const form = useForm<RegistroFormValues>({
+    resolver: zodResolver(registroSchema),
     defaultValues,
     mode: 'onSubmit',
   })
-  const { register, formState, watch, setValue } = form
+  const { register, formState } = form
   const { errors } = formState
 
-  const email = watch('email')
-  const rol = watch('rol')
   const [dismissedServerError, setDismissedServerError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -66,13 +49,9 @@ export function UsuarioForm({ defaultValues, onSubmit, onCancel, isPending, serv
     serverError !== null && serverError !== dismissedServerError ? serverError : null
   const esErrorEmailServidor = activeServerError !== null && /email/i.test(activeServerError)
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  const errorEmail =
-    esErrorEmailServidor
-      ? { type: 'server', message: formatValidationMessage(activeServerError) }
-      : email.trim().length > 0 && !emailRegex.test(email.trim())
-        ? { type: 'validate', message: 'El email no tiene un formato válido.' }
-        : errors.email
+  const errorEmail = esErrorEmailServidor
+    ? { type: 'server', message: formatValidationMessage(activeServerError) }
+    : errors.email
 
   const generalServerError =
     activeServerError !== null && !esErrorEmailServidor
@@ -93,21 +72,24 @@ export function UsuarioForm({ defaultValues, onSubmit, onCancel, isPending, serv
       <FieldSet>
         <FieldLegend className="sr-only">Datos del usuario</FieldLegend>
         <FieldGroup className="space-y-5">
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-            <Field data-invalid={errors.nombre !== undefined}>
-              <FieldLabel htmlFor="nombre">Nombre <span className="text-red-500">*</span></FieldLabel>
-              <Input id="nombre" placeholder="Ej. Juan" aria-invalid={errors.nombre !== undefined} {...register('nombre')} />
-              <FieldError>{errors.nombre?.message}</FieldError>
-            </Field>
-            <Field data-invalid={errors.apellido !== undefined}>
-              <FieldLabel htmlFor="apellido">Apellido <span className="text-red-500">*</span></FieldLabel>
-              <Input id="apellido" placeholder="Ej. Pérez" aria-invalid={errors.apellido !== undefined} {...register('apellido')} />
-              <FieldError>{errors.apellido?.message}</FieldError>
-            </Field>
-          </div>
+          <input type="hidden" {...register('rol')} />
+          <Field data-invalid={errors.nombre !== undefined}>
+            <FieldLabel htmlFor="nombre">
+              Nombre <span className="text-red-500">*</span>
+            </FieldLabel>
+            <Input
+              id="nombre"
+              placeholder="Ej. Ana Pérez"
+              aria-invalid={errors.nombre !== undefined}
+              {...register('nombre')}
+            />
+            <FieldError>{errors.nombre?.message}</FieldError>
+          </Field>
 
           <Field data-invalid={errorEmail !== undefined}>
-            <FieldLabel htmlFor="email">Correo Electrónico <span className="text-red-500">*</span></FieldLabel>
+            <FieldLabel htmlFor="email">
+              Correo electrónico <span className="text-red-500">*</span>
+            </FieldLabel>
             <Input
               id="email"
               type="email"
@@ -119,46 +101,47 @@ export function UsuarioForm({ defaultValues, onSubmit, onCancel, isPending, serv
                 },
               })}
             />
-            <p className="text-xs text-muted-foreground">
-              Se enviará un correo para verificar y definir su contraseña de acceso.
-            </p>
-            <FieldError>{errorEmail?.message as string | undefined}</FieldError>
+            <FieldError>{errorEmail?.message}</FieldError>
           </Field>
 
-          <Field data-invalid={errors.rol !== undefined}>
-            <FieldLabel>Rol de Usuario <span className="text-red-500">*</span></FieldLabel>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Rol de usuario">
-              {ROLES_USUARIO.map((r) => {
-                const selected = rol === r
-                const meta = ROLE_META[r]
-                return (
-                  <label
-                    key={r}
-                    className={cn(
-                      'relative flex cursor-pointer flex-col rounded-xl border-2 p-4 text-left transition',
-                      selected ? meta.ring : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50/60',
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      value={r}
-                      className="sr-only"
-                      {...register('rol')}
-                      onChange={() => setValue('rol', r, { shouldValidate: true, shouldDirty: true })}
-                    />
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className={cn('material-symbols-outlined text-2xl', selected ? meta.tone : 'text-gray-500')}>{meta.icon}</span>
-                      <span className={cn('flex h-4 w-4 items-center justify-center rounded-full border-2', selected ? 'border-current ' + meta.tone : 'border-gray-300')}>
-                        {selected ? <span className={cn('h-2 w-2 rounded-full', r === 'TURISTA' ? 'bg-sky-600' : r === 'PUBLICADOR' ? 'bg-emerald-600' : 'bg-purple-600')} /> : null}
-                      </span>
-                    </div>
-                    <span className="font-heading text-sm font-bold text-gray-900">{r}</span>
-                    <span className="mt-0.5 text-xs text-muted-foreground">{meta.desc}</span>
-                  </label>
-                )
-              })}
-            </div>
-            <FieldError>{errors.rol?.message}</FieldError>
+          <Field data-invalid={errors.telefono !== undefined}>
+            <FieldLabel htmlFor="telefono">Teléfono (opcional)</FieldLabel>
+            <Input
+              id="telefono"
+              type="tel"
+              placeholder="351-5551234"
+              aria-invalid={errors.telefono !== undefined}
+              {...register('telefono')}
+            />
+            <FieldError>{errors.telefono?.message}</FieldError>
+          </Field>
+
+          <Field data-invalid={errors.contrasena !== undefined}>
+            <FieldLabel htmlFor="contrasena">
+              Contraseña <span className="text-red-500">*</span>
+            </FieldLabel>
+            <Input
+              id="contrasena"
+              type="password"
+              autoComplete="new-password"
+              aria-invalid={errors.contrasena !== undefined}
+              {...register('contrasena')}
+            />
+            <FieldError>{errors.contrasena?.message}</FieldError>
+          </Field>
+
+          <Field data-invalid={errors.confirmarContrasena !== undefined}>
+            <FieldLabel htmlFor="confirmarContrasena">
+              Confirmar contraseña <span className="text-red-500">*</span>
+            </FieldLabel>
+            <Input
+              id="confirmarContrasena"
+              type="password"
+              autoComplete="new-password"
+              aria-invalid={errors.confirmarContrasena !== undefined}
+              {...register('confirmarContrasena')}
+            />
+            <FieldError>{errors.confirmarContrasena?.message}</FieldError>
           </Field>
         </FieldGroup>
       </FieldSet>
@@ -166,7 +149,8 @@ export function UsuarioForm({ defaultValues, onSubmit, onCancel, isPending, serv
       <div className="flex items-start gap-3 rounded-xl border border-gray-200/80 bg-gray-50 p-3.5 text-xs text-muted-foreground">
         <span className="material-symbols-outlined mt-0.5 text-base text-sky-600">info</span>
         <span>
-          El usuario recibirá estado <strong className="text-gray-700">Activo</strong> inmediatamente después del guardado. Podrá revocar accesos en cualquier momento.
+          El registro público crea una cuenta con rol <strong className="text-gray-700">Turista</strong>.
+          Un administrador puede asignar otros roles después.
         </span>
       </div>
 
@@ -174,12 +158,14 @@ export function UsuarioForm({ defaultValues, onSubmit, onCancel, isPending, serv
         <Button type="button" variant="outline" onClick={onCancel} className="w-full sm:w-auto">
           Cancelar
         </Button>
-        <Button type="submit" disabled={isPending} className="w-full bg-[#5ab2e6] text-white hover:bg-[#4aa4d9] sm:w-auto">
-          {isPending ? 'Guardando…' : 'Guardar Usuario'}
+        <Button
+          type="submit"
+          disabled={isPending}
+          className="w-full bg-[#5ab2e6] text-white hover:bg-[#4aa4d9] sm:w-auto"
+        >
+          {isPending ? 'Guardando…' : submitLabel}
         </Button>
       </div>
     </form>
   )
 }
-
-

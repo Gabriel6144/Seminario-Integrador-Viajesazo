@@ -37,14 +37,28 @@ public class PropuestaResumenMapper {
 				ubicacion == null ? null : ubicacion.getDireccion(),
 				ubicacion == null ? null : ubicacion.getLatitud(),
 				ubicacion == null ? null : ubicacion.getLongitud(),
-				evento == null ? null : evento.getFechaInicio(),
-				evento == null ? null : evento.getFechaFin(),
+				fechaInicio(evento, actividad),
+				fechaFin(evento, actividad),
 				evento == null ? null : evento.getHorarioInicio(),
 				evento == null ? null : evento.getHorarioFin(),
 				actividad == null ? null : actividad.getDuracionMinutos(),
 				imagenes(propuesta),
 				propuesta.getPublicador() == null ? null : propuesta.getPublicador().getId(),
 				propuesta.getPublicador() == null ? null : propuesta.getPublicador().getNombre());
+	}
+
+	private java.time.LocalDate fechaInicio(Evento evento, Actividad actividad) {
+		if (evento != null) {
+			return evento.getFechaInicio();
+		}
+		return actividad == null ? null : actividad.getFechaInicio();
+	}
+
+	private java.time.LocalDate fechaFin(Evento evento, Actividad actividad) {
+		if (evento != null) {
+			return evento.getFechaFin();
+		}
+		return actividad == null ? null : actividad.getFechaFin();
 	}
 
 	private List<String> imagenes(PropuestaTuristica propuesta) {

@@ -1,11 +1,13 @@
 import { http, HttpResponse } from 'msw'
 
 import {
+  ADMIN_DASHBOARD,
   ALTERNATIVAS_REEMPLAZO,
   errorBody,
   NOMINATIM_REVERSE,
   NOMINATIM_SEARCH,
   page,
+  PUBLICADOR_INSCRIPTOS,
 } from './fixtures'
 import {
   allBorradores,
@@ -28,18 +30,73 @@ import {
   findPublicadorByEmail,
   removeCircuitoItem,
   replaceCircuitoItem,
+  allNotificaciones,
+  allAgendaActividades,
+  darMeGusta,
+  getMeGusta,
+  marcarNotificacionLeida,
+  previewReprogramacion,
+  quitarMeGusta,
+  reprogramarActividad,
+  reprogramarEvento,
   selectCircuito,
   updateBorrador,
   updateEvento,
 } from './store'
 import { CIRCUIT_STRATEGIES } from '@/types/api'
 import type {
+  AuthTokenResponse,
   EventoRequest,
+  LoginRequest,
   PublicadorRequest,
   SeleccionCircuitoRequest,
+  UsuarioRequest,
+  UsuarioResponse,
   ViajeBorradorRequest,
   ViajeRequest,
 } from '@/types/api'
+
+const DEMO_USUARIO: UsuarioResponse = {
+  id: 1,
+  nombre: 'Turista Demo',
+  email: 'turista@test.com',
+  telefono: null,
+  roles: ['TURISTA'],
+  publicadorId: null,
+}
+
+const DEMO_PUBLICADOR: UsuarioResponse = {
+  id: 2,
+  nombre: 'Publicador Demo',
+  email: 'publicador@test.com',
+  telefono: null,
+  roles: ['PUBLICADOR'],
+  publicadorId: 1,
+}
+
+const DEMO_ADMIN: UsuarioResponse = {
+  id: 3,
+  nombre: 'Admin Demo',
+  email: 'admin@test.com',
+  telefono: null,
+  roles: ['ADMINISTRADOR'],
+  publicadorId: null,
+}
+
+const AUTH_USERS: Record<string, { contrasena: string; usuario: UsuarioResponse }> = {
+  'turista@test.com': { contrasena: 'Turista123!', usuario: DEMO_USUARIO },
+  'publicador@test.com': { contrasena: 'Publicador123!', usuario: DEMO_PUBLICADOR },
+  'admin@test.com': { contrasena: 'Admin123!', usuario: DEMO_ADMIN },
+}
+
+function tokenResponse(usuario: UsuarioResponse, accessToken = 'test-access-token'): AuthTokenResponse {
+  return {
+    accessToken,
+    tokenType: 'Bearer',
+    expiresInSeconds: 900,
+    usuario,
+  }
+}
 
 /**
  * Handlers de MSW que replican la API real.
@@ -57,6 +114,239 @@ import type {
  * grilla— en vez de solo que se haya hecho un POST.
  */
 export const handlers = [
+  http.post('/api/auth/login', async ({ request }) => {
+    const body = await readJson<Partial<LoginRequest>>(request)
+    const email = (body.email ?? '').trim().toLowerCase()
+    const entry = AUTH_USERS[email]
+    if (entry === undefined || entry.contrasena !== body.contrasena) {
+      return HttpResponse.json(errorBody(400, 'email o contraseña incorrectos'), { status: 400 })
+    }
+    return HttpResponse.json(tokenResponse(entry.usuario), {
+      headers: {
+        'Set-Cookie': 'refresh_token=test-refresh; Path=/api/auth; HttpOnly',
+      },
+    })
+  }),
+
+  http.post('/api/auth/refresh', ({ request }) => {
+    const cookie = request.headers.get('cookie') ?? ''
+    if (!cookie.includes('refresh_token=')) {
+      return HttpResponse.json(errorBody(401, 'refresh token ausente o inválido'), { status: 401 })
+    }
+    return HttpResponse.json(tokenResponse(DEMO_USUARIO, 'refreshed-access-token'), {
+      headers: {
+        'Set-Cookie': 'refresh_token=test-refresh-rotated; Path=/api/auth; HttpOnly',
+      },
+    })
+  }),
+
+  http.post('/api/auth/logout', () => {
+    return new HttpResponse(null, {
+      status: 204,
+      headers: {
+        'Set-Cookie': 'refresh_token=; Path=/api/auth; Max-Age=0; HttpOnly',
+      },
+    })
+  }),
+
+  http.post('/api/auth/forgot-password', async ({ request }) => {
+    const body = await readJson<{ email?: string }>(request)
+    if (!body.email?.trim()) {
+      return HttpResponse.json(errorBody(400, 'el email es obligatorio'), { status: 400 })
+    }
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.get('/api/auth/me', ({ request }) => {
+    const auth = request.headers.get('authorization') ?? ''
+    if (!auth.startsWith('Bearer ')) {
+      return HttpResponse.json(errorBody(401, 'no autenticado'), { status: 401 })
+    }
+    return HttpResponse.json(DEMO_USUARIO)
+  }),
+
+  http.get('/api/admin/dashboard', () => {
+    return HttpResponse.json(ADMIN_DASHBOARD)
+  }),
+
+  http.get('/api/publicador/inscriptos', () => {
+    return HttpResponse.json(PUBLICADOR_INSCRIPTOS)
+  }),
+
+  http.get('/api/usuarios', ({ request }) => {
+    const users = Object.values(AUTH_USERS).map((entry) => entry.usuario)
+    const searchParams = new URL(request.url).searchParams
+    const q = (searchParams.get('q') ?? '').trim().toLowerCase()
+    const rol = searchParams.get('rol')
+    const filtrados = users.filter((u) => {
+      if (rol && !u.roles.includes(rol as UsuarioResponse['roles'][number])) return false
+      if (q.length === 0) return true
+      return `${u.nombre} ${u.email}`.toLowerCase().includes(q)
+    })
+    const { content, meta } = paginate(filtrados, request.url)
+    return HttpResponse.json(page(content, meta))
+  }),
+
+  http.post('/api/usuarios', async ({ request }) => {
+    const body = await readJson<Partial<UsuarioRequest>>(request)
+    if (!body.nombre?.trim() || !body.email?.trim() || !body.contrasena) {
+      return HttpResponse.json(errorBody(400, 'datos de registro incompletos'), { status: 400 })
+    }
+    if ((body.contrasena?.length ?? 0) < 8) {
+      return HttpResponse.json(
+        errorBody(400, 'contrasena: la contraseña debe tener entre 8 y 72 caracteres'),
+        { status: 400 },
+      )
+    }
+    const email = body.email.trim().toLowerCase()
+    if (AUTH_USERS[email] !== undefined) {
+      return HttpResponse.json(errorBody(400, 'ya existe un usuario con ese email'), { status: 400 })
+    }
+    if ((body.rol as string | undefined) === 'ADMINISTRADOR') {
+      return HttpResponse.json(
+        errorBody(400, 'el registro público solo admite los roles TURISTA o PUBLICADOR'),
+        { status: 400 },
+      )
+    }
+    const rol = body.rol === 'PUBLICADOR' ? 'PUBLICADOR' : 'TURISTA'
+    const created: UsuarioResponse = {
+      id: 99,
+      nombre: body.nombre.trim(),
+      email: body.email.trim(),
+      telefono: body.telefono ?? null,
+      roles: [rol],
+      publicadorId: rol === 'PUBLICADOR' ? 99 : null,
+    }
+    return HttpResponse.json(created, { status: 201 })
+  }),
+
+  http.get('/api/publicador/dashboard', () => {
+    return HttpResponse.json({
+      totalEventos: 2,
+      totalActividades: 1,
+      totalPropuestas: 3,
+      proximas7d: 1,
+      inscriptosPorPropuesta: PUBLICADOR_INSCRIPTOS,
+    })
+  }),
+
+  http.get('/api/propuestas/:id/me-gusta', ({ params }) => {
+    const id = Number(params.id)
+    return HttpResponse.json(getMeGusta(id))
+  }),
+
+  http.post('/api/propuestas/:id/me-gusta', ({ params }) => {
+    const id = Number(params.id)
+    return HttpResponse.json(darMeGusta(id), { status: 201 })
+  }),
+
+  http.delete('/api/propuestas/:id/me-gusta', ({ params }) => {
+    const id = Number(params.id)
+    quitarMeGusta(id)
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.get('/api/publicador/agenda', () => {
+    // Eventos + actividades del publicador (alineado al backend listarAgenda).
+    const eventos = allEventos().map((evento) => ({
+      propuestaId: evento.id,
+      nombre: evento.nombre,
+      tipo: 'EVENTO' as const,
+      fechaInicio: evento.fechaInicio,
+      fechaFin: evento.fechaFin,
+      modalidad: evento.modalidad,
+      imagenUrl: evento.imagenes[0] ?? null,
+      horarioInicio: evento.horarioInicio,
+      horarioFin: evento.horarioFin,
+    }))
+    return HttpResponse.json([...eventos, ...allAgendaActividades()])
+  }),
+
+  http.patch('/api/actividades/:id/reprogramar', async ({ params, request }) => {
+    const id = Number(params.id)
+    const body = (await request.json()) as { fechaInicio?: string }
+    if (!body.fechaInicio) {
+      return HttpResponse.json(
+        { status: 400, message: 'la fecha de inicio es obligatoria' },
+        { status: 400 },
+      )
+    }
+    const actualizado = reprogramarActividad(id, body.fechaInicio)
+    if (!actualizado) {
+      return HttpResponse.json(
+        { status: 404, message: `No existe la actividad con id ${id}` },
+        { status: 404 },
+      )
+    }
+    return HttpResponse.json(actualizado)
+  }),
+
+  http.get('/api/eventos/:id/reprogramar/preview', ({ params, request }) => {
+    const id = Number(params.id)
+    const url = new URL(request.url)
+    const fechaInicio = url.searchParams.get('fechaInicio')
+    if (!fechaInicio) {
+      return HttpResponse.json(
+        { status: 400, message: 'la fecha de inicio es obligatoria' },
+        { status: 400 },
+      )
+    }
+    const preview = previewReprogramacion(id, fechaInicio)
+    if (!preview) {
+      return HttpResponse.json({ status: 404, message: `No existe el evento con id ${id}` }, { status: 404 })
+    }
+    return HttpResponse.json(preview)
+  }),
+
+  http.patch('/api/eventos/:id/reprogramar', async ({ params, request }) => {
+    const id = Number(params.id)
+    const body = (await request.json()) as { fechaInicio?: string }
+    if (!body.fechaInicio) {
+      return HttpResponse.json(
+        { status: 400, message: 'la fecha de inicio es obligatoria' },
+        { status: 400 },
+      )
+    }
+    const actualizado = reprogramarEvento(id, body.fechaInicio)
+    if (!actualizado) {
+      return HttpResponse.json({ status: 404, message: `No existe el evento con id ${id}` }, { status: 404 })
+    }
+    return HttpResponse.json(actualizado)
+  }),
+
+  http.get('/api/notificaciones', () => {
+    // MSW /auth/me siempre es DEMO_USUARIO (id 1)
+    return HttpResponse.json(allNotificaciones(1))
+  }),
+
+  http.patch('/api/notificaciones/:id/leida', ({ params }) => {
+    const id = Number(params.id)
+    const updated = marcarNotificacionLeida(id, 1)
+    if (!updated) {
+      return HttpResponse.json(
+        { status: 404, message: `No existe la notificación con id ${id}` },
+        { status: 404 },
+      )
+    }
+    return HttpResponse.json(updated)
+  }),
+
+  http.get('/api/publicador/fechas-ocupadas', () => {
+    const fechas = new Set<string>()
+    for (const evento of allEventos()) {
+      const [ys, ms, ds] = evento.fechaInicio.split('-').map(Number)
+      const [ye, me, de] = evento.fechaFin.split('-').map(Number)
+      const cur = new Date(ys, ms - 1, ds)
+      const end = new Date(ye, me - 1, de)
+      while (cur <= end) {
+        const iso = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`
+        fechas.add(iso)
+        cur.setDate(cur.getDate() + 1)
+      }
+    }
+    return HttpResponse.json([...fechas].sort())
+  }),
+
   http.get('/api/propuestas', ({ request }) => {
     const searchParams = new URL(request.url).searchParams
     const tipo = searchParams.get('tipo')
@@ -176,12 +466,8 @@ export const handlers = [
   }),
 
   http.get('/api/viajes', ({ request }) => {
-    const params = new URL(request.url).searchParams
-    const usuario = params.get('usuario')
-    const viajes = allBorradores().filter(
-      (viaje) => usuario === null || viaje.usuario === usuario,
-    )
-    const { content, meta } = paginate(viajes, request.url)
+    // El JWT identifica al turista; MSW no valida auth y devuelve todos los del store.
+    const { content, meta } = paginate(allBorradores(), request.url)
     return HttpResponse.json(page(content, meta))
   }),
 

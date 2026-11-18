@@ -20,8 +20,14 @@ acoplados de build: cada uno tiene su `package.json` / `pom.xml` y sus propios c
   buscador y pin arrastrable. **191 tests en 22 archivos (182 en verde).** Los 9 que fallan son
   preexistentes y ajenos: 8 de `eventos-page.test.tsx` (mockea `/api/eventos` y la página usa
   `/api/propuestas`) y 1 de `evento-editar-page.test.tsx` (validación de fecha).
-- Sigue sin autenticación: cualquiera que abra la app puede crear, editar y borrar eventos. Es
-  una limitación conocida del alcance de la tesis, no una decisión de diseño closed.
+- **Autenticación activa:** access JWT en memoria (`src/lib/auth-session.ts`), refresh en cookie
+  HttpOnly vía `credentials: 'include'` en `src/lib/http.ts` (single-flight refresh en 401).
+  Una cuenta = un rol. Registro elige TURISTA o PUBLICADOR. Guards:
+  `RequireAuth` / `RequireRole` / `RequireNotAdmin` / `RequireNotPublicadorTour`.
+  Shells: admin `/admin`+`/usuarios`; publicador `/publicador` + `/publicador/agenda`
+  (sin Inscriptos ni agenda turística/planificar/mis viajes). En **Propuestas** (`/`)
+  el publicador solo ve las suyas (`?publicadorId=`); turista/admin ven el catálogo.
+  Contrato: `../docs/seguridad/AUTENTICACION-Y-AUTORIZACION.md`.
 - Para la API ver el `AGENTS.md` y el `PRUEBAS-MANUALES.md` de `../turismo-backend`.
 
 ## Comandos

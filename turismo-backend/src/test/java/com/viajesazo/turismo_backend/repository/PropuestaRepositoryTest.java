@@ -386,6 +386,8 @@ class PropuestaRepositoryTest {
 		actividad.setUbicacion(ubicacion);
 		actividad.setLugarRecinto("Cabildo");
 		actividad.setDuracionMinutos(duracion);
+		actividad.setFechaInicio(LocalDate.parse("2026-10-01"));
+		actividad.setFechaFin(LocalDate.parse("2026-12-31"));
 		actividad.setDisponibilidades(List.of(Disponibilidad.builder()
 				.diaSemana(java.time.DayOfWeek.MONDAY)
 				.horaInicio(LocalTime.of(9, 0))

@@ -3,7 +3,6 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { useActividad, useActualizarActividad } from '@/api/actividades'
-import { PUBLICADORES_MAX_SIZE, usePublicadores } from '@/api/publicadores'
 import { EventoForm } from '@/components/evento-form'
 import { ErrorState } from '@/components/query-state'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -12,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { toUserMessage } from '@/lib/http'
 import { parseId } from '@/lib/parse-id'
 import { toActividadFormValues, toActividadRequest } from '@/lib/schemas'
+import type { PublicadorResponse } from '@/types/api'
 
 /**
  * Modificación de actividad turística — `PUT /api/actividades/{id}`.
@@ -24,11 +24,10 @@ export function ActividadEditarPage() {
 
   const actividad = useActividad(id)
   const actualizar = useActualizarActividad()
-  const publicadores = usePublicadores(0, PUBLICADORES_MAX_SIZE)
 
   if (id === null) return <IdInvalido />
 
-  if (actividad.isPending || publicadores.isPending) return <FormSkeleton />
+  if (actividad.isPending) return <FormSkeleton />
 
   if (actividad.isError) {
     return (
@@ -39,30 +38,15 @@ export function ActividadEditarPage() {
     )
   }
 
-  if (publicadores.isError) {
-    return (
-      <div className="flex flex-col gap-4">
-        <Volver />
-        <ErrorState error={publicadores.error} />
-      </div>
-    )
-  }
-
-  if (publicadores.data.content.length === 0) {
-    return (
-      <div className="flex flex-col gap-4">
-        <Volver />
-        <Alert>
-          <AlertTitle>No hay publicadores cargados</AlertTitle>
-          <AlertDescription>
-            Sin publicadores no se puede guardar la actividad, porque el publicador es obligatorio.
-          </AlertDescription>
-        </Alert>
-      </div>
-    )
-  }
-
   const actual = actividad.data
+  const publicadores: PublicadorResponse[] = [
+    {
+      id: actual.publicadorId,
+      nombre: actual.publicadorNombre,
+      email: '',
+      telefono: null,
+    },
+  ]
 
   return (
     <div className="flex flex-col gap-6">
@@ -75,7 +59,7 @@ export function ActividadEditarPage() {
 
       <EventoForm
         defaultValues={toActividadFormValues(actual)}
-        publicadores={publicadores.data.content}
+        publicadores={publicadores}
         tipoFijo="ACTIVIDAD"
         submitLabel="Guardar cambios"
         cancelTo={`/actividades/${id}`}

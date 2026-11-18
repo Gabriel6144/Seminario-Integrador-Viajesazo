@@ -145,8 +145,7 @@ export function Paso10Circuito({
             return (
               <article
                 key={item.id}
-                      onClick={() => openCircuit(item)}
-                className={`group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg ${
+                className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg ${
                   isSelected
                     ? 'border-[#00658d] ring-2 ring-[#00658d]/30'
                     : 'border-slate-200/80'
@@ -228,16 +227,13 @@ export function Paso10Circuito({
                     </div>
                   </div>
 
-                  <div
-                    className="mt-2 flex items-center gap-3 border-t border-slate-100 pt-3.5"
-                    onClick={(event) => event.stopPropagation()}
-                  >
+                  <div className="mt-2 flex items-center gap-3 border-t border-slate-100 pt-3.5">
                     <button
                       type="button"
-                onClick={() => openCircuit(item)}
+                      onClick={() => openCircuit(item)}
                       className="flex h-12 flex-1 items-center justify-center rounded-xl bg-[#65B7E8] px-6 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#52a6d8] active:scale-95"
                     >
-                      Ver circuito
+                      Ver detalle
                     </button>
                     <button
                       type="button"

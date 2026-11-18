@@ -1,10 +1,14 @@
 package com.viajesazo.turismo_backend.model;
 
+import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
+
 import jakarta.persistence.*;
 import lombok.*;
 
 /**
- * Turista registrado. Los constructores los genera Lombok ({@code @NoArgsConstructor} para JPA y
+ * Cuenta de usuario. Los constructores los genera Lombok ({@code @NoArgsConstructor} para JPA y
  * {@code @AllArgsConstructor} para el {@code @Builder}); escribirlos a mano choca con los generados
  * y no compila.
  */
@@ -35,16 +39,42 @@ public class Usuario {
 
 	/**
 	 * Baja lógica: {@code false} cuando el usuario dio de baja su cuenta. La fila se conserva, pero
-	 * para la API la cuenta deja de existir (consultas → 404). El login futuro también debe filtrar
-	 * por este campo.
+	 * para la API la cuenta deja de existir (consultas → 404). El login también filtra por este campo.
 	 */
 	@Builder.Default
 	@Column(nullable = false)
 	private boolean activo = true;
 
+	/** Alta de la cuenta (métricas de registros nuevos). */
+	@Builder.Default
+	@Column(nullable = false)
+	private Instant creadoEn = Instant.now();
+
+	/** Último login/refresh exitoso (métricas de usuarios activos). */
+	@Column
+	private Instant ultimoAccesoEn;
+
+	@Builder.Default
+	@ElementCollection(fetch = FetchType.EAGER)
+	@Enumerated(EnumType.STRING)
+	@CollectionTable(name = "usuario_roles", joinColumns = @JoinColumn(name = "usuario_id"))
+	@Column(name = "rol", nullable = false, length = 40)
+	private Set<Rol> roles = new HashSet<>();
+
+	/**
+	 * Perfil de publicador vinculado (1:1). Obligatorio si el usuario tiene el rol {@link Rol#PUBLICADOR}.
+	 */
+	@OneToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "publicador_id", unique = true)
+	private Publicador publicador;
+
 	/** Da de baja la cuenta (baja lógica). */
 	public void darDeBaja() {
 		this.activo = false;
+	}
+
+	public boolean tieneRol(Rol rol) {
+		return roles != null && roles.contains(rol);
 	}
 
 }

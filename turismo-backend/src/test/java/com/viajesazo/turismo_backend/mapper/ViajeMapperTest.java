@@ -17,6 +17,7 @@ import com.viajesazo.turismo_backend.model.EstadoViaje;
 import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.model.TipoRitmo;
 import com.viajesazo.turismo_backend.model.Ubicacion;
+import com.viajesazo.turismo_backend.model.Usuario;
 import com.viajesazo.turismo_backend.model.Viaje;
 
 class ViajeMapperTest {
@@ -24,26 +25,28 @@ class ViajeMapperTest {
 	private final ViajeMapper mapper = new ViajeMapperImpl();
 
 	@Test
-	@DisplayName("mapea el request al viaje y convierte las fechas LocalDate a LocalDateTime")
+	@DisplayName("mapea el request al viaje e ignora el usuario (lo asigna el service)")
 	void mapsRequestToEntity() {
 		Viaje viaje = mapper.toEntity(request());
 
 		assertThat(viaje.getNombre()).isEqualTo("Escapada serrana");
 		assertThat(viaje.getRangoInteresKm()).isEqualTo(35);
 		assertThat(viaje.getRitmo()).isEqualTo(TipoRitmo.EQUILIBRADO);
-		assertThat(viaje.getUsuario()).isEqualTo("turista@test.com");
+		assertThat(viaje.getUsuario()).isNull();
 		assertThat(viaje.getInteresesCategoria()).containsExactly(InteresCategoria.CULTURA);
-		assertThat(viaje.getFechaInicio()).isEqualTo(LocalDateTime.parse("2026-10-20T00:00:00"));
-		assertThat(viaje.getFechaFin()).isEqualTo(LocalDateTime.parse("2026-10-22T00:00:00"));
+		assertThat(viaje.getFechaInicio()).isEqualTo(LocalDate.parse("2026-10-20"));
+		assertThat(viaje.getFechaFin()).isEqualTo(LocalDate.parse("2026-10-22"));
 		assertThat(viaje.getZonaInteres().getCiudad()).isEqualTo("Villa General Belgrano");
 	}
 
 	@Test
-	@DisplayName("mapea el viaje al response y convierte las fechas LocalDateTime a LocalDate")
+	@DisplayName("mapea el viaje al response con usuarioId y usuarioEmail")
 	void mapsEntityToResponse() {
 		Viaje viaje = mapper.toEntity(request());
 		viaje.setId(7L);
 		viaje.setEstado(EstadoViaje.PLANIFICADO);
+		viaje.setUsuario(Usuario.builder().id(1L).nombre("Turista").email("turista@test.com")
+				.contrasena("hash").build());
 
 		ViajeResponse response = mapper.toResponse(viaje);
 
@@ -53,6 +56,8 @@ class ViajeMapperTest {
 		assertThat(response.fechaFin()).isEqualTo(LocalDate.parse("2026-10-22"));
 		assertThat(response.ubicacion().ciudad()).isEqualTo("Villa General Belgrano");
 		assertThat(response.ubicacion().nombre()).isEqualTo("Villa General Belgrano");
+		assertThat(response.usuarioId()).isEqualTo(1L);
+		assertThat(response.usuarioEmail()).isEqualTo("turista@test.com");
 	}
 
 	@Test
@@ -74,12 +79,14 @@ class ViajeMapperTest {
 	void mapsNullDates() {
 		assertThat(mapper.toLocalDateTime(null)).isNull();
 		assertThat(mapper.toLocalDate(null)).isNull();
+		assertThat(mapper.toLocalDateTime(LocalDate.parse("2026-10-20")))
+				.isEqualTo(LocalDateTime.parse("2026-10-20T00:00:00"));
 	}
 
 	private ViajeRequest request() {
 		return new ViajeRequest("Escapada serrana", ubicacion(), 35,
 				LocalDate.parse("2026-10-20"), LocalDate.parse("2026-10-22"),
-				TipoRitmo.EQUILIBRADO, List.of(InteresCategoria.CULTURA), "turista@test.com");
+				TipoRitmo.EQUILIBRADO, List.of(InteresCategoria.CULTURA), null);
 	}
 
 	private UbicacionRequest ubicacion() {

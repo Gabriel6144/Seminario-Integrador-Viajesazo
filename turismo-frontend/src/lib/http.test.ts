@@ -1,7 +1,16 @@
 import { http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { ApiError, apiDelete, apiGet, apiPost, apiPut } from './http'
+import { clearAccessToken, setAccessToken } from '@/lib/auth-session'
+import {
+  ApiError,
+  VIAJESAZO_CSRF_HEADER,
+  VIAJESAZO_CSRF_VALUE,
+  apiDelete,
+  apiGet,
+  apiPost,
+  apiPut,
+} from './http'
 import { errorBody } from '@/test/fixtures'
 import { server } from '@/test/server'
 
@@ -18,6 +27,7 @@ beforeEach(() => {
   // Los handlers de un test no se filtran al siguiente: `setup.ts` los resetea, pero se agrega
   // uno por test y conviene que el punto de partida sea explícito.
   server.resetHandlers()
+  clearAccessToken()
 })
 
 describe('apiGet', () => {
@@ -121,5 +131,70 @@ describe('apiDelete', () => {
     )
 
     await expect(apiDelete('/api/borrar')).rejects.toThrow('No existe el evento con id 99')
+  })
+})
+
+describe('auth headers y refresh', () => {
+  it('manda Authorization Bearer cuando hay access token', async () => {
+    setAccessToken('abc-token')
+    let authorization: string | null = null
+    server.use(
+      http.get('/api/protegido', ({ request }) => {
+        authorization = request.headers.get('authorization')
+        return HttpResponse.json({ ok: true })
+      }),
+    )
+
+    await apiGet('/api/protegido')
+    expect(authorization).toBe('Bearer abc-token')
+  })
+
+  it('manda el header CSRF en requests JSON', async () => {
+    let csrf: string | null = null
+    server.use(
+      http.get('/api/protegido', ({ request }) => {
+        csrf = request.headers.get(VIAJESAZO_CSRF_HEADER)
+        return HttpResponse.json({ ok: true })
+      }),
+    )
+
+    await apiGet('/api/protegido')
+    expect(csrf).toBe(VIAJESAZO_CSRF_VALUE)
+  })
+
+  it('ante 401 refresca una vez y reintenta', async () => {
+    setAccessToken('viejo')
+    let attempts = 0
+    let refreshCsrf: string | null = null
+    server.use(
+      http.get('/api/protegido', ({ request }) => {
+        attempts += 1
+        const auth = request.headers.get('authorization')
+        if (auth === 'Bearer viejo') {
+          return HttpResponse.json(errorBody(401, 'token vencido'), { status: 401 })
+        }
+        return HttpResponse.json({ ok: true })
+      }),
+      http.post('/api/auth/refresh', ({ request }) => {
+        refreshCsrf = request.headers.get(VIAJESAZO_CSRF_HEADER)
+        return HttpResponse.json({
+          accessToken: 'nuevo',
+          tokenType: 'Bearer',
+          expiresInSeconds: 900,
+          usuario: {
+            id: 1,
+            nombre: 'Turista',
+            email: 'turista@test.com',
+            telefono: null,
+            roles: ['TURISTA'],
+            publicadorId: null,
+          },
+        })
+      }),
+    )
+
+    await expect(apiGet<{ ok: boolean }>('/api/protegido')).resolves.toEqual({ ok: true })
+    expect(attempts).toBe(2)
+    expect(refreshCsrf).toBe(VIAJESAZO_CSRF_VALUE)
   })
 })

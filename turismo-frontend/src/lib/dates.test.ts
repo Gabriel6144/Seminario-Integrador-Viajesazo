@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatDateRange, formatLocalDate, formatTimeRange, formatWeekdayAndDate } from './dates'
+import {
+  addDaysLocalDate,
+  eachLocalDateInclusive,
+  exclusiveEndLocalDate,
+  formatDateRange,
+  formatLocalDate,
+  formatTimeRange,
+  formatWeekdayAndDate,
+  formatWeekdayDay,
+} from './dates'
 
 describe('formatLocalDate', () => {
   it('arma la fecha por componentes y no por UTC', () => {
@@ -23,6 +32,12 @@ describe('formatWeekdayAndDate', () => {
   })
 })
 
+describe('formatWeekdayDay', () => {
+  it('formatea como en el Paso 7 del planificador', () => {
+    expect(formatWeekdayDay('2026-10-01')).toBe('Jueves 1')
+  })
+})
+
 describe('formatDateRange', () => {
   it('muestra una sola fecha si el evento dura un día', () => {
     expect(formatDateRange('2026-10-05', '2026-10-05')).toBe('5 de octubre de 2026')
@@ -37,6 +52,22 @@ describe('formatDateRange', () => {
     expect(formatDateRange('2026-09-28', '2026-10-04')).toBe(
       'Del 28 de septiembre de 2026 al 4 de octubre de 2026',
     )
+  })
+})
+
+describe('eachLocalDateInclusive / exclusiveEndLocalDate', () => {
+  it('incluye inicio y fin, y un solo día si coinciden', () => {
+    expect(eachLocalDateInclusive('2026-09-23', '2026-09-23')).toEqual(['2026-09-23'])
+    expect(eachLocalDateInclusive('2026-09-20', '2026-09-22')).toEqual([
+      '2026-09-20',
+      '2026-09-21',
+      '2026-09-22',
+    ])
+  })
+
+  it('suma días en calendario local sin pasar por UTC', () => {
+    expect(addDaysLocalDate('2026-09-30', 1)).toBe('2026-10-01')
+    expect(exclusiveEndLocalDate('2026-09-23')).toBe('2026-09-24')
   })
 })
 

@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.viajesazo.turismo_backend.dto.request.ActividadRequest;
+import com.viajesazo.turismo_backend.dto.request.ReprogramarEventoRequest;
 import com.viajesazo.turismo_backend.dto.response.ActividadResponse;
 import com.viajesazo.turismo_backend.service.ActividadService;
 
@@ -38,6 +40,13 @@ public class ActividadController {
 	@PutMapping("/{id}")
 	public ActividadResponse update(@PathVariable Long id, @Valid @RequestBody ActividadRequest request) {
 		return actividadService.update(id, request);
+	}
+
+	@PatchMapping("/{id}/reprogramar")
+	public ActividadResponse reprogramar(
+			@PathVariable Long id,
+			@Valid @RequestBody ReprogramarEventoRequest request) {
+		return actividadService.reprogramar(id, request);
 	}
 
 	@DeleteMapping("/{id}")

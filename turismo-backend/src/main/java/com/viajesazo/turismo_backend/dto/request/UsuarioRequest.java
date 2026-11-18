@@ -1,7 +1,10 @@
 package com.viajesazo.turismo_backend.dto.request;
 
+import com.viajesazo.turismo_backend.model.Rol;
+
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 public record UsuarioRequest(
@@ -22,5 +25,9 @@ public record UsuarioRequest(
 		// aceptaría variantes que difieren solo al final.
 		@NotBlank(message = "la contraseña es obligatoria")
 		@Size(min = 8, max = 72, message = "la contraseña debe tener entre 8 y 72 caracteres")
-		String contrasena) {
+		String contrasena,
+
+		/** Solo {@code TURISTA} o {@code PUBLICADOR} en el registro público. */
+		@NotNull(message = "el rol es obligatorio")
+		Rol rol) {
 }

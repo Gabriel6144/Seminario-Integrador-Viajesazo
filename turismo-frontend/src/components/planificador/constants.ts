@@ -107,6 +107,7 @@ export const RHYTHM_MAP: Record<string, TipoRitmo> = {
   Tranquilo: 'TRANQUILO',
   Equilibrado: 'EQUILIBRADO',
   Intensivo: 'INTENSIVO',
+  Manual: 'MANUAL',
 }
 
 export const ALL_INTERESTS: InterestItem[] = [
@@ -145,5 +146,13 @@ export const RHYTHMS: RhythmItem[] = [
     tag: '5+ actividades por día',
     badgeClass: 'bg-amber-50 text-amber-800 border-amber-200/80',
     iconBg: 'bg-amber-50 text-amber-600',
+  },
+  {
+    id: 'Manual',
+    title: 'MANUAL',
+    desc: 'Definí vos cuántos eventos y actividades querés cada día del viaje.',
+    tag: 'Personalizado por día',
+    badgeClass: 'bg-violet-50 text-violet-800 border-violet-200/80',
+    iconBg: 'bg-violet-50 text-violet-600',
   },
 ]

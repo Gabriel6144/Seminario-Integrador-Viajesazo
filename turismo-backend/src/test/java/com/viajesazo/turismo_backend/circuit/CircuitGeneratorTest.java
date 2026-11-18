@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.junit.jupiter.api.Test;
@@ -114,7 +115,7 @@ class CircuitGeneratorTest {
         GeneratedAlternative alternative = generator.generate(DAY, DAY, TipoRitmo.EQUILIBRADO,
                 Set.of(InteresCategoria.CULTURA), candidates).get(0);
 
-        assertThat(alternative.proposals()).hasSize(3);
+        assertThat(alternative.proposals()).hasSize(4);
     }
 
     @Test
@@ -163,7 +164,7 @@ class CircuitGeneratorTest {
         GeneratedAlternative alternative = generator.generate(DAY, DAY, TipoRitmo.INTENSIVO,
                 Set.of(InteresCategoria.CULTURA), candidates).get(1);
 
-        assertThat(alternative.proposals()).hasSize(4);
+        assertThat(alternative.proposals()).hasSize(5);
     }
 
     @Test
@@ -220,9 +221,143 @@ class CircuitGeneratorTest {
                 .containsExactly(3L, 1L);
     }
 
+    @Test
+    void manualRhythmRespectsPerDayEventAndActivityQuotasAcrossStrategies() {
+        CircuitGenerator generator = new CircuitGenerator(new FixedDistanceProvider(1, 5));
+        LocalDate day1 = LocalDate.of(2026, 10, 20);
+        LocalDate day2 = LocalDate.of(2026, 10, 21);
+
+        List<CircuitCandidate> candidates = List.of(
+                candidate(1L, "Evento A", TipoRegistro.EVENTO, InteresCategoria.CULTURA,
+                        slot(day1, "09:00", "10:00")),
+                candidate(2L, "Evento B", TipoRegistro.EVENTO, InteresCategoria.CULTURA,
+                        slot(day1, "11:00", "12:00")),
+                candidate(3L, "Actividad A", TipoRegistro.ACTIVIDAD, InteresCategoria.CULTURA,
+                        slot(day1, "13:00", "14:00")),
+                candidate(4L, "Evento C", TipoRegistro.EVENTO, InteresCategoria.CULTURA,
+                        slot(day2, "09:00", "10:00")),
+                candidate(5L, "Actividad B", TipoRegistro.ACTIVIDAD, InteresCategoria.CULTURA,
+                        slot(day2, "11:00", "12:00")),
+                candidate(6L, "Actividad C", TipoRegistro.ACTIVIDAD, InteresCategoria.CULTURA,
+                        slot(day2, "13:00", "14:00")),
+                candidate(7L, "Actividad D", TipoRegistro.ACTIVIDAD, InteresCategoria.CULTURA,
+                        slot(day2, "15:00", "16:00")));
+
+        Map<LocalDate, DayQuota> quotas = Map.of(
+                day1, new DayQuota(2, 1),
+                day2, new DayQuota(1, 2));
+
+        List<GeneratedAlternative> alternatives = generator.generate(day1, day2, TipoRitmo.MANUAL,
+                Set.of(InteresCategoria.CULTURA), candidates, quotas, Set.of(), Map.of());
+
+        assertThat(alternatives).hasSize(3);
+        assertThat(alternatives)
+                .extracting(alternative -> alternative.strategy().name())
+                .containsExactlyInAnyOrder("CERCANIA", "INTERESES", "DESCUBRIMIENTO");
+
+        for (GeneratedAlternative alternative : alternatives) {
+            List<ScheduledProposal> day1Items = alternative.proposals().stream()
+                    .filter(item -> item.date().equals(day1))
+                    .toList();
+            List<ScheduledProposal> day2Items = alternative.proposals().stream()
+                    .filter(item -> item.date().equals(day2))
+                    .toList();
+
+            assertThat(day1Items.stream().filter(item -> item.type() == TipoRegistro.EVENTO).count())
+                    .isEqualTo(2);
+            assertThat(day1Items.stream().filter(item -> item.type() == TipoRegistro.ACTIVIDAD).count())
+                    .isEqualTo(1);
+            assertThat(day2Items.stream().filter(item -> item.type() == TipoRegistro.EVENTO).count())
+                    .isEqualTo(1);
+            assertThat(day2Items.stream().filter(item -> item.type() == TipoRegistro.ACTIVIDAD).count())
+                    .isEqualTo(2);
+        }
+    }
+
+    @Test
+    void equilibradoRhythmAllowsUpToFourStopsPerDay() {
+        CircuitGenerator generator = new CircuitGenerator(new FixedDistanceProvider(1, 5));
+        LocalDate day = LocalDate.of(2026, 10, 20);
+
+        List<CircuitCandidate> candidates = List.of(
+                candidate(1L, "Evento A", TipoRegistro.EVENTO, InteresCategoria.CULTURA,
+                        slot(day, "09:00", "10:00")),
+                candidate(2L, "Evento B", TipoRegistro.EVENTO, InteresCategoria.CULTURA,
+                        slot(day, "11:00", "12:00")),
+                candidate(3L, "Evento C", TipoRegistro.EVENTO, InteresCategoria.CULTURA,
+                        slot(day, "13:00", "14:00")),
+                candidate(4L, "Actividad A", TipoRegistro.ACTIVIDAD, InteresCategoria.CULTURA,
+                        slot(day, "15:00", "16:00")),
+                candidate(5L, "Actividad B", TipoRegistro.ACTIVIDAD, InteresCategoria.CULTURA,
+                        slot(day, "17:00", "18:00")),
+                candidate(6L, "Actividad C", TipoRegistro.ACTIVIDAD, InteresCategoria.CULTURA,
+                        slot(day, "18:30", "19:30")));
+
+        List<GeneratedAlternative> alternatives = generator.generate(day, day, TipoRitmo.EQUILIBRADO,
+                Set.of(InteresCategoria.CULTURA), candidates, Map.of(), Set.of(), Map.of());
+
+        assertThat(alternatives).hasSize(3);
+        for (GeneratedAlternative alternative : alternatives) {
+            assertThat(alternative.proposals()).hasSize(4);
+        }
+    }
+
+    @Test
+    void intensivoRhythmAllowsUpToFiveStopsPerDay() {
+        CircuitGenerator generator = new CircuitGenerator(new FixedDistanceProvider(1, 5));
+        LocalDate day = LocalDate.of(2026, 10, 20);
+
+        List<CircuitCandidate> candidates = List.of(
+                candidate(1L, "P1", TipoRegistro.EVENTO, InteresCategoria.CULTURA, slot(day, "08:00", "09:00")),
+                candidate(2L, "P2", TipoRegistro.EVENTO, InteresCategoria.CULTURA, slot(day, "09:30", "10:30")),
+                candidate(3L, "P3", TipoRegistro.ACTIVIDAD, InteresCategoria.CULTURA, slot(day, "11:00", "12:00")),
+                candidate(4L, "P4", TipoRegistro.ACTIVIDAD, InteresCategoria.CULTURA, slot(day, "12:30", "13:30")),
+                candidate(5L, "P5", TipoRegistro.EVENTO, InteresCategoria.CULTURA, slot(day, "14:00", "15:00")),
+                candidate(6L, "P6", TipoRegistro.ACTIVIDAD, InteresCategoria.CULTURA, slot(day, "15:30", "16:30")));
+
+        List<GeneratedAlternative> alternatives = generator.generate(day, day, TipoRitmo.INTENSIVO,
+                Set.of(InteresCategoria.CULTURA), candidates, Map.of(), Set.of(), Map.of());
+
+        assertThat(alternatives).hasSize(3);
+        for (GeneratedAlternative alternative : alternatives) {
+            assertThat(alternative.proposals()).hasSize(5);
+        }
+    }
+
+    @Test
+    void manualRhythmLeavesEmptyDayWhenQuotaIsZero() {
+        CircuitGenerator generator = new CircuitGenerator(new FixedDistanceProvider(1, 5));
+        LocalDate day1 = LocalDate.of(2026, 10, 20);
+        LocalDate day2 = LocalDate.of(2026, 10, 21);
+
+        List<CircuitCandidate> candidates = List.of(
+                candidate(1L, "Evento A", TipoRegistro.EVENTO, InteresCategoria.CULTURA,
+                        slot(day1, "09:00", "10:00")),
+                candidate(2L, "Actividad A", TipoRegistro.ACTIVIDAD, InteresCategoria.CULTURA,
+                        slot(day2, "11:00", "12:00")));
+
+        Map<LocalDate, DayQuota> quotas = Map.of(
+                day1, new DayQuota(0, 0),
+                day2, new DayQuota(0, 1));
+
+        List<GeneratedAlternative> alternatives = generator.generate(day1, day2, TipoRitmo.MANUAL,
+                Set.of(InteresCategoria.CULTURA), candidates, quotas, Set.of(), Map.of());
+
+        for (GeneratedAlternative alternative : alternatives) {
+            assertThat(alternative.proposals().stream().filter(item -> item.date().equals(day1))).isEmpty();
+            assertThat(alternative.proposals().stream().filter(item -> item.date().equals(day2))).hasSize(1);
+            assertThat(alternative.proposals().get(0).type()).isEqualTo(TipoRegistro.ACTIVIDAD);
+        }
+    }
+
     private CircuitCandidate candidate(Long id, String name, InteresCategoria category,
             CircuitCandidate.TimeSlot slot) {
-        return new CircuitCandidate(id, name, null, TipoRegistro.ACTIVIDAD, category, -31.4, -64.2,
+        return candidate(id, name, TipoRegistro.ACTIVIDAD, category, slot);
+    }
+
+    private CircuitCandidate candidate(Long id, String name, TipoRegistro type, InteresCategoria category,
+            CircuitCandidate.TimeSlot slot) {
+        return new CircuitCandidate(id, name, null, type, category, -31.4, -64.2,
                 List.of(slot), CircuitCandidate.ProposalDetails.empty());
     }
 

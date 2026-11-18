@@ -7,8 +7,14 @@ import {
 } from '@tanstack/react-query'
 
 import { getPage, pageParams, queryKeys } from '@/api/queries'
-import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/http'
-import type { EventoRequest, EventoResponse } from '@/types/api'
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from '@/lib/http'
+import type {
+  EventoRequest,
+  EventoResponse,
+  LocalDate,
+  ReprogramarEventoRequest,
+  ReprogramarPreviewResponse,
+} from '@/types/api'
 
 export const PAGE_SIZE = 12
 
@@ -63,6 +69,9 @@ function invalidateEventoViews(queryClient: QueryClient, publicadorId: number): 
   void queryClient.invalidateQueries({ queryKey: queryKeys.propuestasAll() })
   void queryClient.invalidateQueries({ queryKey: queryKeys.agendaAll() })
   void queryClient.invalidateQueries({ queryKey: queryKeys.publicadorEventosAll(publicadorId) })
+  void queryClient.invalidateQueries({ queryKey: queryKeys.publicadorAgenda() })
+  void queryClient.invalidateQueries({ queryKey: queryKeys.publicadorDashboard() })
+  void queryClient.invalidateQueries({ queryKey: queryKeys.publicadorFechasOcupadas() })
 }
 
 /** `POST /api/eventos` — alta de evento. US1. */
@@ -135,6 +144,50 @@ export function useBorrarEvento() {
       // el botón "atrás" del navegador lo volvería a pedir, recibiría 404 y el usuario vería
       // "no existe el evento" después de haberlo borrado él mismo.
       queryClient.removeQueries({ queryKey: queryKeys.evento(id) })
+    },
+  })
+}
+
+interface ReprogramarEventoVariables {
+  id: number
+  fechaInicio: LocalDate
+}
+
+/**
+ * `GET /api/eventos/{id}/reprogramar/preview?fechaInicio=` — texto y N destinatarios.
+ */
+export function useReprogramarPreview(eventoId: number | null, fechaInicio: LocalDate | null) {
+  return useQuery({
+    queryKey: queryKeys.reprogramarPreview(eventoId ?? 0, fechaInicio ?? ''),
+    queryFn: ({ signal }) =>
+      apiGet<ReprogramarPreviewResponse>(
+        `/api/eventos/${eventoId}/reprogramar/preview?fechaInicio=${fechaInicio}`,
+        signal,
+      ),
+    enabled: eventoId != null && fechaInicio != null,
+  })
+}
+
+/**
+ * `PATCH /api/eventos/{id}/reprogramar` — mueve fechas preservando duración.
+ * Refresca Propuestas (`propuestasAll`), Mi Agenda y fechas ocupadas para mantener sync.
+ */
+export function useReprogramarEvento() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, fechaInicio }: ReprogramarEventoVariables) =>
+      apiPatch<EventoResponse, ReprogramarEventoRequest>(`/api/eventos/${id}/reprogramar`, {
+        fechaInicio,
+      }),
+    onSuccess: (evento) => {
+      // Propuestas + eventos + agenda turística + grilla del publicador
+      invalidateEventoViews(queryClient, evento.publicadorId)
+      void queryClient.invalidateQueries({ queryKey: queryKeys.propuestasAll() })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.evento(evento.id) })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.publicadorAgenda() })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.publicadorFechasOcupadas() })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.publicadorDashboard() })
     },
   })
 }

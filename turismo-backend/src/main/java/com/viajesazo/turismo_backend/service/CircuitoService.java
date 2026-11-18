@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.viajesazo.turismo_backend.circuit.CircuitCandidate;
 import com.viajesazo.turismo_backend.circuit.CircuitGenerator;
+import com.viajesazo.turismo_backend.circuit.DayQuota;
 import com.viajesazo.turismo_backend.circuit.GeneratedAlternative;
 import com.viajesazo.turismo_backend.circuit.DistanceProvider;
 import com.viajesazo.turismo_backend.circuit.ScheduledProposal;
@@ -55,7 +57,9 @@ import com.viajesazo.turismo_backend.model.PropuestaTuristica;
 import com.viajesazo.turismo_backend.model.TipoRitmo;
 import com.viajesazo.turismo_backend.model.Ubicacion;
 import com.viajesazo.turismo_backend.model.Viaje;
+import com.viajesazo.turismo_backend.model.ViajeDiaPlan;
 import com.viajesazo.turismo_backend.repository.CircuitoRepository;
+import com.viajesazo.turismo_backend.repository.MeGustaRepository;
 import com.viajesazo.turismo_backend.repository.PropuestaRepository;
 import com.viajesazo.turismo_backend.repository.ViajeRepository;
 
@@ -72,6 +76,7 @@ public class CircuitoService {
     private final CircuitoRepository circuitoRepository;
     private final ViajeRepository viajeRepository;
     private final PropuestaRepository propuestaRepository;
+    private final MeGustaRepository meGustaRepository;
     private final CircuitGenerator generator;
     private final DistanceProvider distanceProvider;
     private final Clock clock;
@@ -99,8 +104,11 @@ public class CircuitoService {
                     "no hay propuestas compatibles con los intereses y el radio de interés del viaje");
         }
         Set<InteresCategoria> interests = new LinkedHashSet<>(viaje.getInteresesCategoria());
+        Map<LocalDate, DayQuota> dayQuotas = dayQuotas(viaje);
+        Set<Long> likedIds = meGustaRepository.findPropuestaIdsByUsuarioId(viaje.getUsuario().getId());
+        Map<Long, Long> likeCounts = likeCounts(candidates.stream().map(CircuitCandidate::id).toList());
         List<GeneratedAlternative> generated = generator.generate(start, viaje.getFechaFin(),
-                viaje.getRitmo(), interests, candidates);
+                viaje.getRitmo(), interests, candidates, dayQuotas, likedIds, likeCounts);
         if (generated.stream().allMatch(alternative -> alternative.proposals().isEmpty())) {
             throw new InvariantViolationException(
                     "no hay propuestas compatibles con los intereses y el radio de interés del viaje");
@@ -132,6 +140,15 @@ public class CircuitoService {
         return new GenerationResult(toGenerationResponse(circuito), existing != null);
     }
 
+    /**
+     * Confirma una alternativa del circuito.
+     * <p>
+     * Efecto de negocio (inscripción automática): al setear {@code estrategiaSeleccionada},
+     * el turista queda contado como inscripto en cada evento/actividad ({@code CircuitoItem.propuestaId})
+     * de esa alternativa, siempre que la propuesta tenga publicador. El conteo es
+     * {@code COUNT(DISTINCT usuario)} por propuesta (no hay doble inscripción del mismo turista).
+     * El dashboard del publicador lee esos conteos vía {@code InscriptosService}.
+     */
     @Transactional
     public GeneracionCircuitoResponse select(Long viajeId, SeleccionCircuitoRequest request) {
         Circuito circuito = findCircuit(viajeId);
@@ -592,9 +609,14 @@ public class CircuitoService {
     }
 
     private Viaje findTrip(Long id) {
-        return viajeRepository.findByIdAndEstadoNotIn(id,
+        Viaje viaje = viajeRepository.findByIdAndEstadoNotIn(id,
                 List.of(com.viajesazo.turismo_backend.model.EstadoViaje.CANCELADO))
                 .orElseThrow(() -> new ResourceNotFoundException("No existe el viaje con id " + id));
+        Long currentId = com.viajesazo.turismo_backend.security.SecurityUtils.currentUsuarioId();
+        if (viaje.getUsuario() == null || !viaje.getUsuario().getId().equals(currentId)) {
+            throw new ResourceNotFoundException("No existe el viaje con id " + id);
+        }
+        return viaje;
     }
 
     private Circuito findCircuit(Long viajeId) {
@@ -617,6 +639,10 @@ public class CircuitoService {
         }
         if (viaje.getRangoInteresKm() == null || viaje.getRangoInteresKm() <= 0) missing.add("radio de interés");
         if (viaje.getRitmo() == null) missing.add("ritmo del viaje");
+        if (viaje.getRitmo() == TipoRitmo.MANUAL
+                && (viaje.getDiasPlan() == null || viaje.getDiasPlan().isEmpty())) {
+            missing.add("plan diario de eventos y actividades");
+        }
         if (viaje.getInteresesCategoria() == null || viaje.getInteresesCategoria().isEmpty()) {
             missing.add("preferencias de interés");
         }
@@ -626,6 +652,31 @@ public class CircuitoService {
         if (viaje.getFechaFin().isBefore(effectiveStart(viaje))) {
             throw new BusinessRuleException("el viaje no tiene días disponibles para planificar");
         }
+    }
+
+    private Map<LocalDate, DayQuota> dayQuotas(Viaje viaje) {
+        if (viaje.getRitmo() != TipoRitmo.MANUAL || viaje.getDiasPlan() == null) {
+            return Map.of();
+        }
+        Map<LocalDate, DayQuota> quotas = new HashMap<>();
+        for (ViajeDiaPlan dia : viaje.getDiasPlan()) {
+            if (dia.getFecha() == null) {
+                continue;
+            }
+            quotas.put(dia.getFecha(), new DayQuota(dia.getCantidadEventos(), dia.getCantidadActividades()));
+        }
+        return quotas;
+    }
+
+    private Map<Long, Long> likeCounts(List<Long> propuestaIds) {
+        if (propuestaIds == null || propuestaIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, Long> counts = new HashMap<>();
+        for (Object[] row : meGustaRepository.countByPropuestaIdIn(propuestaIds)) {
+            counts.put((Long) row[0], (Long) row[1]);
+        }
+        return counts;
     }
 
     private void snapshot(Circuito circuito, Viaje viaje) {

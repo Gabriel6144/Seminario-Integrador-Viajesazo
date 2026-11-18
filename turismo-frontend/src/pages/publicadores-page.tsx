@@ -1,6 +1,7 @@
 import { MailIcon, PhoneIcon, PlusIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
+import { useAuth } from '@/components/auth-provider'
 import { usePublicadores } from '@/api/publicadores'
 import { PaginationBar } from '@/components/pagination-bar'
 import { EmptyState, ErrorState, GridSkeleton } from '@/components/query-state'
@@ -22,6 +23,8 @@ import type { PublicadorResponse } from '@/types/api'
  * ese orden sin ordenar del lado del cliente.
  */
 export function PublicadoresPage() {
+  const { hasRole } = useAuth()
+  const canCreate = hasRole('ADMINISTRADOR')
   const [page, setPage] = usePageParam()
   const query = usePublicadores(page)
 
@@ -38,12 +41,14 @@ export function PublicadoresPage() {
           </p>
         </div>
 
-        <Button asChild size="sm" className="h-12 rounded-xl bg-[#00658d] px-6 text-white shadow-md hover:bg-[#65b7e8]">
-          <Link to="/publicadores/nuevo">
-            <PlusIcon className="h-5 w-5" aria-hidden />
-            Nuevo publicador
-          </Link>
-        </Button>
+        {canCreate ? (
+          <Button asChild size="sm" className="h-12 rounded-xl bg-[#00658d] px-6 text-white shadow-md hover:bg-[#65b7e8]">
+            <Link to="/publicadores/nuevo">
+              <PlusIcon className="h-5 w-5" aria-hidden />
+              Nuevo publicador
+            </Link>
+          </Button>
+        ) : null}
       </div>
 
       {/*

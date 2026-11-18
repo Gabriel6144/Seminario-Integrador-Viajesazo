@@ -3,7 +3,6 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { useActualizarEvento, useEvento } from '@/api/eventos'
-import { PUBLICADORES_MAX_SIZE, usePublicadores } from '@/api/publicadores'
 import { EventoForm } from '@/components/evento-form'
 import { ErrorState } from '@/components/query-state'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -12,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { toUserMessage } from '@/lib/http'
 import { parseId } from '@/lib/parse-id'
 import { toEventoFormValues, toEventoRequest } from '@/lib/schemas'
+import type { PublicadorResponse } from '@/types/api'
 
 /**
  * Modificación de evento — `PUT /api/eventos/{id}`. US2.
@@ -28,12 +28,11 @@ export function EventoEditarPage() {
 
   const evento = useEvento(id)
   const actualizar = useActualizarEvento()
-  const publicadores = usePublicadores(0, PUBLICADORES_MAX_SIZE)
 
   // Un id no numérico no llega al backend: pedírlo devolvería 500 en lugar de 400.
   if (id === null) return <IdInvalido />
 
-  if (evento.isPending || publicadores.isPending) return <FormSkeleton />
+  if (evento.isPending) return <FormSkeleton />
 
   if (evento.isError) {
     return (
@@ -44,30 +43,15 @@ export function EventoEditarPage() {
     )
   }
 
-  if (publicadores.isError) {
-    return (
-      <div className="flex flex-col gap-4">
-        <Volver />
-        <ErrorState error={publicadores.error} />
-      </div>
-    )
-  }
-
-  if (publicadores.data.content.length === 0) {
-    return (
-      <div className="flex flex-col gap-4">
-        <Volver />
-        <Alert>
-          <AlertTitle>No hay publicadores cargados</AlertTitle>
-          <AlertDescription>
-            Sin publicadores no se puede guardar el evento, porque el publicador es obligatorio.
-          </AlertDescription>
-        </Alert>
-      </div>
-    )
-  }
-
   const actual = evento.data
+  const publicadores: PublicadorResponse[] = [
+    {
+      id: actual.publicadorId,
+      nombre: actual.publicadorNombre,
+      email: '',
+      telefono: null,
+    },
+  ]
 
   return (
     <div className="flex flex-col gap-6">
@@ -80,7 +64,7 @@ export function EventoEditarPage() {
 
       <EventoForm
         defaultValues={toEventoFormValues(actual)}
-        publicadores={publicadores.data.content}
+        publicadores={publicadores}
         submitLabel="Guardar cambios"
         cancelTo={`/eventos/${id}`}
         isPending={actualizar.isPending}

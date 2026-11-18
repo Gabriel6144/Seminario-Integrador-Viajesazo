@@ -76,8 +76,8 @@ VALUES (
     (SELECT id FROM propuesta_turistica WHERE nombre = 'Cosquín Rock'),
     70000,
     'https://cosquinrock.net',
-    DATEADD('DAY', 100, CURRENT_DATE),
-    DATEADD('DAY', 101, CURRENT_DATE),
+    DATEADD('DAY', 2, CURRENT_DATE),
+    DATEADD('DAY', 2, CURRENT_DATE),
     '18:00:00',
     '23:59:00'
 );
@@ -107,8 +107,8 @@ VALUES (
     (SELECT id FROM propuesta_turistica WHERE nombre = 'Festival Nacional de Folklore de Cosquín'),
     25000,
     'https://festivaldecosquin.com',
-    DATEADD('DAY', -20, CURRENT_DATE),
-    DATEADD('DAY', -10, CURRENT_DATE),
+    DATEADD('DAY', 1, CURRENT_DATE),
+    DATEADD('DAY', 1, CURRENT_DATE),
     '20:00:00',
     '23:30:00'
 );
@@ -138,8 +138,8 @@ VALUES (
     (SELECT id FROM propuesta_turistica WHERE nombre = 'Oktoberfest'),
     15000,
     'https://oktoberfestargentina.com.ar',
-    DATEADD('DAY', 2, CURRENT_DATE),
-    DATEADD('DAY', 12, CURRENT_DATE),
+    DATEADD('DAY', 1, CURRENT_DATE),
+    DATEADD('DAY', 1, CURRENT_DATE),
     '18:00:00',
     '23:59:00'
 );
@@ -278,11 +278,13 @@ VALUES
      (SELECT id FROM ubicacion WHERE direccion = 'Av. San Martín 100, Villa General Belgrano'),
      1);
 
-INSERT INTO evento (id, fecha_inicio, fecha_fin)
+INSERT INTO evento (id, fecha_inicio, fecha_fin, horario_inicio, horario_fin)
 VALUES (
     (SELECT id FROM propuesta_turistica WHERE nombre = 'Masa Vienesa'),
-    DATEADD('DAY', 1, CURRENT_DATE),
-    DATEADD('DAY', 4, CURRENT_DATE)
+    DATEADD('DAY', 5, CURRENT_DATE),
+    DATEADD('DAY', 5, CURRENT_DATE),
+    '10:00:00',
+    '18:00:00'
 );
 
 INSERT INTO propuesta_imagen (propuesta_id, url, orden)
@@ -309,8 +311,9 @@ VALUES
      (SELECT id FROM ubicacion WHERE direccion = 'Av. San Martín 800, Cosquín'),
      2);
 
-INSERT INTO actividad (id, duracion_minutos)
-VALUES ((SELECT id FROM propuesta_turistica WHERE nombre = 'Visita guiada por el Casco Histórico'), 90);
+INSERT INTO actividad (id, duracion_minutos, fecha_inicio, fecha_fin)
+VALUES ((SELECT id FROM propuesta_turistica WHERE nombre = 'Visita guiada por el Casco Histórico'), 90,
+        DATEADD('DAY', 3, CURRENT_DATE), DATEADD('DAY', 3, CURRENT_DATE));
 
 INSERT INTO actividad_disponibilidad (actividad_id, orden, dia_semana, hora_inicio, hora_fin) VALUES
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Visita guiada por el Casco Histórico'), 0, 'MONDAY', '09:00:00', '11:00:00'),
@@ -333,8 +336,9 @@ VALUES
      (SELECT id FROM ubicacion WHERE direccion = 'Cerro de la Cruz, Carlos Paz'),
      1);
 
-INSERT INTO actividad (id, duracion_minutos)
-VALUES ((SELECT id FROM propuesta_turistica WHERE nombre = 'Senderismo en el Cerro de la Cruz'), 180);
+INSERT INTO actividad (id, duracion_minutos, fecha_inicio, fecha_fin)
+VALUES ((SELECT id FROM propuesta_turistica WHERE nombre = 'Senderismo en el Cerro de la Cruz'), 180,
+        DATEADD('DAY', 6, CURRENT_DATE), DATEADD('DAY', 6, CURRENT_DATE));
 
 INSERT INTO actividad_disponibilidad (actividad_id, orden, dia_semana, hora_inicio, hora_fin) VALUES
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Senderismo en el Cerro de la Cruz'), 0, 'SATURDAY', '08:00:00', '11:00:00'),
@@ -462,35 +466,35 @@ VALUES
 
 INSERT INTO evento (id, fecha_inicio, fecha_fin, horario_inicio, horario_fin) VALUES
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Caminata al Río Los Reartes'),
-     DATEADD('DAY', 7, CURRENT_DATE), DATEADD('DAY', 9, CURRENT_DATE), '09:00:00', '13:00:00'),
+     DATEADD('DAY', 7, CURRENT_DATE), DATEADD('DAY', 7, CURRENT_DATE), '09:00:00', '13:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Museo de la Cerveza'),
-     DATEADD('DAY', 7, CURRENT_DATE), DATEADD('DAY', 9, CURRENT_DATE), '10:00:00', '18:00:00'),
+     DATEADD('DAY', 8, CURRENT_DATE), DATEADD('DAY', 8, CURRENT_DATE), '10:00:00', '18:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Noche de cerveza artesanal'),
-     DATEADD('DAY', 7, CURRENT_DATE), DATEADD('DAY', 9, CURRENT_DATE), '20:00:00', '23:30:00'),
+     DATEADD('DAY', 9, CURRENT_DATE), DATEADD('DAY', 9, CURRENT_DATE), '20:00:00', '23:30:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Visita a la Manzana Jesuítica'),
-     DATEADD('DAY', 14, CURRENT_DATE), DATEADD('DAY', 17, CURRENT_DATE), '10:00:00', '13:00:00'),
+     DATEADD('DAY', 14, CURRENT_DATE), DATEADD('DAY', 14, CURRENT_DATE), '10:00:00', '13:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Feria de artesanos del Centro'),
-     DATEADD('DAY', 14, CURRENT_DATE), DATEADD('DAY', 17, CURRENT_DATE), '11:00:00', '19:00:00'),
+     DATEADD('DAY', 14, CURRENT_DATE), DATEADD('DAY', 14, CURRENT_DATE), '11:00:00', '19:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Peña en la Cañada'),
-     DATEADD('DAY', 14, CURRENT_DATE), DATEADD('DAY', 17, CURRENT_DATE), '21:00:00', '23:59:00'),
+     DATEADD('DAY', 15, CURRENT_DATE), DATEADD('DAY', 15, CURRENT_DATE), '21:00:00', '23:59:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Kayak en el lago San Roque'),
-     DATEADD('DAY', 21, CURRENT_DATE), DATEADD('DAY', 24, CURRENT_DATE), '09:00:00', '12:00:00'),
+     DATEADD('DAY', 24, CURRENT_DATE), DATEADD('DAY', 24, CURRENT_DATE), '09:00:00', '12:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Teleférico y mirador'),
-     DATEADD('DAY', 21, CURRENT_DATE), DATEADD('DAY', 24, CURRENT_DATE), '12:30:00', '13:30:00'),
+     DATEADD('DAY', 25, CURRENT_DATE), DATEADD('DAY', 25, CURRENT_DATE), '12:30:00', '13:30:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Teatro en Carlos Paz'),
-     DATEADD('DAY', 21, CURRENT_DATE), DATEADD('DAY', 24, CURRENT_DATE), '21:00:00', '23:30:00'),
+     DATEADD('DAY', 19, CURRENT_DATE), DATEADD('DAY', 19, CURRENT_DATE), '21:00:00', '23:30:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Museo Casa del Che'),
-     DATEADD('DAY', 28, CURRENT_DATE), DATEADD('DAY', 30, CURRENT_DATE), '10:00:00', '13:00:00'),
+     DATEADD('DAY', 28, CURRENT_DATE), DATEADD('DAY', 28, CURRENT_DATE), '10:00:00', '13:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Feria de productores de Alta Gracia'),
-     DATEADD('DAY', 28, CURRENT_DATE), DATEADD('DAY', 30, CURRENT_DATE), '11:00:00', '18:00:00'),
+     DATEADD('DAY', 29, CURRENT_DATE), DATEADD('DAY', 29, CURRENT_DATE), '11:00:00', '18:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Peña de los cerros'),
-     DATEADD('DAY', 28, CURRENT_DATE), DATEADD('DAY', 30, CURRENT_DATE), '20:30:00', '23:30:00'),
+     DATEADD('DAY', 28, CURRENT_DATE), DATEADD('DAY', 28, CURRENT_DATE), '20:30:00', '23:30:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Bosque de los Pioneros'),
-     DATEADD('DAY', 35, CURRENT_DATE), DATEADD('DAY', 38, CURRENT_DATE), '09:00:00', '13:00:00'),
+     DATEADD('DAY', 34, CURRENT_DATE), DATEADD('DAY', 34, CURRENT_DATE), '09:00:00', '13:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Cascada de La Cumbrecita'),
-     DATEADD('DAY', 35, CURRENT_DATE), DATEADD('DAY', 38, CURRENT_DATE), '10:00:00', '14:00:00'),
+     DATEADD('DAY', 35, CURRENT_DATE), DATEADD('DAY', 35, CURRENT_DATE), '10:00:00', '14:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Fogón bajo las estrellas'),
-     DATEADD('DAY', 35, CURRENT_DATE), DATEADD('DAY', 38, CURRENT_DATE), '20:00:00', '23:30:00');
+     DATEADD('DAY', 36, CURRENT_DATE), DATEADD('DAY', 36, CURRENT_DATE), '20:00:00', '23:30:00');
 
 -- ============================================================
 -- PROPUESTAS AMPLIADAS PARA EL CIRCUITO AUTOMÁTICO
@@ -566,15 +570,15 @@ VALUES
 
 INSERT INTO evento (id, monto_estimado, sitio_oficial, fecha_inicio, fecha_fin, horario_inicio, horario_fin) VALUES
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Degustación en el Parque Cervecero'),
-     5000, 'https://turismo.cordoba.gob.ar', DATEADD('DAY', 7, CURRENT_DATE), DATEADD('DAY', 9, CURRENT_DATE), '10:00:00', '11:00:00'),
+     5000, 'https://turismo.cordoba.gob.ar', DATEADD('DAY', 4, CURRENT_DATE), DATEADD('DAY', 4, CURRENT_DATE), '10:00:00', '11:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Feria de productores y artesanos de VGB'),
-     NULL, NULL, DATEADD('DAY', 7, CURRENT_DATE), DATEADD('DAY', 9, CURRENT_DATE), '08:00:00', '09:00:00'),
+     NULL, NULL, DATEADD('DAY', 7, CURRENT_DATE), DATEADD('DAY', 7, CURRENT_DATE), '08:00:00', '09:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Paseo por el Río Los Reartes'),
-     NULL, NULL, DATEADD('DAY', 7, CURRENT_DATE), DATEADD('DAY', 9, CURRENT_DATE), '14:00:00', '15:00:00'),
+     NULL, NULL, DATEADD('DAY', 3, CURRENT_DATE), DATEADD('DAY', 3, CURRENT_DATE), '14:00:00', '15:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Noche de música en vivo en la Plaza José Hernández'),
-     NULL, NULL, DATEADD('DAY', 7, CURRENT_DATE), DATEADD('DAY', 9, CURRENT_DATE), '18:00:00', '19:00:00'),
+     NULL, NULL, DATEADD('DAY', 7, CURRENT_DATE), DATEADD('DAY', 7, CURRENT_DATE), '18:00:00', '19:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Cena con food trucks y cerveza artesanal'),
-     8000, 'https://turismo.cordoba.gob.ar', DATEADD('DAY', 7, CURRENT_DATE), DATEADD('DAY', 9, CURRENT_DATE), '16:00:00', '17:00:00');
+     8000, 'https://turismo.cordoba.gob.ar', DATEADD('DAY', 13, CURRENT_DATE), DATEADD('DAY', 13, CURRENT_DATE), '16:00:00', '17:00:00');
 
 -- Ciudad de Córdoba
 
@@ -615,15 +619,15 @@ VALUES
 
 INSERT INTO evento (id, monto_estimado, sitio_oficial, fecha_inicio, fecha_fin, horario_inicio, horario_fin) VALUES
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Paseo del Buen Pastor'),
-     NULL, NULL, DATEADD('DAY', 14, CURRENT_DATE), DATEADD('DAY', 17, CURRENT_DATE), '08:00:00', '09:00:00'),
+     NULL, NULL, DATEADD('DAY', 16, CURRENT_DATE), DATEADD('DAY', 16, CURRENT_DATE), '08:00:00', '09:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Museo Emilio Caraffa'),
-     3000, 'https://turismo.cordoba.gob.ar', DATEADD('DAY', 14, CURRENT_DATE), DATEADD('DAY', 17, CURRENT_DATE), '09:30:00', '10:30:00'),
+     3000, 'https://turismo.cordoba.gob.ar', DATEADD('DAY', 17, CURRENT_DATE), DATEADD('DAY', 17, CURRENT_DATE), '09:30:00', '10:30:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Cabildo de Córdoba'),
-     NULL, NULL, DATEADD('DAY', 14, CURRENT_DATE), DATEADD('DAY', 17, CURRENT_DATE), '14:00:00', '15:00:00'),
+     NULL, NULL, DATEADD('DAY', 14, CURRENT_DATE), DATEADD('DAY', 14, CURRENT_DATE), '14:00:00', '15:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Iglesia de los Capuchinos'),
-     NULL, NULL, DATEADD('DAY', 14, CURRENT_DATE), DATEADD('DAY', 17, CURRENT_DATE), '15:30:00', '16:30:00'),
+     NULL, NULL, DATEADD('DAY', 15, CURRENT_DATE), DATEADD('DAY', 15, CURRENT_DATE), '15:30:00', '16:30:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Paseo de las Artes de Güemes'),
-     NULL, NULL, DATEADD('DAY', 14, CURRENT_DATE), DATEADD('DAY', 17, CURRENT_DATE), '17:00:00', '18:00:00');
+     NULL, NULL, DATEADD('DAY', 15, CURRENT_DATE), DATEADD('DAY', 15, CURRENT_DATE), '17:00:00', '18:00:00');
 
 -- Carlos Paz
 
@@ -706,29 +710,29 @@ VALUES
 
 INSERT INTO evento (id, monto_estimado, sitio_oficial, fecha_inicio, fecha_fin, horario_inicio, horario_fin) VALUES
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Parque de aventura en las sierras'),
-     12000, 'https://turismo.cordoba.gob.ar', DATEADD('DAY', 21, CURRENT_DATE), DATEADD('DAY', 24, CURRENT_DATE), '09:00:00', '10:00:00'),
+     12000, 'https://turismo.cordoba.gob.ar', DATEADD('DAY', 19, CURRENT_DATE), DATEADD('DAY', 19, CURRENT_DATE), '09:00:00', '10:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Tirolesa en el valle de Punilla'),
-     9000, 'https://turismo.cordoba.gob.ar', DATEADD('DAY', 21, CURRENT_DATE), DATEADD('DAY', 24, CURRENT_DATE), '10:30:00', '11:30:00'),
+     9000, 'https://turismo.cordoba.gob.ar', DATEADD('DAY', 20, CURRENT_DATE), DATEADD('DAY', 20, CURRENT_DATE), '10:30:00', '11:30:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Cabalgata por las sierras de Carlos Paz'),
-     8000, 'https://turismo.cordoba.gob.ar', DATEADD('DAY', 21, CURRENT_DATE), DATEADD('DAY', 24, CURRENT_DATE), '12:00:00', '13:00:00'),
+     8000, 'https://turismo.cordoba.gob.ar', DATEADD('DAY', 20, CURRENT_DATE), DATEADD('DAY', 20, CURRENT_DATE), '12:00:00', '13:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Paseo en lancha por el lago San Roque'),
-     7000, 'https://turismo.cordoba.gob.ar', DATEADD('DAY', 21, CURRENT_DATE), DATEADD('DAY', 24, CURRENT_DATE), '14:00:00', '15:00:00'),
+     7000, 'https://turismo.cordoba.gob.ar', DATEADD('DAY', 21, CURRENT_DATE), DATEADD('DAY', 21, CURRENT_DATE), '14:00:00', '15:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Balneario El Fantasio'),
-     NULL, NULL, DATEADD('DAY', 21, CURRENT_DATE), DATEADD('DAY', 24, CURRENT_DATE), '15:30:00', '16:30:00'),
+     NULL, NULL, DATEADD('DAY', 21, CURRENT_DATE), DATEADD('DAY', 21, CURRENT_DATE), '15:30:00', '16:30:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Parque Estancia La Quinta'),
-     NULL, NULL, DATEADD('DAY', 21, CURRENT_DATE), DATEADD('DAY', 24, CURRENT_DATE), '17:00:00', '18:00:00'),
+     NULL, NULL, DATEADD('DAY', 22, CURRENT_DATE), DATEADD('DAY', 22, CURRENT_DATE), '17:00:00', '18:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Mirador del Cerro de la Cruz'),
-     NULL, NULL, DATEADD('DAY', 21, CURRENT_DATE), DATEADD('DAY', 24, CURRENT_DATE), '18:30:00', '19:30:00'),
+     NULL, NULL, DATEADD('DAY', 22, CURRENT_DATE), DATEADD('DAY', 22, CURRENT_DATE), '18:30:00', '19:30:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Sendero del río San Antonio'),
-     NULL, NULL, DATEADD('DAY', 21, CURRENT_DATE), DATEADD('DAY', 24, CURRENT_DATE), '08:00:00', '09:00:00'),
+     NULL, NULL, DATEADD('DAY', 23, CURRENT_DATE), DATEADD('DAY', 23, CURRENT_DATE), '08:00:00', '09:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Peña en el centro de Carlos Paz'),
-     NULL, NULL, DATEADD('DAY', 21, CURRENT_DATE), DATEADD('DAY', 24, CURRENT_DATE), '20:00:00', '21:00:00'),
+     NULL, NULL, DATEADD('DAY', 23, CURRENT_DATE), DATEADD('DAY', 23, CURRENT_DATE), '20:00:00', '21:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Cena show en el Teatro del Lago'),
-     15000, 'https://turismo.cordoba.gob.ar', DATEADD('DAY', 21, CURRENT_DATE), DATEADD('DAY', 24, CURRENT_DATE), '21:00:00', '22:00:00'),
+     15000, 'https://turismo.cordoba.gob.ar', DATEADD('DAY', 24, CURRENT_DATE), DATEADD('DAY', 24, CURRENT_DATE), '21:00:00', '22:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Bar de música en vivo'),
-     NULL, NULL, DATEADD('DAY', 21, CURRENT_DATE), DATEADD('DAY', 24, CURRENT_DATE), '19:00:00', '20:00:00'),
+     NULL, NULL, DATEADD('DAY', 25, CURRENT_DATE), DATEADD('DAY', 25, CURRENT_DATE), '19:00:00', '20:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Noche de cine al aire libre'),
-     NULL, NULL, DATEADD('DAY', 21, CURRENT_DATE), DATEADD('DAY', 24, CURRENT_DATE), '22:00:00', '23:00:00');
+     NULL, NULL, DATEADD('DAY', 21, CURRENT_DATE), DATEADD('DAY', 21, CURRENT_DATE), '22:00:00', '23:00:00');
 
 -- Alta Gracia
 
@@ -757,11 +761,11 @@ VALUES
 
 INSERT INTO evento (id, monto_estimado, sitio_oficial, fecha_inicio, fecha_fin, horario_inicio, horario_fin) VALUES
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Museo Manuel de Falla'),
-     NULL, NULL, DATEADD('DAY', 28, CURRENT_DATE), DATEADD('DAY', 30, CURRENT_DATE), '10:30:00', '11:30:00'),
+     NULL, NULL, DATEADD('DAY', 29, CURRENT_DATE), DATEADD('DAY', 29, CURRENT_DATE), '10:30:00', '11:30:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Reloj Público y Tajamar'),
-     NULL, NULL, DATEADD('DAY', 28, CURRENT_DATE), DATEADD('DAY', 30, CURRENT_DATE), '14:00:00', '15:00:00'),
+     NULL, NULL, DATEADD('DAY', 28, CURRENT_DATE), DATEADD('DAY', 28, CURRENT_DATE), '14:00:00', '15:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Peña gastronómica de Alta Gracia'),
-     NULL, NULL, DATEADD('DAY', 28, CURRENT_DATE), DATEADD('DAY', 30, CURRENT_DATE), '20:00:00', '21:00:00');
+     NULL, NULL, DATEADD('DAY', 30, CURRENT_DATE), DATEADD('DAY', 30, CURRENT_DATE), '20:00:00', '21:00:00');
 
 -- La Cumbrecita
 
@@ -826,23 +830,23 @@ VALUES
 
 INSERT INTO evento (id, monto_estimado, sitio_oficial, fecha_inicio, fecha_fin, horario_inicio, horario_fin) VALUES
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Río Almbach y pozones naturales'),
-     NULL, NULL, DATEADD('DAY', 35, CURRENT_DATE), DATEADD('DAY', 38, CURRENT_DATE), '08:00:00', '09:00:00'),
+     NULL, NULL, DATEADD('DAY', 37, CURRENT_DATE), DATEADD('DAY', 37, CURRENT_DATE), '08:00:00', '09:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Mirador del Cerro Wank'),
-     NULL, NULL, DATEADD('DAY', 35, CURRENT_DATE), DATEADD('DAY', 38, CURRENT_DATE), '09:30:00', '10:30:00'),
+     NULL, NULL, DATEADD('DAY', 38, CURRENT_DATE), DATEADD('DAY', 38, CURRENT_DATE), '09:30:00', '10:30:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Reserva natural de La Cumbrecita'),
-     NULL, NULL, DATEADD('DAY', 35, CURRENT_DATE), DATEADD('DAY', 38, CURRENT_DATE), '11:00:00', '12:00:00'),
+     NULL, NULL, DATEADD('DAY', 34, CURRENT_DATE), DATEADD('DAY', 34, CURRENT_DATE), '11:00:00', '12:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Tirolesa en el bosque'),
-     9000, 'https://turismo.cordoba.gob.ar', DATEADD('DAY', 35, CURRENT_DATE), DATEADD('DAY', 38, CURRENT_DATE), '14:00:00', '15:00:00'),
+     9000, 'https://turismo.cordoba.gob.ar', DATEADD('DAY', 35, CURRENT_DATE), DATEADD('DAY', 35, CURRENT_DATE), '14:00:00', '15:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Cabalgata por los senderos de montaña'),
-     NULL, NULL, DATEADD('DAY', 35, CURRENT_DATE), DATEADD('DAY', 38, CURRENT_DATE), '15:30:00', '16:30:00'),
+     NULL, NULL, DATEADD('DAY', 39, CURRENT_DATE), DATEADD('DAY', 39, CURRENT_DATE), '15:30:00', '16:30:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Escalada en roca'),
-     10000, 'https://turismo.cordoba.gob.ar', DATEADD('DAY', 35, CURRENT_DATE), DATEADD('DAY', 38, CURRENT_DATE), '17:00:00', '18:00:00'),
+     10000, 'https://turismo.cordoba.gob.ar', DATEADD('DAY', 34, CURRENT_DATE), DATEADD('DAY', 34, CURRENT_DATE), '17:00:00', '18:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Picnic familiar en el bosque'),
-     NULL, NULL, DATEADD('DAY', 35, CURRENT_DATE), DATEADD('DAY', 38, CURRENT_DATE), '18:30:00', '19:30:00'),
+     NULL, NULL, DATEADD('DAY', 36, CURRENT_DATE), DATEADD('DAY', 36, CURRENT_DATE), '18:30:00', '19:30:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Fogón familiar con chocolate caliente'),
-     NULL, NULL, DATEADD('DAY', 35, CURRENT_DATE), DATEADD('DAY', 38, CURRENT_DATE), '20:00:00', '21:00:00'),
+     NULL, NULL, DATEADD('DAY', 37, CURRENT_DATE), DATEADD('DAY', 37, CURRENT_DATE), '20:00:00', '21:00:00'),
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Paseo relajante por el pueblo'),
-     NULL, NULL, DATEADD('DAY', 35, CURRENT_DATE), DATEADD('DAY', 38, CURRENT_DATE), '21:30:00', '22:30:00');
+     NULL, NULL, DATEADD('DAY', 35, CURRENT_DATE), DATEADD('DAY', 35, CURRENT_DATE), '21:30:00', '22:30:00');
 
 -- Actividades nuevas
 
@@ -881,12 +885,17 @@ VALUES
      'Cerro Wank',
      (SELECT id FROM ubicacion WHERE direccion = 'Cerro Wank, La Cumbrecita'), 1);
 
-INSERT INTO actividad (id, duracion_minutos) VALUES
-    ((SELECT id FROM propuesta_turistica WHERE nombre = 'Senderismo guiado por los senderos de VGB'), 180),
-    ((SELECT id FROM propuesta_turistica WHERE nombre = 'Visita guiada a la Catedral de Córdoba'), 60),
-    ((SELECT id FROM propuesta_turistica WHERE nombre = 'Kayak guiado por el lago San Roque'), 120),
-    ((SELECT id FROM propuesta_turistica WHERE nombre = 'Visita guiada al Museo Nacional Estancia Jesuítica'), 60),
-    ((SELECT id FROM propuesta_turistica WHERE nombre = 'Trekking guiado al Cerro Wank'), 120);
+INSERT INTO actividad (id, duracion_minutos, fecha_inicio, fecha_fin) VALUES
+    ((SELECT id FROM propuesta_turistica WHERE nombre = 'Senderismo guiado por los senderos de VGB'), 180,
+     DATEADD('DAY', 10, CURRENT_DATE), DATEADD('DAY', 11, CURRENT_DATE)),
+    ((SELECT id FROM propuesta_turistica WHERE nombre = 'Visita guiada a la Catedral de Córdoba'), 60,
+     DATEADD('DAY', 10, CURRENT_DATE), DATEADD('DAY', 10, CURRENT_DATE)),
+    ((SELECT id FROM propuesta_turistica WHERE nombre = 'Kayak guiado por el lago San Roque'), 120,
+     DATEADD('DAY', 12, CURRENT_DATE), DATEADD('DAY', 12, CURRENT_DATE)),
+    ((SELECT id FROM propuesta_turistica WHERE nombre = 'Visita guiada al Museo Nacional Estancia Jesuítica'), 60,
+     DATEADD('DAY', 8, CURRENT_DATE), DATEADD('DAY', 8, CURRENT_DATE)),
+    ((SELECT id FROM propuesta_turistica WHERE nombre = 'Trekking guiado al Cerro Wank'), 120,
+     DATEADD('DAY', 18, CURRENT_DATE), DATEADD('DAY', 18, CURRENT_DATE));
 
 INSERT INTO actividad_disponibilidad (actividad_id, orden, dia_semana, hora_inicio, hora_fin) VALUES
     ((SELECT id FROM propuesta_turistica WHERE nombre = 'Senderismo guiado por los senderos de VGB'), 0, 'MONDAY', '08:00:00', '12:00:00'),
@@ -1052,10 +1061,66 @@ INSERT INTO propuesta_imagen (propuesta_id, url, orden) VALUES
 -- ============================================================
 -- VIAJES SUGERIDOS PARA TURISTAS
 -- ============================================================
+-- ============================================================
+-- USUARIOS (cuentas de demo para login JWT)
+-- ============================================================
+-- Hashes BCrypt:
+--   Admin123!   → $2a$10$ZBKJhOz4PCJnwPIqviRhB.by2T.v2Ys51eDCV45poFr47MRPYkDlO
+--   Turista123! → $2a$10$h.trpkEjKgzu4eWYf/od.uift33hy6hwW9tYJXnvmAKo8mIrXWEM6
+
+INSERT INTO usuario (nombre, email, telefono, contrasena, activo, creado_en, ultimo_acceso_en) VALUES
+    ('Administrador Viajesazo', 'admin@viajesazo.com', NULL,
+     '$2a$10$ZBKJhOz4PCJnwPIqviRhB.by2T.v2Ys51eDCV45poFr47MRPYkDlO', TRUE,
+     DATEADD('DAY', -60, CURRENT_TIMESTAMP), DATEADD('DAY', -1, CURRENT_TIMESTAMP)),
+    ('Turista Demo', 'turista.demo@viajesazo.com', NULL,
+     '$2a$10$h.trpkEjKgzu4eWYf/od.uift33hy6hwW9tYJXnvmAKo8mIrXWEM6', TRUE,
+     DATEADD('DAY', -45, CURRENT_TIMESTAMP), DATEADD('DAY', -2, CURRENT_TIMESTAMP)),
+    ('Turista Aventura', 'turista.aventura@viajesazo.com', NULL,
+     '$2a$10$h.trpkEjKgzu4eWYf/od.uift33hy6hwW9tYJXnvmAKo8mIrXWEM6', TRUE,
+     DATEADD('DAY', -10, CURRENT_TIMESTAMP), DATEADD('DAY', -3, CURRENT_TIMESTAMP)),
+    ('Turista Gastronómico', 'turista.gastronomico@viajesazo.com', NULL,
+     '$2a$10$h.trpkEjKgzu4eWYf/od.uift33hy6hwW9tYJXnvmAKo8mIrXWEM6', TRUE,
+     DATEADD('DAY', -5, CURRENT_TIMESTAMP), DATEADD('DAY', -20, CURRENT_TIMESTAMP)),
+    ('Familia Demo', 'familia.demo@viajesazo.com', NULL,
+     '$2a$10$h.trpkEjKgzu4eWYf/od.uift33hy6hwW9tYJXnvmAKo8mIrXWEM6', TRUE,
+     DATEADD('DAY', -2, CURRENT_TIMESTAMP), NULL),
+    ('Publicador Demo', 'publicador.demo@viajesazo.com', NULL,
+     '$2a$10$h.trpkEjKgzu4eWYf/od.uift33hy6hwW9tYJXnvmAKo8mIrXWEM6', TRUE,
+     DATEADD('DAY', -30, CURRENT_TIMESTAMP), DATEADD('DAY', -1, CURRENT_TIMESTAMP)),
+    ('Publicador Cosquín', 'publicador.cosquin@viajesazo.com', NULL,
+     '$2a$10$h.trpkEjKgzu4eWYf/od.uift33hy6hwW9tYJXnvmAKo8mIrXWEM6', TRUE,
+     DATEADD('DAY', -25, CURRENT_TIMESTAMP), DATEADD('DAY', -1, CURRENT_TIMESTAMP));
+
+-- Vínculo 1:1 obligatorio para el rol PUBLICADOR.
+-- Turismo Córdoba → publicador.demo; Municipalidad de Cosquín → publicador.cosquin
+-- (propuestas distintas: Cosquín Rock/etc. vs Folklore Cosquín + visita Casco Histórico).
+UPDATE usuario
+SET publicador_id = (SELECT id FROM publicador WHERE email = 'info@cordoba.gob.ar')
+WHERE email = 'publicador.demo@viajesazo.com';
+
+UPDATE usuario
+SET publicador_id = (SELECT id FROM publicador WHERE email = 'cosquin@cordoba.gob.ar')
+WHERE email = 'publicador.cosquin@viajesazo.com';
+
+INSERT INTO usuario_roles (usuario_id, rol)
+SELECT id, 'ADMINISTRADOR' FROM usuario WHERE email = 'admin@viajesazo.com';
+INSERT INTO usuario_roles (usuario_id, rol)
+SELECT id, 'TURISTA' FROM usuario WHERE email = 'turista.demo@viajesazo.com';
+INSERT INTO usuario_roles (usuario_id, rol)
+SELECT id, 'TURISTA' FROM usuario WHERE email = 'turista.aventura@viajesazo.com';
+INSERT INTO usuario_roles (usuario_id, rol)
+SELECT id, 'TURISTA' FROM usuario WHERE email = 'turista.gastronomico@viajesazo.com';
+INSERT INTO usuario_roles (usuario_id, rol)
+SELECT id, 'TURISTA' FROM usuario WHERE email = 'familia.demo@viajesazo.com';
+INSERT INTO usuario_roles (usuario_id, rol)
+SELECT id, 'PUBLICADOR' FROM usuario WHERE email = 'publicador.demo@viajesazo.com';
+INSERT INTO usuario_roles (usuario_id, rol)
+SELECT id, 'PUBLICADOR' FROM usuario WHERE email = 'publicador.cosquin@viajesazo.com';
+
 --
 -- `Viaje.zonaInteres` es una asociación `@ManyToOne` a `Ubicacion` (columna
 -- `zona_interes_id`). Se referencia por ciudad para no depender del orden de
--- inserción de las ubicaciones.
+-- inserción de las ubicaciones. `usuario_id` referencia la cuenta por email.
 --
 -- Las fechas son relativas a hoy (mismo criterio que los eventos) para que el
 -- demo tenga siempre viajes futuros.
@@ -1068,49 +1133,8 @@ INSERT INTO viaje (
     fecha_fin,
     ritmo,
     estado,
-    usuario
-)
-VALUES (
-    'Escapada serrana por Villa General Belgrano',
-    (SELECT id FROM ubicacion WHERE ciudad = 'Villa General Belgrano' AND direccion IS NULL),
-    35,
-    DATEADD('DAY', 7, CURRENT_TIMESTAMP),
-    DATEADD('DAY', 9, CURRENT_TIMESTAMP),
-    'EQUILIBRADO',
-    'PLANIFICADO',
-    'turista.demo@viajesazo.com'
-);
-
-INSERT INTO viaje (
-    nombre,
-    zona_interes_id,
-    rango_interes_km,
-    fecha_inicio,
-    fecha_fin,
-    ritmo,
-    estado,
-    usuario
-)
-VALUES (
-    'Cultura y naturaleza en Córdoba',
-    (SELECT id FROM ubicacion WHERE ciudad = 'Ciudad de Córdoba' AND direccion IS NULL),
-    50,
-    DATEADD('DAY', 14, CURRENT_TIMESTAMP),
-    DATEADD('DAY', 17, CURRENT_TIMESTAMP),
-    'TRANQUILO',
-    'PLANIFICADO',
-    'turista.demo@viajesazo.com'
-);
-
-INSERT INTO viaje (
-    nombre,
-    zona_interes_id,
-    rango_interes_km,
-    fecha_inicio,
-    fecha_fin,
-    ritmo,
-    estado,
-    usuario
+    usuario_id,
+    creado_en
 )
 VALUES (
     'Aventura en el Valle de Punilla',
@@ -1120,7 +1144,8 @@ VALUES (
     DATEADD('DAY', 24, CURRENT_TIMESTAMP),
     'INTENSIVO',
     'PLANIFICADO',
-    'turista.aventura@viajesazo.com'
+    (SELECT id FROM usuario WHERE email = 'turista.aventura@viajesazo.com'),
+    DATEADD('DAY', -5, CURRENT_TIMESTAMP)
 );
 
 INSERT INTO viaje (
@@ -1131,7 +1156,8 @@ INSERT INTO viaje (
     fecha_fin,
     ritmo,
     estado,
-    usuario
+    usuario_id,
+    creado_en
 )
 VALUES (
     'Sabores y tradiciones de Córdoba',
@@ -1141,7 +1167,8 @@ VALUES (
     DATEADD('DAY', 30, CURRENT_TIMESTAMP),
     'TRANQUILO',
     'PLANIFICADO',
-    'turista.gastronomico@viajesazo.com'
+    (SELECT id FROM usuario WHERE email = 'turista.gastronomico@viajesazo.com'),
+    DATEADD('DAY', -25, CURRENT_TIMESTAMP)
 );
 
 INSERT INTO viaje (
@@ -1152,7 +1179,8 @@ INSERT INTO viaje (
     fecha_fin,
     ritmo,
     estado,
-    usuario
+    usuario_id,
+    creado_en
 )
 VALUES (
     'Recorrido familiar por las sierras',
@@ -1162,7 +1190,8 @@ VALUES (
     DATEADD('DAY', 38, CURRENT_TIMESTAMP),
     'EQUILIBRADO',
     'PLANIFICADO',
-    'familia.demo@viajesazo.com'
+    (SELECT id FROM usuario WHERE email = 'familia.demo@viajesazo.com'),
+    DATEADD('DAY', -1, CURRENT_TIMESTAMP)
 );
 
 -- ============================================================
@@ -1173,12 +1202,6 @@ VALUES (
 
 INSERT INTO viaje_intereses_categoria (viaje_id, categoria)
 VALUES
-    ((SELECT id FROM viaje WHERE nombre = 'Escapada serrana por Villa General Belgrano'), 'NATURALEZA'),
-    ((SELECT id FROM viaje WHERE nombre = 'Escapada serrana por Villa General Belgrano'), 'GASTRONOMIA'),
-    ((SELECT id FROM viaje WHERE nombre = 'Escapada serrana por Villa General Belgrano'), 'VIDA_NOCTURNA'),
-    ((SELECT id FROM viaje WHERE nombre = 'Cultura y naturaleza en Córdoba'), 'CULTURA'),
-    ((SELECT id FROM viaje WHERE nombre = 'Cultura y naturaleza en Córdoba'), 'HISTORIA'),
-    ((SELECT id FROM viaje WHERE nombre = 'Cultura y naturaleza en Córdoba'), 'COMPRAS'),
     ((SELECT id FROM viaje WHERE nombre = 'Aventura en el Valle de Punilla'), 'AVENTURA'),
     ((SELECT id FROM viaje WHERE nombre = 'Aventura en el Valle de Punilla'), 'NATURALEZA'),
     ((SELECT id FROM viaje WHERE nombre = 'Aventura en el Valle de Punilla'), 'VIDA_NOCTURNA'),

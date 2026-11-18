@@ -1,6 +1,7 @@
 package com.viajesazo.turismo_backend.dto.response;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 import com.viajesazo.turismo_backend.model.EstadoPropuesta;
@@ -26,6 +27,8 @@ public record ActividadResponse(
 		BigDecimal latitud,
 		BigDecimal longitud,
 		int duracionMinutos,
+		LocalDate fechaInicio,
+		LocalDate fechaFin,
 		List<DisponibilidadResponse> disponibilidades,
 		List<String> imagenes,
 		Long publicadorId,

@@ -4,47 +4,59 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.ToIntFunction;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
 
 import com.viajesazo.turismo_backend.model.InteresCategoria;
+import com.viajesazo.turismo_backend.model.TipoRegistro;
 import com.viajesazo.turismo_backend.model.TipoRitmo;
 
 @Component
 public class CircuitGenerator {
 
-    private static final LocalTime PLANNING_DAY_START = LocalTime.of(6, 0);
-    private static final LocalTime PLANNING_DAY_END = LocalTime.of(23, 59);
+	private static final LocalTime PLANNING_DAY_START = LocalTime.of(6, 0);
+	private static final LocalTime PLANNING_DAY_END = LocalTime.of(23, 59);
 
-    private final DistanceProvider distanceProvider;
+	private final DistanceProvider distanceProvider;
 
-    public CircuitGenerator(DistanceProvider distanceProvider) {
-        this.distanceProvider = distanceProvider;
-    }
+	public CircuitGenerator(DistanceProvider distanceProvider) {
+		this.distanceProvider = distanceProvider;
+	}
 
-    public List<GeneratedAlternative> generate(LocalDate start, LocalDate end, TipoRitmo rhythm,
-            Set<InteresCategoria> interests, List<CircuitCandidate> candidates) {
-        List<GeneratedAlternative> alternatives = new ArrayList<>();
-        for (CircuitStrategy strategy : CircuitStrategy.values()) {
-            alternatives.add(generateAlternative(start, end, rhythm, interests, candidates, strategy));
-        }
-        return alternatives;
-    }
+	public List<GeneratedAlternative> generate(LocalDate start, LocalDate end, TipoRitmo rhythm,
+			Set<InteresCategoria> interests, List<CircuitCandidate> candidates) {
+		return generate(start, end, rhythm, interests, candidates, Map.of(), Set.of(), Map.of());
+	}
+
+	public List<GeneratedAlternative> generate(LocalDate start, LocalDate end, TipoRitmo rhythm,
+			Set<InteresCategoria> interests, List<CircuitCandidate> candidates,
+			Map<LocalDate, DayQuota> dayQuotas, Set<Long> likedIds, Map<Long, Long> likeCounts) {
+		Map<LocalDate, DayQuota> quotas = dayQuotas == null ? Map.of() : dayQuotas;
+		Set<Long> liked = likedIds == null ? Set.of() : likedIds;
+		Map<Long, Long> likes = likeCounts == null ? Map.of() : likeCounts;
+		List<GeneratedAlternative> alternatives = new ArrayList<>();
+		for (CircuitStrategy strategy : CircuitStrategy.values()) {
+			alternatives.add(generateAlternative(start, end, rhythm, interests, candidates, strategy, quotas, liked,
+					likes));
+		}
+		return alternatives;
+	}
 
 	private GeneratedAlternative generateAlternative(LocalDate start, LocalDate end, TipoRitmo rhythm,
-			Set<InteresCategoria> interests, List<CircuitCandidate> candidates, CircuitStrategy strategy) {
+			Set<InteresCategoria> interests, List<CircuitCandidate> candidates, CircuitStrategy strategy,
+			Map<LocalDate, DayQuota> dayQuotas, Set<Long> likedIds, Map<Long, Long> likeCounts) {
 		List<CircuitCandidate> remaining = new ArrayList<>(candidates);
 		List<ScheduledProposal> scheduled = new ArrayList<>();
 		Set<InteresCategoria> covered = new LinkedHashSet<>();
 		double totalDistance = 0;
-		int dailyLimit = dailyLimit(rhythm);
+		boolean useTypeQuotas = rhythm == TipoRitmo.MANUAL;
+		int defaultDailyLimit = useTypeQuotas ? 0 : dailyLimit(rhythm);
 		Map<Long, CircuitCandidate> candidateById = candidates.stream()
 				.collect(Collectors.toMap(CircuitCandidate::id, candidate -> candidate, (first, second) -> first));
 
@@ -53,30 +65,74 @@ public class CircuitGenerator {
 			LocalTime cursor = PLANNING_DAY_START;
 			CircuitCandidate previous = null;
 			int order = 1;
-			while (order <= dailyLimit) {
-				CircuitCandidate candidate = choose(remaining, previous, cursor, day, strategy, interests, covered);
-				if (candidate == null) {
-					break;
-				}
-				CircuitCandidate.TimeSlot slot = slotFor(candidate, day, cursor, previous);
-				if (slot == null) {
+
+			if (useTypeQuotas) {
+				DayQuota quota = dayQuotas.getOrDefault(day, new DayQuota(0, 0));
+				int remainingEvents = Math.max(0, quota.events());
+				int remainingActivities = Math.max(0, quota.activities());
+				while (remainingEvents + remainingActivities > 0) {
+					TipoRegistro preferred = remainingEvents > 0 ? TipoRegistro.EVENTO : TipoRegistro.ACTIVIDAD;
+					CircuitCandidate candidate = choose(remaining, previous, cursor, day, strategy, interests, covered,
+							likedIds, likeCounts, preferred);
+					if (candidate == null && preferred == TipoRegistro.EVENTO && remainingActivities > 0) {
+						candidate = choose(remaining, previous, cursor, day, strategy, interests, covered, likedIds,
+								likeCounts, TipoRegistro.ACTIVIDAD);
+					} else if (candidate == null && preferred == TipoRegistro.ACTIVIDAD && remainingEvents > 0) {
+						candidate = choose(remaining, previous, cursor, day, strategy, interests, covered, likedIds,
+								likeCounts, TipoRegistro.EVENTO);
+					}
+					if (candidate == null) {
+						break;
+					}
+					CircuitCandidate.TimeSlot slot = slotFor(candidate, day, cursor, previous);
+					if (slot == null) {
+						remaining.remove(candidate);
+						continue;
+					}
+					TravelEstimate transfer = previous == null ? new TravelEstimate(0, 0)
+							: distance(previous, candidate);
+					dayItems.add(new ScheduledProposal(candidate.id(), candidate.name(), candidate.description(),
+							candidate.type(), candidate.category(), day, order, slot.start(), slot.end(),
+							transfer.distanceKm(), transfer.durationMinutes(), true, null, candidate.details()));
+					cursor = slot.end();
+					previous = candidate;
+					covered.add(candidate.category());
 					remaining.remove(candidate);
-					continue;
+					if (candidate.type() == TipoRegistro.EVENTO) {
+						remainingEvents = Math.max(0, remainingEvents - 1);
+					} else {
+						remainingActivities = Math.max(0, remainingActivities - 1);
+					}
+					order++;
 				}
-				TravelEstimate transfer = previous == null ? new TravelEstimate(0, 0)
-						: distance(previous, candidate);
-				dayItems.add(new ScheduledProposal(candidate.id(), candidate.name(), candidate.description(),
-						candidate.type(), candidate.category(), day, order, slot.start(), slot.end(),
-						transfer.distanceKm(), transfer.durationMinutes(), true, null, candidate.details()));
-				cursor = slot.end();
-				previous = candidate;
-				covered.add(candidate.category());
-				remaining.remove(candidate);
-				order++;
+			} else {
+				while (order <= defaultDailyLimit) {
+					CircuitCandidate candidate = choose(remaining, previous, cursor, day, strategy, interests, covered,
+							likedIds, likeCounts, null);
+					if (candidate == null) {
+						break;
+					}
+					CircuitCandidate.TimeSlot slot = slotFor(candidate, day, cursor, previous);
+					if (slot == null) {
+						remaining.remove(candidate);
+						continue;
+					}
+					TravelEstimate transfer = previous == null ? new TravelEstimate(0, 0)
+							: distance(previous, candidate);
+					dayItems.add(new ScheduledProposal(candidate.id(), candidate.name(), candidate.description(),
+							candidate.type(), candidate.category(), day, order, slot.start(), slot.end(),
+							transfer.distanceKm(), transfer.durationMinutes(), true, null, candidate.details()));
+					cursor = slot.end();
+					previous = candidate;
+					covered.add(candidate.category());
+					remaining.remove(candidate);
+					order++;
+				}
+				if (dayItems.size() < defaultDailyLimit) {
+					compactDay(day, dayItems, remaining, defaultDailyLimit, covered, candidateById);
+				}
 			}
-			if (dayItems.size() < dailyLimit) {
-				compactDay(day, dayItems, remaining, dailyLimit, covered, candidateById);
-			}
+
 			normalizeDay(dayItems, candidateById);
 			for (ScheduledProposal item : dayItems) {
 				scheduled.add(item);
@@ -93,11 +149,6 @@ public class CircuitGenerator {
 				affinity(scheduled, candidates, interests), covered, warning);
 	}
 
-	/**
-	 * Completa un día que la estrategia dejó corto: recorre las propuestas no usadas y las inserta
-	 * en los huecos libres, respetando el tope diario, los solapamientos y los traslados. No
-	 * descarta las paradas ya elegidas por la estrategia.
-	 */
 	private void compactDay(LocalDate day, List<ScheduledProposal> dayItems, List<CircuitCandidate> remaining,
 			int dailyLimit, Set<InteresCategoria> covered, Map<Long, CircuitCandidate> candidateById) {
 		record CandidateSlot(CircuitCandidate candidate, CircuitCandidate.TimeSlot slot) {
@@ -135,11 +186,6 @@ public class CircuitGenerator {
 		}
 	}
 
-	/**
-	 * Reordena el día por horario, renumera {@code order} y recalcula cada traslado desde la parada
-	 * anterior. La compactación puede insertar paradas en el medio, así que los traslados no se
-	 * pueden dejar como los calculó la pasada por estrategia.
-	 */
 	private void normalizeDay(List<ScheduledProposal> dayItems, Map<Long, CircuitCandidate> candidateById) {
 		dayItems.sort(Comparator.comparing(ScheduledProposal::start));
 		List<ScheduledProposal> normalized = new ArrayList<>();
@@ -170,25 +216,25 @@ public class CircuitGenerator {
 		return index;
 	}
 
-    private boolean fitsAfter(ScheduledProposal previous, CircuitCandidate candidate,
-            CircuitCandidate.TimeSlot slot, Map<Long, CircuitCandidate> candidateById) {
-        CircuitCandidate previousCandidate = candidateById.get(previous.proposalId());
-        if (previousCandidate == null) {
-            return true;
-        }
-        TravelEstimate transfer = distance(previousCandidate, candidate);
-        return minuteOfDay(slot.start()) >= minuteOfDay(previous.end()) + transfer.durationMinutes();
-    }
+	private boolean fitsAfter(ScheduledProposal previous, CircuitCandidate candidate,
+			CircuitCandidate.TimeSlot slot, Map<Long, CircuitCandidate> candidateById) {
+		CircuitCandidate previousCandidate = candidateById.get(previous.proposalId());
+		if (previousCandidate == null) {
+			return true;
+		}
+		TravelEstimate transfer = distance(previousCandidate, candidate);
+		return minuteOfDay(slot.start()) >= minuteOfDay(previous.end()) + transfer.durationMinutes();
+	}
 
-    private boolean fitsBefore(CircuitCandidate candidate, CircuitCandidate.TimeSlot slot,
-            ScheduledProposal next, Map<Long, CircuitCandidate> candidateById) {
-        CircuitCandidate nextCandidate = candidateById.get(next.proposalId());
-        if (nextCandidate == null) {
-            return true;
-        }
-        TravelEstimate transfer = distance(candidate, nextCandidate);
-        return minuteOfDay(slot.end()) + transfer.durationMinutes() <= minuteOfDay(next.start());
-    }
+	private boolean fitsBefore(CircuitCandidate candidate, CircuitCandidate.TimeSlot slot,
+			ScheduledProposal next, Map<Long, CircuitCandidate> candidateById) {
+		CircuitCandidate nextCandidate = candidateById.get(next.proposalId());
+		if (nextCandidate == null) {
+			return true;
+		}
+		TravelEstimate transfer = distance(candidate, nextCandidate);
+		return minuteOfDay(slot.end()) + transfer.durationMinutes() <= minuteOfDay(next.start());
+	}
 
 	private CircuitCandidate.TimeSlot slotOnDay(CircuitCandidate candidate, LocalDate day) {
 		for (CircuitCandidate.TimeSlot slot : candidate.slots()) {
@@ -203,82 +249,87 @@ public class CircuitGenerator {
 		return null;
 	}
 
-    private CircuitCandidate choose(List<CircuitCandidate> candidates, CircuitCandidate previous,
-            LocalTime cursor, LocalDate day, CircuitStrategy strategy, Set<InteresCategoria> interests,
-            Set<InteresCategoria> covered) {
-        List<CircuitCandidate> feasible = candidates.stream()
-                .filter(candidate -> slotFor(candidate, day, cursor, previous) != null)
-                .toList();
-        if (feasible.isEmpty()) {
-            return null;
-        }
-        Comparator<CircuitCandidate> comparator;
-        if (strategy == CircuitStrategy.CERCANIA && previous != null) {
-            comparator = Comparator.comparingDouble(candidate -> distance(previous, candidate).distanceKm());
-        } else if (strategy == CircuitStrategy.DESCUBRIMIENTO) {
-            comparator = Comparator
-                    .comparing((CircuitCandidate candidate) -> covered.contains(candidate.category()))
-                    .thenComparingInt(candidate -> availabilityCount(candidate))
-                    .thenComparing(candidate -> candidate.name());
-        } else {
-            comparator = Comparator
-                    .comparingInt((CircuitCandidate candidate) -> interestScore(candidate, interests)).reversed()
-                    .thenComparing(candidate -> candidate.name());
-        }
-        return feasible.stream().sorted(comparator).findFirst().orElse(null);
-    }
+	private CircuitCandidate choose(List<CircuitCandidate> candidates, CircuitCandidate previous,
+			LocalTime cursor, LocalDate day, CircuitStrategy strategy, Set<InteresCategoria> interests,
+			Set<InteresCategoria> covered, Set<Long> likedIds, Map<Long, Long> likeCounts, TipoRegistro requiredType) {
+		List<CircuitCandidate> feasible = candidates.stream()
+				.filter(candidate -> requiredType == null || candidate.type() == requiredType)
+				.filter(candidate -> slotFor(candidate, day, cursor, previous) != null)
+				.toList();
+		if (feasible.isEmpty()) {
+			return null;
+		}
+		Comparator<CircuitCandidate> comparator;
+		if (strategy == CircuitStrategy.CERCANIA && previous != null) {
+			comparator = Comparator.comparingDouble(candidate -> distance(previous, candidate).distanceKm());
+		} else if (strategy == CircuitStrategy.DESCUBRIMIENTO) {
+			comparator = Comparator
+					.comparing((CircuitCandidate candidate) -> covered.contains(candidate.category()))
+					.thenComparingInt(this::availabilityCount)
+					.thenComparing(CircuitCandidate::name);
+		} else {
+			comparator = Comparator
+					.comparingInt((CircuitCandidate candidate) -> interestScore(candidate, interests)).reversed()
+					.thenComparing(CircuitCandidate::name);
+		}
+		comparator = comparator
+				.thenComparing((CircuitCandidate candidate) -> !likedIds.contains(candidate.id()))
+				.thenComparingLong((CircuitCandidate candidate) -> -likeCounts.getOrDefault(candidate.id(), 0L));
+		return feasible.stream().sorted(comparator).findFirst().orElse(null);
+	}
 
-    private CircuitCandidate.TimeSlot slotFor(CircuitCandidate candidate, LocalDate day,
-            LocalTime cursor, CircuitCandidate previous) {
-        TravelEstimate transfer = previous == null ? new TravelEstimate(0, 0) : distance(previous, candidate);
-        int earliestArrival = minuteOfDay(cursor) + transfer.durationMinutes();
-        for (CircuitCandidate.TimeSlot slot : candidate.slots()) {
-            if (!slot.date().equals(day)) {
-                continue;
-            }
-            if (slot.start().isBefore(PLANNING_DAY_START) || slot.end().isAfter(PLANNING_DAY_END)) {
-                continue;
-            }
-            if (minuteOfDay(slot.start()) < earliestArrival) {
-                continue;
-            }
-            return slot;
-        }
-        return null;
-    }
+	private CircuitCandidate.TimeSlot slotFor(CircuitCandidate candidate, LocalDate day,
+			LocalTime cursor, CircuitCandidate previous) {
+		TravelEstimate transfer = previous == null ? new TravelEstimate(0, 0) : distance(previous, candidate);
+		int earliestArrival = minuteOfDay(cursor) + transfer.durationMinutes();
+		for (CircuitCandidate.TimeSlot slot : candidate.slots()) {
+			if (!slot.date().equals(day)) {
+				continue;
+			}
+			if (slot.start().isBefore(PLANNING_DAY_START) || slot.end().isAfter(PLANNING_DAY_END)) {
+				continue;
+			}
+			if (minuteOfDay(slot.start()) < earliestArrival) {
+				continue;
+			}
+			return slot;
+		}
+		return null;
+	}
 
-    private static int minuteOfDay(LocalTime time) {
-        return time.getHour() * 60 + time.getMinute();
-    }
+	private static int minuteOfDay(LocalTime time) {
+		return time.getHour() * 60 + time.getMinute();
+	}
 
-    private TravelEstimate distance(CircuitCandidate from, CircuitCandidate to) {
-        return distanceProvider.estimate(from.latitude(), from.longitude(), to.latitude(), to.longitude());
-    }
+	private TravelEstimate distance(CircuitCandidate from, CircuitCandidate to) {
+		return distanceProvider.estimate(from.latitude(), from.longitude(), to.latitude(), to.longitude());
+	}
 
-    private int interestScore(CircuitCandidate candidate, Set<InteresCategoria> interests) {
-        return candidate.category() != null && interests.contains(candidate.category()) ? 1 : 0;
-    }
+	private int interestScore(CircuitCandidate candidate, Set<InteresCategoria> interests) {
+		return candidate.category() != null && interests.contains(candidate.category()) ? 1 : 0;
+	}
 
-    private double affinity(List<ScheduledProposal> scheduled, List<CircuitCandidate> candidates,
-            Set<InteresCategoria> interests) {
-        if (scheduled.isEmpty()) {
-            return 0;
-        }
-        Set<Long> ids = scheduled.stream().map(ScheduledProposal::proposalId).collect(java.util.stream.Collectors.toSet());
-        long matching = candidates.stream().filter(candidate -> ids.contains(candidate.id()))
-                .filter(candidate -> candidate.category() != null && interests.contains(candidate.category())).count();
-        return (double) matching / scheduled.size();
-    }
+	private double affinity(List<ScheduledProposal> scheduled, List<CircuitCandidate> candidates,
+			Set<InteresCategoria> interests) {
+		if (scheduled.isEmpty()) {
+			return 0;
+		}
+		Set<Long> ids = scheduled.stream().map(ScheduledProposal::proposalId).collect(Collectors.toSet());
+		long matching = candidates.stream().filter(candidate -> ids.contains(candidate.id()))
+				.filter(candidate -> candidate.category() != null && interests.contains(candidate.category())).count();
+		return (double) matching / scheduled.size();
+	}
 
-    private int availabilityCount(CircuitCandidate candidate) {
-        return candidate.slots().size();
-    }
+	private int availabilityCount(CircuitCandidate candidate) {
+		return candidate.slots().size();
+	}
 
-    private int dailyLimit(TipoRitmo rhythm) {
-        return switch (rhythm) {
-            case TRANQUILO -> 2;
-            case EQUILIBRADO -> 3;
-            case INTENSIVO -> 4;
-        };
-    }
+	private int dailyLimit(TipoRitmo rhythm) {
+		return switch (rhythm) {
+			case TRANQUILO -> 2;
+			case EQUILIBRADO -> 4;
+			case INTENSIVO -> 5;
+			case MANUAL -> 0;
+		};
+	}
 }

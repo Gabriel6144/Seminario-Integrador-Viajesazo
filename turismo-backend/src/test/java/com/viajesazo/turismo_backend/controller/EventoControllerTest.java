@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -20,6 +21,7 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
@@ -31,7 +33,9 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.viajesazo.turismo_backend.config.AppConfig;
 import com.viajesazo.turismo_backend.dto.request.EventoRequest;
+import com.viajesazo.turismo_backend.dto.request.ReprogramarEventoRequest;
 import com.viajesazo.turismo_backend.dto.response.EventoResponse;
+import com.viajesazo.turismo_backend.dto.response.ReprogramarPreviewResponse;
 import com.viajesazo.turismo_backend.exception.ResourceNotFoundException;
 import com.viajesazo.turismo_backend.exception.BusinessRuleException;
 import com.viajesazo.turismo_backend.model.EstadoPropuesta;
@@ -40,9 +44,11 @@ import com.viajesazo.turismo_backend.model.Modalidad;
 import com.viajesazo.turismo_backend.model.TipoAcceso;
 import com.viajesazo.turismo_backend.model.TipoPropuesta;
 import com.viajesazo.turismo_backend.model.TipoRegistro;
+import com.viajesazo.turismo_backend.service.NotificacionService;
 import com.viajesazo.turismo_backend.service.PropuestaService;
 
 @WebMvcTest(EventoController.class)
+@AutoConfigureMockMvc(addFilters = false)
 // @WebMvcTest es un slice: solo carga beans web, así que el Clock que inyecta
 // GlobalExceptionHandler no existiría. Se importa la configuración real en vez de duplicarla.
 @Import(AppConfig.class)
@@ -73,6 +79,9 @@ class EventoControllerTest {
 
 	@MockitoBean
 	private PropuestaService propuestaService;
+
+	@MockitoBean
+	private NotificacionService notificacionService;
 
 	@Test
 	@DisplayName("US1: registra el evento y responde 201 con el evento creado")
@@ -181,6 +190,52 @@ class EventoControllerTest {
 
 		mockMvc.perform(put("/api/eventos/404").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
 				.andExpect(status().isNotFound());
+	}
+
+	@Test
+	@DisplayName("preview de reprogramar responde destinatarios y texto")
+	void previewReprogramar() throws Exception {
+		when(notificacionService.previewReprogramacion(eq(7L), eq(LocalDate.parse("2026-12-01"))))
+				.thenReturn(new ReprogramarPreviewResponse(
+						2L,
+						"Evento reprogramado: Festival de Folklore",
+						"El evento «Festival de Folklore» fue reprogramado del 1/10/2026 al 1/12/2026."));
+
+		mockMvc.perform(get("/api/eventos/7/reprogramar/preview").param("fechaInicio", "2026-12-01"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.destinatarios").value(2))
+				.andExpect(jsonPath("$.titulo").value("Evento reprogramado: Festival de Folklore"))
+				.andExpect(jsonPath("$.cuerpo").exists());
+
+		verify(notificacionService).previewReprogramacion(eq(7L), eq(LocalDate.parse("2026-12-01")));
+	}
+
+	@Test
+	@DisplayName("reprogramar mueve el evento y responde 200")
+	void reprogramsEvent() throws Exception {
+		when(propuestaService.reprogramar(eq(7L), any(ReprogramarEventoRequest.class))).thenReturn(response());
+
+		mockMvc.perform(patch("/api/eventos/7/reprogramar")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"fechaInicio\":\"2026-12-01\"}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.id").value(7));
+
+		verify(propuestaService).reprogramar(eq(7L), any(ReprogramarEventoRequest.class));
+	}
+
+	@Test
+	@DisplayName("reprogramar con solapamiento responde 400")
+	void reprogramOverlapReturns400() throws Exception {
+		when(propuestaService.reprogramar(eq(7L), any(ReprogramarEventoRequest.class)))
+				.thenThrow(new BusinessRuleException(
+						"ya tenés una propuesta agendada que se solapa con ese rango de fechas"));
+
+		mockMvc.perform(patch("/api/eventos/7/reprogramar")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"fechaInicio\":\"2026-12-01\"}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.status").value(400));
 	}
 
 	@Test

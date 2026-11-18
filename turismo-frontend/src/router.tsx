@@ -1,8 +1,16 @@
 import { createBrowserRouter } from 'react-router-dom'
 
 import { Layout } from '@/components/layout'
+import {
+  HomeEntry,
+  RequireAuth,
+  RequireNotAdmin,
+  RequireNotPublicadorTour,
+  RequireRole,
+} from '@/components/require-auth'
 import { ActividadDetailPage } from '@/pages/actividad-detail-page'
 import { ActividadEditarPage } from '@/pages/actividad-editar-page'
+import { AdminDashboardPage } from '@/pages/admin-dashboard-page'
 import { AgendaPage } from '@/pages/agenda-page'
 import { BorradoresPage } from '@/pages/borradores-page'
 import { CircuitoPage } from '@/pages/circuito-page'
@@ -10,50 +18,96 @@ import { EventoDetailPage } from '@/pages/evento-detail-page'
 import { EventoEditarPage } from '@/pages/evento-editar-page'
 import { EventoNuevoPage } from '@/pages/evento-nuevo-page'
 import { EventosPage } from '@/pages/eventos-page'
+import { LoginPage } from '@/pages/login-page'
 import { NotFoundPage } from '@/pages/not-found-page'
 import { PlanificadorPage } from '@/pages/planificador-page'
+import { PublicadorAgendaPage } from '@/pages/publicador-agenda-page'
+import { PublicadorDashboardPage } from '@/pages/publicador-dashboard-page'
 import { PublicadorDetailPage } from '@/pages/publicador-detail-page'
 import { PublicadorNuevoPage } from '@/pages/publicador-nuevo-page'
 import { PublicadoresPage } from '@/pages/publicadores-page'
+import { RegistroPage } from '@/pages/registro-page'
 import { UsuarioNuevoPage } from '@/pages/usuario-nuevo-page'
 import { UsuariosPage } from '@/pages/usuarios-page'
 
 /**
  * Rutas de la app.
  *
- * Todas cuelgan de `Layout`, que renderiza la navegación y el `Outlet`. React Router puntúa las
- * rutas de la más específica a la más genérica, así que el orden importa:
- *
- * - `/` tiene que ir antes que `/eventos/:id` para no quedar capturada por ella.
- * - `/eventos/nuevo` es un segmento estático contra uno dinámico. El scoring de React Router le
- *   da prioridad al estático, así que no hay colisión; y si algo fallara igual, `parseId('nuevo')`
- *   devuelve `null` y se muestra el mensaje de id inválido, no una pantalla rota.
- *
- * Las rutas se definen con `createBrowserRouter` y no `<BrowserRouter>` + `<Routes>` porque la
- * primera construye la ruta como **datos**, lo que deja `loader` y `useMatches` disponibles más
- * adelante sin tener que migrar.
+ * - ADMINISTRADOR: `/admin` + `/usuarios` (+ alta publicador).
+ * - PUBLICADOR: Mis propuestas + panel/agenda; sin catálogo Publicadores ni agenda turística/viajes.
+ * - TURISTA / guest: catálogo Publicadores; turista además planificar + mis viajes + agenda.
  */
 export const router = createBrowserRouter([
   {
     path: '/',
     Component: Layout,
     children: [
-      { index: true, Component: EventosPage },
-      { path: 'agenda', Component: AgendaPage },
-      { path: 'borradores', Component: BorradoresPage },
-      { path: 'viajes/:id/circuito', Component: CircuitoPage },
-      { path: 'planificar', Component: PlanificadorPage },
-      { path: 'propuestas/nueva', Component: EventoNuevoPage },
-      { path: 'eventos/nuevo', Component: EventoNuevoPage },
-      { path: 'eventos/:id', Component: EventoDetailPage },
-      { path: 'eventos/:id/editar', Component: EventoEditarPage },
-      { path: 'actividades/:id', Component: ActividadDetailPage },
-      { path: 'actividades/:id/editar', Component: ActividadEditarPage },
-      { path: 'publicadores', Component: PublicadoresPage },
-      { path: 'publicadores/nuevo', Component: PublicadorNuevoPage },
-      { path: 'publicadores/:id', Component: PublicadorDetailPage },
-      { path: 'usuarios', Component: UsuariosPage },
-      { path: 'usuarios/nuevo', Component: UsuarioNuevoPage },
+      {
+        index: true,
+        element: (
+          <HomeEntry>
+            <EventosPage />
+          </HomeEntry>
+        ),
+      },
+      { path: 'login', Component: LoginPage },
+      { path: 'registro', Component: RegistroPage },
+
+      {
+        Component: RequireNotAdmin,
+        children: [
+          { path: 'eventos/:id', Component: EventoDetailPage },
+          { path: 'actividades/:id', Component: ActividadDetailPage },
+          {
+            Component: RequireNotPublicadorTour,
+            children: [
+              { path: 'publicadores', Component: PublicadoresPage },
+              { path: 'publicadores/:id', Component: PublicadorDetailPage },
+            ],
+          },
+        ],
+      },
+
+      {
+        Component: RequireAuth,
+        children: [
+          {
+            Component: RequireNotAdmin,
+            children: [
+              {
+                Component: RequireNotPublicadorTour,
+                children: [
+                  { path: 'agenda', Component: AgendaPage },
+                  { path: 'borradores', Component: BorradoresPage },
+                  { path: 'planificar', Component: PlanificadorPage },
+                  { path: 'viajes/:id/circuito', Component: CircuitoPage },
+                ],
+              },
+              {
+                element: <RequireRole roles={['PUBLICADOR']} />,
+                children: [
+                  { path: 'publicador', Component: PublicadorDashboardPage },
+                  { path: 'publicador/agenda', Component: PublicadorAgendaPage },
+                  { path: 'propuestas/nueva', Component: EventoNuevoPage },
+                  { path: 'eventos/nuevo', Component: EventoNuevoPage },
+                  { path: 'eventos/:id/editar', Component: EventoEditarPage },
+                  { path: 'actividades/:id/editar', Component: ActividadEditarPage },
+                ],
+              },
+            ],
+          },
+          {
+            element: <RequireRole roles={['ADMINISTRADOR']} />,
+            children: [
+              { path: 'admin', Component: AdminDashboardPage },
+              { path: 'publicadores/nuevo', Component: PublicadorNuevoPage },
+              { path: 'usuarios', Component: UsuariosPage },
+              { path: 'usuarios/nuevo', Component: UsuarioNuevoPage },
+            ],
+          },
+        ],
+      },
+
       { path: '*', Component: NotFoundPage },
     ],
   },

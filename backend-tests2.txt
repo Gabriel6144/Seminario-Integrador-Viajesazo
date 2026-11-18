@@ -1,0 +1,12 @@
+﻿[ERROR] COMPILATION ERROR : 
+[ERROR] /C:/Users/Thiago Alejo Decalli/Documents/Seminario-Integrador-Viajesazo/turismo-backend/target/generated-sources/annotations/com/viajesazo/turismo_backend/mapper/ViajeMapperImpl.java: error reading C:\Users\Thiago Alejo Decalli\Documents\Seminario-Integrador-Viajesazo\turismo-backend\target\generated-sources\annotations\com\viajesazo\turismo_backend\mapper\ViajeMapperImpl.java; C:\Users\Thiago Alejo Decalli\Documents\Seminario-Integrador-Viajesazo\turismo-backend\target\generated-sources\annotations\com\viajesazo\turismo_backend\mapper\ViajeMapperImpl.java
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.15.0:compile (default-compile) on project turismo-backend: Compilation failure
+[ERROR] /C:/Users/Thiago Alejo Decalli/Documents/Seminario-Integrador-Viajesazo/turismo-backend/target/generated-sources/annotations/com/viajesazo/turismo_backend/mapper/ViajeMapperImpl.java: error reading C:\Users\Thiago Alejo Decalli\Documents\Seminario-Integrador-Viajesazo\turismo-backend\target\generated-sources\annotations\com\viajesazo\turismo_backend\mapper\ViajeMapperImpl.java; C:\Users\Thiago Alejo Decalli\Documents\Seminario-Integrador-Viajesazo\turismo-backend\target\generated-sources\annotations\com\viajesazo\turismo_backend\mapper\ViajeMapperImpl.java
+[ERROR] 
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

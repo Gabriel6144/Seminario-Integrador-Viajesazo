@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.viajesazo.turismo_backend.dto.request.EventoRequest;
+import com.viajesazo.turismo_backend.dto.request.ReprogramarEventoRequest;
 import com.viajesazo.turismo_backend.dto.response.EventoResponse;
 import com.viajesazo.turismo_backend.exception.BusinessRuleException;
 import com.viajesazo.turismo_backend.exception.ResourceNotFoundException;
@@ -18,12 +19,15 @@ import com.viajesazo.turismo_backend.mapper.EventoMapper;
 import com.viajesazo.turismo_backend.model.EstadoPropuesta;
 import com.viajesazo.turismo_backend.model.Evento;
 import com.viajesazo.turismo_backend.model.Publicador;
+import com.viajesazo.turismo_backend.model.Rol;
 import com.viajesazo.turismo_backend.model.TipoAcceso;
 import com.viajesazo.turismo_backend.model.Ubicacion;
 import com.viajesazo.turismo_backend.repository.EventoRepository;
 import com.viajesazo.turismo_backend.repository.EstadoPropuestaRepository;
 import com.viajesazo.turismo_backend.repository.PublicadorRepository;
 import com.viajesazo.turismo_backend.repository.UbicacionRepository;
+import com.viajesazo.turismo_backend.security.SecurityUtils;
+import com.viajesazo.turismo_backend.security.UsuarioPrincipal;
 
 import lombok.RequiredArgsConstructor;
 
@@ -38,6 +42,8 @@ public class PropuestaService {
 	private final Clock clock;
 	private final EventoMapper mapper;
 	private final GeocodingService geocodingService;
+	private final PublicadorAgendaService publicadorAgendaService;
+	private final NotificacionService notificacionService;
 
 	@Transactional
 	public EventoResponse create(EventoRequest request) {
@@ -46,7 +52,10 @@ public class PropuestaService {
 		Evento evento = mapper.toEntity(request);
 		evento.setTipoAcceso(request.tipoAcceso() == null ? TipoAcceso.GRATUITO : request.tipoAcceso());
 		evento.setEstadoPropuesta(getInitialState());
-		evento.setPublicador(getPublicadorOrThrow(request.publicadorId()));
+		Publicador publicador = resolvePublicadorForWrite(request.publicadorId(), null);
+		evento.setPublicador(publicador);
+		publicadorAgendaService.assertSinSolapamiento(
+				publicador.getId(), request.fechaInicio(), request.fechaFin(), null, null);
 		applyUbicacion(evento, request);
 		evento.validarInvariantes();
 		return mapper.toResponse(eventoRepository.save(evento));
@@ -57,12 +66,16 @@ public class PropuestaService {
 		validateRange(request);
 		validateAcceso(request);
 		Evento evento = getOrThrow(id);
+		assertCanManage(evento.getPublicador());
 		evento.validarEditable();
 		mapper.updateEntity(request, evento);
 		if (request.tipoAcceso() != null) {
 			evento.setTipoAcceso(request.tipoAcceso());
 		}
-		evento.setPublicador(getPublicadorOrThrow(request.publicadorId()));
+		Publicador publicador = resolvePublicadorForWrite(request.publicadorId(), evento.getPublicador());
+		evento.setPublicador(publicador);
+		publicadorAgendaService.assertSinSolapamiento(
+				publicador.getId(), request.fechaInicio(), request.fechaFin(), id, null);
 		applyUbicacion(evento, request);
 		evento.validarInvariantes();
 		return mapper.toResponse(eventoRepository.save(evento));
@@ -70,7 +83,36 @@ public class PropuestaService {
 
 	@Transactional
 	public void delete(Long id) {
-		eventoRepository.delete(getOrThrow(id));
+		Evento evento = getOrThrow(id);
+		assertCanManage(evento.getPublicador());
+		eventoRepository.delete(evento);
+	}
+
+	/**
+	 * Reprograma solo las fechas del evento, preservando la duración del rango.
+	 * No geocodifica ni toca el resto de campos.
+	 */
+	@Transactional
+	public EventoResponse reprogramar(Long id, ReprogramarEventoRequest request) {
+		Evento evento = getOrThrow(id);
+		assertCanManage(evento.getPublicador());
+		evento.validarEditable();
+		if (request.fechaInicio() == null) {
+			throw new BusinessRuleException("la fecha de inicio es obligatoria");
+		}
+		LocalDate fechaAnteriorInicio = evento.getFechaInicio();
+		LocalDate fechaAnteriorFin = evento.getFechaFin();
+		long dias = java.time.temporal.ChronoUnit.DAYS.between(fechaAnteriorInicio, fechaAnteriorFin);
+		LocalDate nuevaInicio = request.fechaInicio();
+		LocalDate nuevaFin = nuevaInicio.plusDays(dias);
+		publicadorAgendaService.assertSinSolapamiento(
+				evento.getPublicador().getId(), nuevaInicio, nuevaFin, id, null);
+		evento.setFechaInicio(nuevaInicio);
+		evento.setFechaFin(nuevaFin);
+		evento.validarInvariantes();
+		Evento guardado = eventoRepository.save(evento);
+		notificacionService.notificarReprogramacion(guardado, fechaAnteriorInicio, fechaAnteriorFin);
+		return mapper.toResponse(guardado);
 	}
 
 	@Transactional(readOnly = true)
@@ -120,6 +162,35 @@ public class PropuestaService {
 		return publicadorRepository.findById(publicadorId)
 				.orElseThrow(() -> new ResourceNotFoundException(
 						"No existe el publicador con id " + publicadorId));
+	}
+
+	/**
+	 * ABAC: el administrador puede operar sobre cualquier publicador; el publicador solo sobre el
+	 * propio. En el alta de un PUBLICADOR se fuerza su {@code publicadorId}.
+	 */
+	private Publicador resolvePublicadorForWrite(Long requestedPublicadorId, Publicador existing) {
+		UsuarioPrincipal principal = SecurityUtils.currentPrincipal();
+		if (principal.hasRole(Rol.ADMINISTRADOR)) {
+			return getPublicadorOrThrow(requestedPublicadorId);
+		}
+		if (!principal.hasRole(Rol.PUBLICADOR) || principal.getPublicadorId() == null) {
+			throw new BusinessRuleException("solo un publicador o administrador puede gestionar eventos");
+		}
+		if (existing != null && !existing.getId().equals(principal.getPublicadorId())) {
+			throw new BusinessRuleException("no podés gestionar eventos de otro publicador");
+		}
+		return getPublicadorOrThrow(principal.getPublicadorId());
+	}
+
+	private void assertCanManage(Publicador publicador) {
+		UsuarioPrincipal principal = SecurityUtils.currentPrincipal();
+		if (principal.hasRole(Rol.ADMINISTRADOR)) {
+			return;
+		}
+		if (!principal.hasRole(Rol.PUBLICADOR) || principal.getPublicadorId() == null
+				|| publicador == null || !publicador.getId().equals(principal.getPublicadorId())) {
+			throw new BusinessRuleException("no podés gestionar eventos de otro publicador");
+		}
 	}
 
 	private EstadoPropuesta getInitialState() {

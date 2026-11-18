@@ -19,8 +19,11 @@ interface UsuarioBajaDialogProps {
   isPending: boolean
 }
 
-function initials(nombre: string, apellido: string) {
-  return `${nombre.trim()[0] ?? ''}${apellido.trim()[0] ?? ''}`.toUpperCase() || 'U'
+function initials(nombre: string) {
+  const parts = nombre.trim().split(/\s+/)
+  const a = parts[0]?.[0] ?? ''
+  const b = parts[1]?.[0] ?? ''
+  return `${a}${b}`.toUpperCase() || 'U'
 }
 
 function rolBadgeClass(rol: RolUsuario) {
@@ -29,8 +32,14 @@ function rolBadgeClass(rol: RolUsuario) {
   return 'bg-red-100 text-red-700 border-red-200'
 }
 
-export function UsuarioBajaDialog({ usuario, open, onOpenChange, onConfirm, isPending }: UsuarioBajaDialogProps) {
-  const nombreCompleto = usuario ? `${usuario.nombre} ${usuario.apellido}` : ''
+export function UsuarioBajaDialog({
+  usuario,
+  open,
+  onOpenChange,
+  onConfirm,
+  isPending,
+}: UsuarioBajaDialogProps) {
+  const primaryRole = usuario?.roles[0] ?? 'TURISTA'
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent className="max-w-[420px] rounded-t-3xl p-0 sm:rounded-2xl sm:p-0">
@@ -46,7 +55,7 @@ export function UsuarioBajaDialog({ usuario, open, onOpenChange, onConfirm, isPe
           </AlertDialogTitle>
           <AlertDialogDescription className="mt-1 text-xs leading-relaxed text-gray-600 sm:text-sm">
             {usuario
-              ? `Esta acción deshabilitará al usuario ${nombreCompleto} (${usuario.email}) del sistema.`
+              ? `Esta acción deshabilitará al usuario ${usuario.nombre} (${usuario.email}) del sistema.`
               : 'Esta acción deshabilitará al usuario seleccionado del sistema.'}
           </AlertDialogDescription>
 
@@ -54,22 +63,32 @@ export function UsuarioBajaDialog({ usuario, open, onOpenChange, onConfirm, isPe
             <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 text-left">
               <div className="flex min-w-0 items-center gap-3">
                 <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border border-blue-200 bg-blue-100 font-heading text-sm font-bold text-blue-700">
-                  {initials(usuario.nombre, usuario.apellido)}
+                  {initials(usuario.nombre)}
                 </div>
                 <div className="min-w-0">
-                  <h4 className="truncate font-heading text-sm font-bold text-gray-900">{nombreCompleto}</h4>
+                  <h4 className="truncate font-heading text-sm font-bold text-gray-900">
+                    {usuario.nombre}
+                  </h4>
                   <p className="truncate font-mono text-xs text-muted-foreground">{usuario.email}</p>
                 </div>
               </div>
-              <span className={cn('inline-flex flex-shrink-0 items-center rounded-full border px-2.5 py-1 text-xs font-bold', rolBadgeClass(usuario.rol))}>
-                {usuario.rol}
+              <span
+                className={cn(
+                  'inline-flex flex-shrink-0 items-center rounded-full border px-2.5 py-1 text-xs font-bold',
+                  rolBadgeClass(primaryRole),
+                )}
+              >
+                {primaryRole}
               </span>
             </div>
           ) : null}
 
           <div className="mt-3 flex items-center gap-2 rounded-lg border border-red-100 bg-red-50/70 p-2.5 text-left text-xs text-red-700">
             <span className="material-symbols-outlined flex-shrink-0 text-base">warning</span>
-            <span>Se revocarán todos los tokens y permisos activos de forma inmediata (según comportamiento del backend).</span>
+            <span>
+              Se revocarán los refresh tokens activos. La baja requiere la contraseña del usuario en
+              la API real.
+            </span>
           </div>
         </AlertDialogHeader>
 
@@ -80,7 +99,7 @@ export function UsuarioBajaDialog({ usuario, open, onOpenChange, onConfirm, isPe
             disabled={isPending}
             className="w-full bg-[#d32f2f] hover:bg-[#b71c1c] sm:w-auto"
           >
-            {isPending ? 'Dando de baja…' : 'Sí, Dar de Baja'}
+            {isPending ? 'Dando de baja…' : 'Sí, dar de baja'}
           </Button>
           <AlertDialogCancel disabled={isPending} className="mt-0 w-full sm:w-auto">
             Cancelar

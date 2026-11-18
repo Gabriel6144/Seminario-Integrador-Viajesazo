@@ -295,7 +295,7 @@ export function CircuitoMapaGeneralView({
                     : 'text-slate-600 hover:bg-slate-100 hover:text-[#00658d]'
                 }`}
               >
-                Día {day.number}
+                {day.label}
               </button>
             ))}
           </div>

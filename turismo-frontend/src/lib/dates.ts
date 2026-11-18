@@ -39,6 +39,14 @@ export function formatWeekdayAndDate(iso: LocalDate): string {
   })
 }
 
+/** `"2026-10-01"` → `"Jueves 1"` (formato Paso 7 / tabs de circuito). */
+export function formatWeekdayDay(iso: LocalDate): string {
+  const date = toLocalDate(iso)
+  const weekday = date.toLocaleDateString('es-AR', { weekday: 'long' })
+  const capitalized = weekday.charAt(0).toUpperCase() + weekday.slice(1)
+  return `${capitalized} ${date.getDate()}`
+}
+
 /**
  * Rango de fechas legible. Si el evento dura un solo día muestra una fecha; si cruza meses
  * muestra las dos completas.
@@ -88,4 +96,37 @@ export function formatTimeRange(
 
 function truncateToMinutes(time: LocalTime): string {
   return time.slice(0, 5)
+}
+
+/** Suma días a un `LocalDate` ISO usando calendario local (nunca UTC). */
+export function addDaysLocalDate(iso: LocalDate, days: number): LocalDate {
+  const date = toLocalDate(iso)
+  date.setDate(date.getDate() + days)
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+/**
+ * Todos los días inclusivos entre `inicio` y `fin` (ambos inclusive).
+ * Si `fin < inicio` devuelve lista vacía.
+ */
+export function eachLocalDateInclusive(inicio: LocalDate, fin: LocalDate): LocalDate[] {
+  if (fin < inicio) return []
+  const days: LocalDate[] = []
+  let day = inicio
+  while (day <= fin) {
+    days.push(day)
+    day = addDaysLocalDate(day, 1)
+  }
+  return days
+}
+
+/**
+ * FullCalendar all-day usa `end` exclusivo; el dominio guarda `fechaFin` inclusiva.
+ * Un evento de un solo día (`inicio === fin`) queda con end = día siguiente.
+ */
+export function exclusiveEndLocalDate(fechaFin: LocalDate): LocalDate {
+  return addDaysLocalDate(fechaFin, 1)
 }

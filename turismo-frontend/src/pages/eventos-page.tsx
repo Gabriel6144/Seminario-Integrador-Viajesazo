@@ -14,10 +14,11 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
+import { usePropuestas } from '@/api/propuestas'
+import { useAuth } from '@/components/auth-provider'
 import { EventoCard } from '@/components/evento-card'
 import { PaginationBar } from '@/components/pagination-bar'
 import { EmptyState, ErrorState, GridSkeleton } from '@/components/query-state'
-import { usePropuestas } from '@/api/propuestas'
 import { Button } from '@/components/ui/button'
 import { usePageParam } from '@/lib/use-page-param'
 import {
@@ -84,6 +85,8 @@ function addDaysIso(baseIso: string, days: number): string {
  * y menú desplegable colapsable de filtros avanzados (Fecha, Zona y Estado).
  */
 export function EventosPage() {
+  const { hasRole, user } = useAuth()
+  const canCreate = hasRole('PUBLICADOR', 'ADMINISTRADOR')
   const [page, setPage] = usePageParam()
   const [filtroTipo, setFiltroTipo] = useState<FiltroTipo>('TODAS')
   const [busqueda, setBusqueda] = useState('')
@@ -95,7 +98,10 @@ export function EventosPage() {
 
   const opcionesTipoPropuesta: readonly TipoPropuesta[] = TIPOS_PROPUESTA
 
-  const query = usePropuestas(page)
+  // Solo el publicador ve sus propuestas; turista/admin siguen con el catálogo global.
+  const publicadorIdFiltro =
+    hasRole('PUBLICADOR') && user?.publicadorId != null ? user.publicadorId : undefined
+  const query = usePropuestas(page, { publicadorId: publicadorIdFiltro })
   const todasLasPropuestas = query.data?.content ?? []
 
   // Zonas (localidades) disponibles dinámicamente según las propuestas cargadas
@@ -251,19 +257,23 @@ export function EventosPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h2 className="font-heading text-2xl font-bold tracking-tight text-[#191c1e]">
-            Propuestas turísticas
+            {hasRole('PUBLICADOR') ? 'Mis Propuestas' : 'Propuestas turísticas'}
           </h2>
           <p className="text-sm text-[#3f484e]">
-            Eventos y actividades turísticas cargados en Córdoba.
+            {hasRole('PUBLICADOR')
+              ? 'Eventos y actividades que publicaste en la plataforma.'
+              : 'Eventos y actividades turísticas cargados en Córdoba.'}
           </p>
         </div>
 
-        <Button asChild size="sm" className="h-12 rounded-xl bg-[#00658d] px-6 text-white shadow-md hover:bg-[#65b7e8]">
-          <Link to="/eventos/nuevo">
-            <PlusIcon className="h-5 w-5" aria-hidden />
-            Nueva propuesta
-          </Link>
-        </Button>
+        {canCreate ? (
+          <Button asChild size="sm" className="h-12 rounded-xl bg-[#00658d] px-6 text-white shadow-md hover:bg-[#65b7e8]">
+            <Link to="/eventos/nuevo">
+              <PlusIcon className="h-5 w-5" aria-hidden />
+              Nueva propuesta
+            </Link>
+          </Button>
+        ) : null}
       </div>
 
       {/* Barra de píldoras permanentes + buscador + menú desplegable colapsable */}

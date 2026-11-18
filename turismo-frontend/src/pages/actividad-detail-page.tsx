@@ -13,6 +13,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { useActividad, useBorrarActividad } from '@/api/actividades'
+import { useAuth } from '@/components/auth-provider'
 import { CategoriaBadge } from '@/components/categoria-badge'
 import { EventoImagen } from '@/components/evento-imagen'
 import { EventoMapa } from '@/components/evento-mapa'
@@ -308,9 +309,12 @@ function ActividadActions({
   imagen?: string
   duracionMinutos: number
 }) {
+  const { hasRole } = useAuth()
   const [isOpen, setIsOpen] = useState(false)
   const navigate = useNavigate()
   const borrar = useBorrarActividad()
+
+  if (!hasRole('PUBLICADOR')) return null
 
   function confirmarBaja() {
     borrar.mutate(

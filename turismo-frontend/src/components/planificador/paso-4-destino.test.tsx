@@ -109,7 +109,8 @@ describe('Paso4Destino', () => {
     const user = userEvent.setup()
     renderPaso4()
 
-    const toggle = await screen.findByRole('button', { name: /ver en 2d/i })
+    // DestinoMapa va con lazy(); hay que esperar a que monte el toggle.
+    const toggle = await screen.findByRole('button', { name: /ver en 2d/i }, { timeout: 10_000 })
     await user.click(toggle)
 
     expect(screen.getByRole('button', { name: /ver en 3d/i })).toBeInTheDocument()

@@ -6,6 +6,7 @@ import {
   PUBLICADORES,
 } from './fixtures'
 import type {
+  ActividadResponse,
   AlternativaItemResponse,
   AlternativaReemplazoResponse,
   CircuitStrategy,
@@ -13,12 +14,19 @@ import type {
   EventoRequest,
   EventoResponse,
   GeneracionCircuitoResponse,
+  NotificacionResponse,
+  PublicadorAgendaItemResponse,
   PublicadorRequest,
   PublicadorResponse,
   ViajeBorradorRequest,
   ViajeRequest,
   ViajeResponse,
 } from '@/types/api'
+
+/** Notificación en memoria con destinatario (solo para MSW). */
+export interface StoredNotificacion extends NotificacionResponse {
+  usuarioId: number
+}
 
 /**
  * Base de datos en memoria para los tests.
@@ -36,11 +44,19 @@ import type {
 let eventos: EventoResponse[] = []
 let publicadores: PublicadorResponse[] = []
 let borradores: ViajeResponse[] = []
+let notificaciones: StoredNotificacion[] = []
+/** Actividades del publicador demo para Mi Agenda (MSW). */
+let agendaActividades: PublicadorAgendaItemResponse[] = []
 let circuitos = new Map<number, GeneracionCircuitoResponse>()
 let circuitosSeleccionados = new Map<number, CircuitoSeleccionadoResponse>()
 let nextEventoId = 0
 let nextPublicadorId = 0
 let nextBorradorId = 0
+let nextNotificacionId = 1
+
+/** Mock de inscriptos por propuesta para preview / notify en tests. */
+const MOCK_INSCRIPTOS_POR_PROPUESTA = 2
+const MOCK_TURISTA_ID = 1
 
 function buildGeneradoFromSeleccionado(
   seleccionado: CircuitoSeleccionadoResponse,
@@ -97,10 +113,40 @@ function buildGeneradoFromSeleccionado(
   }
 }
 
+/** Estado de me gusta por propuesta (demo MSW: un turista de sesión). */
+let meGustas = new Map<number, { meGusta: boolean; total: number }>()
+
 export function resetStore(): void {
   eventos = structuredClone(EVENTOS)
   publicadores = structuredClone(PUBLICADORES)
   borradores = structuredClone(BORRADORES)
+  notificaciones = []
+  meGustas = new Map()
+  // Ids altos para no chocar con eventos del fixture.
+  agendaActividades = [
+    {
+      propuestaId: 9001,
+      nombre: 'Trekking Sierras',
+      tipo: 'ACTIVIDAD',
+      fechaInicio: '2026-10-10',
+      fechaFin: '2026-10-10',
+      modalidad: 'PEDESTRE',
+      imagenUrl: null,
+      horarioInicio: null,
+      horarioFin: null,
+    },
+    {
+      propuestaId: 9002,
+      nombre: 'Taller de cocina',
+      tipo: 'ACTIVIDAD',
+      fechaInicio: '2026-10-15',
+      fechaFin: '2026-10-16',
+      modalidad: null,
+      imagenUrl: null,
+      horarioInicio: null,
+      horarioFin: null,
+    },
+  ]
   const seleccionadoViaje2 = structuredClone(CIRCUITO_SELECCIONADO)
   circuitosSeleccionados = new Map([[2, seleccionadoViaje2]])
   circuitos = new Map([[2, buildGeneradoFromSeleccionado(seleccionadoViaje2)]])
@@ -108,10 +154,89 @@ export function resetStore(): void {
   nextEventoId = Math.max(0, ...EVENTOS.map((evento) => evento.id)) + 1
   nextPublicadorId = Math.max(0, ...PUBLICADORES.map((publicador) => publicador.id)) + 1
   nextBorradorId = Math.max(0, ...BORRADORES.map((borrador) => borrador.id)) + 1
+  nextNotificacionId = 1
+}
+
+export function getMeGusta(propuestaId: number): { meGusta: boolean; total: number } {
+  return meGustas.get(propuestaId) ?? { meGusta: false, total: 0 }
+}
+
+export function darMeGusta(propuestaId: number): { meGusta: boolean; total: number } {
+  const prev = getMeGusta(propuestaId)
+  const next = {
+    meGusta: true,
+    total: prev.meGusta ? prev.total : prev.total + 1,
+  }
+  meGustas.set(propuestaId, next)
+  return next
+}
+
+export function quitarMeGusta(propuestaId: number): { meGusta: boolean; total: number } {
+  const prev = getMeGusta(propuestaId)
+  const next = {
+    meGusta: false,
+    total: prev.meGusta ? Math.max(0, prev.total - 1) : prev.total,
+  }
+  meGustas.set(propuestaId, next)
+  return next
 }
 
 export function allEventos(): EventoResponse[] {
   return eventos
+}
+
+export function allAgendaActividades(): PublicadorAgendaItemResponse[] {
+  return agendaActividades
+}
+
+/** Reprograma una actividad de agenda (MSW); devuelve un ActividadResponse mínimo. */
+export function reprogramarActividad(
+  id: number,
+  fechaInicio: string,
+): ActividadResponse | undefined {
+  const item = agendaActividades.find((a) => a.propuestaId === id)
+  if (item === undefined) return undefined
+
+  const [ys, ms, ds] = item.fechaInicio.split('-').map(Number)
+  const [ye, me, de] = item.fechaFin.split('-').map(Number)
+  const offsetDays = Math.round(
+    (new Date(ye, me - 1, de).getTime() - new Date(ys, ms - 1, ds).getTime()) /
+      (24 * 60 * 60 * 1000),
+  )
+  const [y, m, d] = fechaInicio.split('-').map(Number)
+  const fin = new Date(y, m - 1, d + offsetDays)
+  const fechaFin = `${fin.getFullYear()}-${String(fin.getMonth() + 1).padStart(2, '0')}-${String(fin.getDate()).padStart(2, '0')}`
+
+  const actualizado: PublicadorAgendaItemResponse = {
+    ...item,
+    fechaInicio,
+    fechaFin,
+  }
+  agendaActividades[agendaActividades.indexOf(item)] = actualizado
+
+  return {
+    id,
+    tipo: 'ACTIVIDAD',
+    nombre: actualizado.nombre,
+    descripcion: null,
+    tipoPropuesta: 'VISITA_GUIADA',
+    categoria: null,
+    modalidad: actualizado.modalidad,
+    tipoAcceso: 'GRATUITO',
+    estadoPropuesta: 'INICIADO',
+    lugarRecinto: null,
+    localidad: null,
+    direccion: null,
+    latitud: null,
+    longitud: null,
+    duracionMinutos: 60,
+    fechaInicio,
+    fechaFin,
+    disponibilidades: [],
+    imagenes: [],
+    publicadorId: 1,
+    publicadorNombre: 'Turismo Córdoba',
+  }
 }
 
 export function allPublicadores(): PublicadorResponse[] {
@@ -144,9 +269,11 @@ export function createBorrador(request: ViajeBorradorRequest): ViajeResponse {
     fechaFin: request.fechaFin ?? null,
     ritmo: request.ritmo ?? null,
     interesesCategoria: request.interesesCategoria ?? [],
+    diasPlan: request.diasPlan ?? [],
     estado: 'BORRADOR',
     pasoActual: request.pasoActual ?? null,
-    usuario: request.usuario,
+    usuarioId: 1,
+    usuarioEmail: 'turista@test.com',
   }
   borradores.push(created)
   return created
@@ -170,6 +297,7 @@ export function updateBorrador(id: number, request: ViajeBorradorRequest): Viaje
   if (request.fechaFin !== undefined) borrador.fechaFin = request.fechaFin
   if (request.ritmo !== undefined) borrador.ritmo = request.ritmo
   if (request.interesesCategoria) borrador.interesesCategoria = request.interesesCategoria
+  if (request.diasPlan !== undefined && request.diasPlan !== null) borrador.diasPlan = request.diasPlan
   if (request.pasoActual !== undefined) borrador.pasoActual = request.pasoActual
   return borrador
 }
@@ -193,7 +321,7 @@ export function createViaje(request: ViajeRequest): ViajeResponse {
     ritmo: request.ritmo,
     interesesCategoria: request.intereses,
     pasoActual: 8,
-    usuario: request.usuario,
+    diasPlan: request.diasPlan ?? [],
   })
   created.estado = 'PLANIFICADO'
   return created
@@ -265,8 +393,129 @@ export function removeCircuitoItem(viajeId: number, itemId: number): boolean {
   return false
 }
 
+function eachIsoDateInclusive(from: string, to: string): string[] {
+  if (!from || !to || from > to) return from ? [from] : []
+  const dates: string[] = []
+  const cursor = new Date(`${from}T12:00:00`)
+  const end = new Date(`${to}T12:00:00`)
+  while (cursor <= end) {
+    const y = cursor.getFullYear()
+    const m = String(cursor.getMonth() + 1).padStart(2, '0')
+    const d = String(cursor.getDate()).padStart(2, '0')
+    dates.push(`${y}-${m}-${d}`)
+    cursor.setDate(cursor.getDate() + 1)
+  }
+  return dates
+}
+
+const AUTO_RHYTHM_DAILY_LIMIT: Record<string, number> = {
+  TRANQUILO: 2,
+  EQUILIBRADO: 4,
+  INTENSIVO: 5,
+}
+
 export function createCircuito(viajeId: number): GeneracionCircuitoResponse {
   const created = structuredClone(CIRCUITO)
+  // Alinea las fechas del snapshot con el viaje: el view-model filtra paradas por día del
+  // viaje, y el fixture CIRCUITO usa fechas fijas que no coinciden con isoDate(+N) de los tests.
+  const viaje = findBorrador(viajeId)
+  const fecha = viaje?.fechaInicio
+  const fechaFin = viaje?.fechaFin ?? fecha
+  const ritmo = viaje?.ritmo ?? null
+
+  const templates = created.alternativas.flatMap((alt) => alt.propuestas)
+  const eventTemplates = templates.filter((item) => item.tipo === 'EVENTO')
+  const activityTemplates = templates.filter((item) => item.tipo === 'ACTIVIDAD')
+  const activityPool =
+    activityTemplates.length > 0
+      ? activityTemplates
+      : eventTemplates.map((item) => ({ ...item, tipo: 'ACTIVIDAD' as const }))
+  const mixedPool = [...eventTemplates, ...activityPool]
+
+  const fillTypedPlan = (
+    planDias: Array<{ fecha: string; cantidadEventos: number; cantidadActividades: number }>,
+  ) => {
+    for (const alternativa of created.alternativas) {
+      const propuestas: typeof alternativa.propuestas = []
+      let nextItemId =
+        alternativa.estrategia === 'CERCANIA' ? 300 : alternativa.estrategia === 'INTERESES' ? 100 : 200
+      let nextPropuestaId = 1000 + nextItemId
+      let eventCursor = 0
+      let activityCursor = 0
+      for (const dia of planDias) {
+        let orden = 1
+        for (let i = 0; i < dia.cantidadEventos; i++) {
+          if (eventTemplates.length === 0) break
+          const eventTemplate = eventTemplates[eventCursor % eventTemplates.length]
+          eventCursor++
+          propuestas.push({
+            ...structuredClone(eventTemplate),
+            itemId: nextItemId++,
+            propuestaId: nextPropuestaId++,
+            tipo: 'EVENTO',
+            fecha: dia.fecha,
+            orden: orden++,
+            propuestaNombre: `${eventTemplate.propuestaNombre} (${alternativa.estrategia})`,
+          })
+        }
+        for (let i = 0; i < dia.cantidadActividades; i++) {
+          if (activityPool.length === 0) break
+          const activityTemplate = activityPool[activityCursor % activityPool.length]
+          activityCursor++
+          propuestas.push({
+            ...structuredClone(activityTemplate),
+            itemId: nextItemId++,
+            propuestaId: nextPropuestaId++,
+            tipo: 'ACTIVIDAD',
+            fecha: dia.fecha,
+            orden: orden++,
+            propuestaNombre: `${activityTemplate.propuestaNombre} (${alternativa.estrategia})`,
+          })
+        }
+      }
+      alternativa.propuestas = propuestas
+    }
+  }
+
+  const fillMixedDailyLimit = (dates: string[], dailyLimit: number) => {
+    for (const alternativa of created.alternativas) {
+      const propuestas: typeof alternativa.propuestas = []
+      let nextItemId =
+        alternativa.estrategia === 'CERCANIA' ? 300 : alternativa.estrategia === 'INTERESES' ? 100 : 200
+      let nextPropuestaId = 1000 + nextItemId
+      let poolCursor = 0
+      for (const diaFecha of dates) {
+        let orden = 1
+        for (let i = 0; i < dailyLimit; i++) {
+          if (mixedPool.length === 0) break
+          const template = mixedPool[poolCursor % mixedPool.length]
+          poolCursor++
+          propuestas.push({
+            ...structuredClone(template),
+            itemId: nextItemId++,
+            propuestaId: nextPropuestaId++,
+            tipo: template.tipo,
+            fecha: diaFecha,
+            orden: orden++,
+            propuestaNombre: `${template.propuestaNombre} (${alternativa.estrategia})`,
+          })
+        }
+      }
+      alternativa.propuestas = propuestas
+    }
+  }
+
+  if (ritmo === 'MANUAL' && viaje && viaje.diasPlan.length > 0) {
+    fillTypedPlan(viaje.diasPlan)
+  } else if (ritmo && AUTO_RHYTHM_DAILY_LIMIT[ritmo] && fecha && fechaFin) {
+    fillMixedDailyLimit(eachIsoDateInclusive(fecha, fechaFin), AUTO_RHYTHM_DAILY_LIMIT[ritmo])
+  } else if (fecha) {
+    for (const alternativa of created.alternativas) {
+      for (const item of alternativa.propuestas) {
+        item.fecha = fecha
+      }
+    }
+  }
   circuitos.set(viajeId, created)
   return created
 }
@@ -321,6 +570,96 @@ export function createPublicador(request: PublicadorRequest): PublicadorResponse
  * Esa regla es la que hace que el test de edición sirva de algo: si el handler no la respeta, un
  * PUT con `imagenes: []` dejaría las imágenes viejas y el test pasaría sin detectar el bug.
  */
+/**
+ * Mueve solo fechas preservando duración (espejo de `PATCH .../reprogramar`).
+ * También crea notificaciones mock para el turista demo.
+ */
+export function reprogramarEvento(
+  id: number,
+  fechaInicio: string,
+): EventoResponse | undefined {
+  const evento = findEvento(id)
+  if (evento === undefined) return undefined
+
+  const fechaAnterior = evento.fechaInicio
+  const [ys, ms, ds] = evento.fechaInicio.split('-').map(Number)
+  const [ye, me, de] = evento.fechaFin.split('-').map(Number)
+  const offsetDays = Math.round(
+    (new Date(ye, me - 1, de).getTime() - new Date(ys, ms - 1, ds).getTime()) /
+      (24 * 60 * 60 * 1000),
+  )
+  const [y, m, d] = fechaInicio.split('-').map(Number)
+  const fin = new Date(y, m - 1, d + offsetDays)
+  const fechaFin = `${fin.getFullYear()}-${String(fin.getMonth() + 1).padStart(2, '0')}-${String(fin.getDate()).padStart(2, '0')}`
+
+  const actualizado: EventoResponse = {
+    ...evento,
+    fechaInicio,
+    fechaFin,
+  }
+  eventos[eventos.indexOf(evento)] = actualizado
+
+  const destinatarios = countInscriptosMock(id)
+  if (destinatarios > 0) {
+    const titulo = `Evento reprogramado: ${evento.nombre}`
+    const cuerpo = `El evento «${evento.nombre}» fue reprogramado del ${formatFechaEs(fechaAnterior)} al ${formatFechaEs(fechaInicio)}.`
+    for (let i = 0; i < destinatarios; i += 1) {
+      notificaciones.unshift({
+        id: nextNotificacionId++,
+        usuarioId: MOCK_TURISTA_ID,
+        titulo,
+        cuerpo,
+        leida: false,
+        creadaEn: new Date().toISOString(),
+        propuestaId: id,
+        tipo: 'EVENTO_REPROGRAMADO',
+      })
+    }
+  }
+
+  return actualizado
+}
+
+export function countInscriptosMock(_propuestaId: number): number {
+  return MOCK_INSCRIPTOS_POR_PROPUESTA
+}
+
+export function previewReprogramacion(
+  id: number,
+  fechaInicio: string,
+): { destinatarios: number; titulo: string; cuerpo: string } | undefined {
+  const evento = findEvento(id)
+  if (evento === undefined) return undefined
+  const destinatarios = countInscriptosMock(id)
+  return {
+    destinatarios,
+    titulo: `Evento reprogramado: ${evento.nombre}`,
+    cuerpo: `El evento «${evento.nombre}» fue reprogramado del ${formatFechaEs(evento.fechaInicio)} al ${formatFechaEs(fechaInicio)}.`,
+  }
+}
+
+export function allNotificaciones(usuarioId: number): NotificacionResponse[] {
+  return notificaciones
+    .filter((n) => n.usuarioId === usuarioId)
+    .map(({ usuarioId: _u, ...rest }) => rest)
+}
+
+export function marcarNotificacionLeida(
+  id: number,
+  usuarioId: number,
+): NotificacionResponse | undefined {
+  const n = notificaciones.find((item) => item.id === id && item.usuarioId === usuarioId)
+  if (!n) return undefined
+  n.leida = true
+  const { usuarioId: _u, ...rest } = n
+  return rest
+}
+
+function formatFechaEs(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  return `${d}/${m}/${y}`
+}
+
 export function updateEvento(id: number, request: EventoRequest): EventoResponse | undefined {
   const evento = findEvento(id)
   if (evento === undefined) return undefined

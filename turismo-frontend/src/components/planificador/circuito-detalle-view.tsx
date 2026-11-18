@@ -32,12 +32,14 @@ const RITMO_MIN_PARADAS: Record<TipoRitmo, number> = {
   TRANQUILO: 1,
   EQUILIBRADO: 3,
   INTENSIVO: 5,
+  MANUAL: 0,
 }
 
 const RITMO_LABELS: Record<TipoRitmo, string> = {
   TRANQUILO: 'Tranquilo (1 a 2 paradas)',
   EQUILIBRADO: 'Equilibrado (3 a 4 paradas)',
   INTENSIVO: 'Intenso (5 o más actividades)',
+  MANUAL: 'Manual (según tu plan diario)',
 }
 
 export function CircuitoDetalleView({
@@ -176,7 +178,7 @@ export function CircuitoDetalleView({
                       : 'bg-slate-200/80 text-slate-700 hover:bg-slate-300/70'
                   }`}
                 >
-                  <span>Día {day.number}</span>
+                  <span>{day.label}</span>
                   {active && <span className="h-2 w-2 rounded-full bg-sky-200" />}
                 </button>
               </li>

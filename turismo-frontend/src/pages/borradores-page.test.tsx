@@ -6,14 +6,15 @@ import { renderWithProviders } from '@/test/utils'
 
 describe('BorradoresPage', () => {
   it('lista los borradores y los circuitos ya confirmados del usuario', async () => {
-    renderWithProviders(<BorradoresPage />)
+    renderWithProviders(<BorradoresPage />, { authenticated: true })
 
     expect(await screen.findByText(/2 viajes en total/i)).toBeInTheDocument()
     expect(screen.getByText(/1 en planificación/i)).toBeInTheDocument()
-    expect(screen.getByText(/1 circuito confirmado/i)).toBeInTheDocument()
+    expect(screen.getByText(/1 viaje$/i)).toBeInTheDocument()
     expect(screen.getByText('Borrador de ejemplo')).toBeInTheDocument()
+    expect(screen.getByText(/Falta definir dónde se alojará/i)).toBeInTheDocument()
     expect(screen.getByText('Circuito confirmado de ejemplo')).toBeInTheDocument()
-    expect(screen.getByText('Circuito confirmado')).toBeInTheDocument()
+    expect(screen.getByText('Planificado')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /ver circuito/i })).toHaveAttribute(
       'href',
       '/viajes/2/circuito',

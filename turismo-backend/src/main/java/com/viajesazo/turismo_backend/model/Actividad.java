@@ -1,5 +1,6 @@
 package com.viajesazo.turismo_backend.model;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
@@ -33,6 +34,13 @@ public class Actividad extends PropuestaTuristica {
 	@Column(name = "duracion_minutos", nullable = false)
 	private int duracionMinutos;
 
+	/** Rango de agenda del publicador (además de las franjas semanales de disponibilidad). */
+	@Column(name = "fecha_inicio", nullable = false)
+	private LocalDate fechaInicio;
+
+	@Column(name = "fecha_fin", nullable = false)
+	private LocalDate fechaFin;
+
 	/**
 	 * Las franjas son parte del agregado: se guardan en una tabla propia pero no tienen
 	 * identidad ni repositorio. El {@code orden} conserva el orden en que las cargó el publicador.
@@ -61,6 +69,13 @@ public class Actividad extends PropuestaTuristica {
 	protected void validarInvariantesEspecificas() {
 		if (duracionMinutos <= 0) {
 			throw new InvariantViolationException("la duración de la actividad debe ser mayor a cero");
+		}
+		if (fechaInicio == null || fechaFin == null) {
+			throw new InvariantViolationException("la actividad debe indicar fecha de inicio y de fin");
+		}
+		if (fechaFin.isBefore(fechaInicio)) {
+			throw new InvariantViolationException(
+					"la fecha de finalización no puede ser anterior a la de inicio");
 		}
 		if (disponibilidades == null || disponibilidades.isEmpty()) {
 			throw new InvariantViolationException("la actividad debe tener al menos una disponibilidad horaria");

@@ -6,6 +6,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -20,6 +21,7 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -32,7 +34,9 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.viajesazo.turismo_backend.config.AppConfig;
 import com.viajesazo.turismo_backend.dto.request.ActividadRequest;
+import com.viajesazo.turismo_backend.dto.request.ReprogramarEventoRequest;
 import com.viajesazo.turismo_backend.dto.response.ActividadResponse;
+import com.viajesazo.turismo_backend.exception.BusinessRuleException;
 import com.viajesazo.turismo_backend.dto.response.DisponibilidadResponse;
 import com.viajesazo.turismo_backend.exception.InvariantViolationException;
 import com.viajesazo.turismo_backend.exception.ResourceNotFoundException;
@@ -46,6 +50,7 @@ import com.viajesazo.turismo_backend.model.TipoRegistro;
 import com.viajesazo.turismo_backend.service.ActividadService;
 
 @WebMvcTest(ActividadController.class)
+@AutoConfigureMockMvc(addFilters = false)
 @Import(AppConfig.class)
 class ActividadControllerTest {
 
@@ -61,6 +66,8 @@ class ActividadControllerTest {
 			  "localidad": "Cosquín",
 			  "direccion": "Av. San Martín 800",
 			  "duracionMinutos": 90,
+			  "fechaInicio": "2026-10-01",
+			  "fechaFin": "2026-12-31",
 			  "disponibilidades": [
 			    {"diaSemana": "MONDAY", "horaInicio": "09:00:00", "horaFin": "11:00:00"}
 			  ],
@@ -157,6 +164,43 @@ class ActividadControllerTest {
 	}
 
 	@Test
+	@DisplayName("reprogramar actividad responde 200 con nuevas fechas")
+	void reprogramsActivity() throws Exception {
+		ActividadResponse moved = new ActividadResponse(7L, TipoRegistro.ACTIVIDAD, "Visita guiada",
+				"Recorrido por el centro histórico", TipoPropuesta.VISITA_GUIADA, InteresCategoria.CULTURA,
+				Modalidad.PEDESTRE, TipoAcceso.GRATUITO, estado(), "Cabildo", "Cosquín", "Av. San Martín 800",
+				new BigDecimal("-31.41350000"), new BigDecimal("-64.49470000"), 90,
+				java.time.LocalDate.parse("2026-11-01"), java.time.LocalDate.parse("2027-01-31"),
+				List.of(new DisponibilidadResponse(DayOfWeek.MONDAY, LocalTime.of(9, 0), LocalTime.of(11, 0))),
+				List.of("https://cdn.cordoba.gob.ar/cabildo.jpg"), 1L, "Turismo Córdoba");
+		when(actividadService.reprogramar(eq(7L), any(ReprogramarEventoRequest.class))).thenReturn(moved);
+
+		mockMvc.perform(patch("/api/actividades/7/reprogramar")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{ "fechaInicio": "2026-11-01" }
+								"""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.fechaInicio").value("2026-11-01"))
+				.andExpect(jsonPath("$.fechaFin").value("2027-01-31"));
+	}
+
+	@Test
+	@DisplayName("reprogramar con solape responde 400")
+	void reprogramOverlap() throws Exception {
+		when(actividadService.reprogramar(eq(7L), any(ReprogramarEventoRequest.class)))
+				.thenThrow(new BusinessRuleException("ya hay una propuesta en esa fecha"));
+
+		mockMvc.perform(patch("/api/actividades/7/reprogramar")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("""
+								{ "fechaInicio": "2026-11-01" }
+								"""))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.message").value("ya hay una propuesta en esa fecha"));
+	}
+
+	@Test
 	@DisplayName("US2: un invariante violado responde 422 problem+json")
 	void returnsUnprocessableEntityForInvariant() throws Exception {
 		when(actividadService.create(any(ActividadRequest.class)))
@@ -188,6 +232,7 @@ class ActividadControllerTest {
 				"Recorrido por el centro histórico", TipoPropuesta.VISITA_GUIADA, InteresCategoria.CULTURA,
 				Modalidad.PEDESTRE, TipoAcceso.GRATUITO, estado(), "Cabildo", "Cosquín", "Av. San Martín 800",
 				new BigDecimal("-31.41350000"), new BigDecimal("-64.49470000"), 90,
+				java.time.LocalDate.parse("2026-10-01"), java.time.LocalDate.parse("2026-12-31"),
 				List.of(new DisponibilidadResponse(DayOfWeek.MONDAY, LocalTime.of(9, 0), LocalTime.of(11, 0))),
 				List.of("https://cdn.cordoba.gob.ar/cabildo.jpg"), 1L, "Turismo Córdoba");
 	}

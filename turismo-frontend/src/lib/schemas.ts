@@ -1,10 +1,10 @@
 import { z } from 'zod'
 
+import { addDaysLocalDate } from '@/lib/dates'
 import {
   CATEGORIAS,
   DIAS_SEMANA,
   MODALIDADES,
-  ROLES_USUARIO,
   TIPOS_ACCESO,
   TIPOS_PROPUESTA,
   type ActividadRequest,
@@ -12,9 +12,9 @@ import {
   type Categoria,
   type DiaSemana,
   type EventoRequest,
+  type LoginRequest,
   type Modalidad,
   type PublicadorRequest,
-  type RolUsuario,
   type TipoAcceso,
   type TipoPropuesta,
   type TipoRegistro,
@@ -307,42 +307,99 @@ export function crearEventoSchema(minFechaInicio?: string) {
  * base de `EventoFormValues` para que cambiar entre Evento y Actividad en el formulario conserve
  * todo lo que el usuario ya completó.
  */
-export const actividadSchema = z.object({
-  nombre: z.string().trim().min(1, 'El nombre es obligatorio.'),
-  descripcion: z.string(),
-  categoria: categoriaSchema,
-  tipoPropuesta: tipoPropuestaSchema,
-  modalidad: modalidadSchema,
-  tipoAcceso: tipoAccesoSchema,
-  montoEstimado: z.string(),
-  descripcionArancel: z.string(),
-  sitioOficial: z.string(),
-  lugarRecinto: z.string().trim().min(1, 'El lugar o recinto es obligatorio.'),
-  localidad: z.string().trim().min(1, 'La ciudad es obligatoria.'),
-  direccion: z.string().trim().min(1, 'La dirección exacta es obligatoria.'),
-  fechaInicio: z.string(),
-  fechaFin: z.string(),
-  horarioInicio: z.string(),
-  horarioFin: z.string(),
-  duracionMinutos: z
-    .string()
-    .optional()
-    .refine((value) => (value ?? '').trim().length > 0, 'La duración en minutos es obligatoria.')
-    .refine(
-      (value) => {
-        const trimmed = (value ?? '').trim()
-        return trimmed.length === 0 || (/^\d+$/.test(trimmed) && Number(trimmed) > 0)
-      },
-      'La duración de la actividad debe ser mayor a cero.',
-    ),
-  disponibilidades: z.array(disponibilidadSchema).optional(),
-  imagenes: z.array(imagenSchema),
-  publicadorId: publicadorIdSchema,
-})
+export const actividadSchema = z
+  .object({
+    nombre: z.string().trim().min(1, 'El nombre es obligatorio.'),
+    descripcion: z.string(),
+    categoria: categoriaSchema,
+    tipoPropuesta: tipoPropuestaSchema,
+    modalidad: modalidadSchema,
+    tipoAcceso: tipoAccesoSchema,
+    montoEstimado: z.string(),
+    descripcionArancel: z.string(),
+    sitioOficial: z.string(),
+    lugarRecinto: z.string().trim().min(1, 'El lugar o recinto es obligatorio.'),
+    localidad: z.string().trim().min(1, 'La ciudad es obligatoria.'),
+    direccion: z.string().trim().min(1, 'La dirección exacta es obligatoria.'),
+    fechaInicio: z
+      .string()
+      .trim()
+      .min(1, 'La fecha de inicio es obligatoria.')
+      .regex(ISO_DATE, 'La fecha de inicio no tiene un formato válido.'),
+    fechaFin: z
+      .string()
+      .trim()
+      .min(1, 'La fecha de finalización es obligatoria.')
+      .regex(ISO_DATE, 'La fecha de finalización no tiene un formato válido.'),
+    horarioInicio: z.string(),
+    horarioFin: z.string(),
+    duracionMinutos: z
+      .string()
+      .optional()
+      .refine((value) => (value ?? '').trim().length > 0, 'La duración en minutos es obligatoria.')
+      .refine(
+        (value) => {
+          const trimmed = (value ?? '').trim()
+          return trimmed.length === 0 || (/^\d+$/.test(trimmed) && Number(trimmed) > 0)
+        },
+        'La duración de la actividad debe ser mayor a cero.',
+      ),
+    disponibilidades: z.array(disponibilidadSchema).optional(),
+    imagenes: z.array(imagenSchema),
+    publicadorId: publicadorIdSchema,
+  })
+  .refine(
+    (values) =>
+      values.fechaInicio.length === 0 ||
+      values.fechaFin.length === 0 ||
+      values.fechaFin >= values.fechaInicio,
+    {
+      message: 'La fecha de finalización no puede ser anterior a la de inicio.',
+      path: ['fechaFin'],
+    },
+  )
 
-export function crearPropuestaSchema(tipoRegistro: TipoRegistro, minFechaInicio?: string) {
-  if (tipoRegistro === 'ACTIVIDAD') return actividadSchema
-  return crearEventoSchema(minFechaInicio)
+function withOccupiedDates<T extends z.ZodTypeAny>(schema: T, fechasOcupadas?: string[]) {
+  if (!fechasOcupadas || fechasOcupadas.length === 0) return schema
+  const occupied = new Set(fechasOcupadas)
+  return schema.superRefine((values: { fechaInicio?: string; fechaFin?: string }, ctx) => {
+    const inicio = values.fechaInicio?.trim() ?? ''
+    const fin = values.fechaFin?.trim() ?? ''
+    if (!ISO_DATE.test(inicio) || !ISO_DATE.test(fin) || fin < inicio) return
+    let day = inicio
+    while (day <= fin) {
+      if (occupied.has(day)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Ese rango incluye un día en el que ya tenés una propuesta agendada.',
+          path: ['fechaInicio'],
+        })
+        return
+      }
+      day = addDaysLocalDate(day, 1)
+    }
+  })
+}
+
+export function crearPropuestaSchema(
+  tipoRegistro: TipoRegistro,
+  minFechaInicio?: string,
+  fechasOcupadas?: string[],
+) {
+  if (tipoRegistro === 'ACTIVIDAD') {
+    const base =
+      minFechaInicio === undefined
+        ? actividadSchema
+        : actividadSchema.refine(
+            (values) => values.fechaInicio.length === 0 || values.fechaInicio >= minFechaInicio,
+            {
+              message: 'La fecha de inicio no puede ser anterior a la fecha actual.',
+              path: ['fechaInicio'],
+            },
+          )
+    return withOccupiedDates(base, fechasOcupadas)
+  }
+  return withOccupiedDates(crearEventoSchema(minFechaInicio), fechasOcupadas)
 }
 
 export function toActividadRequest(values: EventoFormValues): ActividadRequest {
@@ -357,6 +414,8 @@ export function toActividadRequest(values: EventoFormValues): ActividadRequest {
     localidad: values.localidad.trim(),
     direccion: values.direccion.trim(),
     duracionMinutos: Number((values.duracionMinutos ?? '0').trim()),
+    fechaInicio: values.fechaInicio.trim(),
+    fechaFin: values.fechaFin.trim(),
     disponibilidades: (values.disponibilidades ?? []).map((item) => ({
       diaSemana: item.diaSemana as DiaSemana,
       horaInicio: item.horaInicio.trim(),
@@ -500,8 +559,8 @@ export function toActividadFormValues(actividad: ActividadResponse): EventoFormV
     lugarRecinto: actividad.lugarRecinto ?? '',
     localidad: actividad.localidad ?? '',
     direccion: actividad.direccion ?? '',
-    fechaInicio: '',
-    fechaFin: '',
+    fechaInicio: actividad.fechaInicio,
+    fechaFin: actividad.fechaFin,
     horarioInicio: '',
     horarioFin: '',
     duracionMinutos: String(actividad.duracionMinutos),
@@ -516,27 +575,75 @@ export function toActividadFormValues(actividad: ActividadResponse): EventoFormV
 }
 
 // ---------------------------------------------------------------------------
-// Usuario (plantilla frontend — contrato backend pendiente)
+// Auth / registro
 // ---------------------------------------------------------------------------
 
-export const usuarioSchema = z.object({
-  nombre: z.string().trim().min(1, 'El nombre es obligatorio.'),
-  apellido: z.string().trim().min(1, 'El apellido es obligatorio.'),
+export const loginSchema = z.object({
   email: z
     .string()
     .trim()
-    .min(1, 'El correo electrónico es obligatorio.')
+    .min(1, 'El email es obligatorio.')
     .email('El email no tiene un formato válido.'),
-  rol: z.enum(ROLES_USUARIO, { message: 'El rol de usuario es obligatorio.' }),
+  contrasena: z.string().min(1, 'La contraseña es obligatoria.'),
 })
 
-export type UsuarioFormValues = z.infer<typeof usuarioSchema>
+export type LoginFormValues = z.infer<typeof loginSchema>
 
-export function toUsuarioRequest(values: UsuarioFormValues): UsuarioRequest {
+export function toLoginRequest(values: LoginFormValues): LoginRequest {
   return {
-    nombre: values.nombre.trim(),
-    apellido: values.apellido.trim(),
     email: values.email.trim(),
-    rol: values.rol as RolUsuario,
+    contrasena: values.contrasena,
   }
 }
+
+export const forgotPasswordSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, 'El email es obligatorio.')
+    .email('El email no tiene un formato válido.'),
+})
+
+export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>
+
+/** Registro público: el usuario elige TURISTA o PUBLICADOR (nunca ADMIN). */
+export const registroSchema = z
+  .object({
+    nombre: z.string().trim().min(1, 'El nombre es obligatorio.'),
+    email: z
+      .string()
+      .trim()
+      .min(1, 'El email es obligatorio.')
+      .email('El email no tiene un formato válido.'),
+    telefono: z.string(),
+    rol: z.enum(['TURISTA', 'PUBLICADOR'], {
+      required_error: 'Elegí si sos turista o publicador.',
+      invalid_type_error: 'Elegí si sos turista o publicador.',
+    }),
+    contrasena: z
+      .string()
+      .min(8, 'La contraseña debe tener entre 8 y 72 caracteres.')
+      .max(72, 'La contraseña debe tener entre 8 y 72 caracteres.'),
+    confirmarContrasena: z.string().min(1, 'Confirmá la contraseña.'),
+  })
+  .refine((values) => values.contrasena === values.confirmarContrasena, {
+    message: 'Las contraseñas no coinciden.',
+    path: ['confirmarContrasena'],
+  })
+
+export type RegistroFormValues = z.infer<typeof registroSchema>
+
+export function toUsuarioRequest(values: RegistroFormValues): UsuarioRequest {
+  return {
+    nombre: values.nombre.trim(),
+    email: values.email.trim(),
+    telefono: blankToNull(values.telefono),
+    contrasena: values.contrasena,
+    rol: values.rol,
+  }
+}
+
+/** Formulario admin de alta (plantilla; sin listado real en backend). */
+export const usuarioSchema = registroSchema
+
+export type UsuarioFormValues = RegistroFormValues

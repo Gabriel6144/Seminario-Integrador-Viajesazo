@@ -121,9 +121,10 @@ describe('EventoEditarPage', () => {
     await user().type(screen.getByLabelText('Fecha de finalización'), '2026-09-01')
     await user().click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
+    // El mensaje puede aparecer más de una vez (FieldError + descripción del schema).
     expect(
-      await screen.findByText('La fecha de finalización no puede ser anterior a la de inicio.'),
-    ).toBeInTheDocument()
+      await screen.findAllByText('La fecha de finalización no puede ser anterior a la de inicio.'),
+    ).not.toHaveLength(0)
     expect(findEvento(1)?.fechaFin).toBe(FOLKLORE.fechaFin)
   })
 

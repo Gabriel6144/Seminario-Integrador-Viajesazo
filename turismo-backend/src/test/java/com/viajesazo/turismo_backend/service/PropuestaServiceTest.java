@@ -17,6 +17,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import com.viajesazo.turismo_backend.dto.request.EventoRequest;
+import com.viajesazo.turismo_backend.dto.request.ReprogramarEventoRequest;
 import com.viajesazo.turismo_backend.dto.response.EventoResponse;
 import com.viajesazo.turismo_backend.exception.BusinessRuleException;
 import com.viajesazo.turismo_backend.exception.ResourceNotFoundException;
@@ -39,13 +41,16 @@ import com.viajesazo.turismo_backend.model.Evento;
 import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.model.Modalidad;
 import com.viajesazo.turismo_backend.model.Publicador;
+import com.viajesazo.turismo_backend.model.Rol;
 import com.viajesazo.turismo_backend.model.TipoAcceso;
 import com.viajesazo.turismo_backend.model.TipoPropuesta;
 import com.viajesazo.turismo_backend.model.Ubicacion;
+import com.viajesazo.turismo_backend.model.Usuario;
 import com.viajesazo.turismo_backend.repository.EventoRepository;
 import com.viajesazo.turismo_backend.repository.EstadoPropuestaRepository;
 import com.viajesazo.turismo_backend.repository.PublicadorRepository;
 import com.viajesazo.turismo_backend.repository.UbicacionRepository;
+import com.viajesazo.turismo_backend.security.TestSecuritySupport;
 
 @ExtendWith(MockitoExtension.class)
 class PropuestaServiceTest {
@@ -65,14 +70,22 @@ class PropuestaServiceTest {
 	@Mock
 	private GeocodingService geocodingService;
 
+	@Mock
+	private PublicadorAgendaService publicadorAgendaService;
+
+	@Mock
+	private NotificacionService notificacionService;
+
 	private PropuestaService service;
 
 	@BeforeEach
 	void setUp() {
+		Usuario admin = Usuario.builder().id(99L).nombre("Admin").email("admin@test.com").contrasena("hash").build();
+		TestSecuritySupport.authenticate(admin, null, Rol.ADMINISTRADOR);
 		Clock clock = Clock.fixed(LocalDate.parse("2026-09-23").atStartOfDay(ZoneId.of("America/Argentina/Buenos_Aires")).toInstant(),
 				ZoneId.of("America/Argentina/Buenos_Aires"));
 		service = new PropuestaService(eventoRepository, publicadorRepository, estadoPropuestaRepository, ubicacionRepository, clock, new EventoMapperImpl(),
-				geocodingService);
+				geocodingService, publicadorAgendaService, notificacionService);
 		// La mayoría de los tests no ejercita el camino de la geocodificación; queda lenient para
 		// que los que fallan antes (validaciones) no rompan por strict stubs.
 		lenient().when(geocodingService.geocode(any(), any(), any())).thenReturn(Optional
@@ -81,6 +94,11 @@ class PropuestaServiceTest {
 				.thenReturn(Optional.of(initialState()));
 		lenient().when(ubicacionRepository.save(any(Ubicacion.class)))
 				.thenAnswer(invocation -> invocation.getArgument(0));
+	}
+
+	@AfterEach
+	void tearDown() {
+		TestSecuritySupport.clear();
 	}
 
 	@Test
@@ -99,6 +117,12 @@ class PropuestaServiceTest {
 		assertThat(result.nombre()).isEqualTo("Festival de Folklore");
 		assertThat(result.categoria()).isEqualTo(InteresCategoria.CULTURA);
 		assertThat(result.publicadorId()).isEqualTo(1L);
+		verify(publicadorAgendaService).assertSinSolapamiento(
+				eq(1L),
+				eq(LocalDate.parse("2026-10-01")),
+				eq(LocalDate.parse("2026-10-03")),
+				eq(null),
+				eq(null));
 		verify(eventoRepository).save(any(Evento.class));
 	}
 
@@ -257,6 +281,45 @@ class PropuestaServiceTest {
 		assertThatThrownBy(() -> service.update(404L, request()))
 				.isInstanceOf(ResourceNotFoundException.class)
 				.hasMessageContaining("404");
+	}
+
+	@Test
+	@DisplayName("reprogramar preserva la duración y no geocodifica")
+	void reprogramsEventPreservingDuration() {
+		Evento evento = persistedEvent();
+		when(eventoRepository.findById(7L)).thenReturn(Optional.of(evento));
+		when(eventoRepository.save(any(Evento.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		EventoResponse result = service.reprogramar(7L, new ReprogramarEventoRequest(LocalDate.parse("2026-12-01")));
+
+		assertThat(result.fechaInicio()).isEqualTo(LocalDate.parse("2026-12-01"));
+		assertThat(result.fechaFin()).isEqualTo(LocalDate.parse("2026-12-02"));
+		verify(publicadorAgendaService).assertSinSolapamiento(
+				eq(1L),
+				eq(LocalDate.parse("2026-12-01")),
+				eq(LocalDate.parse("2026-12-02")),
+				eq(7L),
+				eq(null));
+		verify(notificacionService).notificarReprogramacion(
+				any(Evento.class),
+				eq(LocalDate.parse("2026-09-25")),
+				eq(LocalDate.parse("2026-09-26")));
+		verify(geocodingService, never()).geocode(any(), any(), any());
+	}
+
+	@Test
+	@DisplayName("reprogramar propaga solapamiento como BusinessRuleException")
+	void reprogramPropagatesOverlap() {
+		when(eventoRepository.findById(7L)).thenReturn(Optional.of(persistedEvent()));
+		org.mockito.Mockito.doThrow(new BusinessRuleException(
+				"ya tenés una propuesta agendada que se solapa con ese rango de fechas"))
+				.when(publicadorAgendaService)
+				.assertSinSolapamiento(any(), any(), any(), any(), any());
+
+		assertThatThrownBy(() -> service.reprogramar(7L, new ReprogramarEventoRequest(LocalDate.parse("2026-12-01"))))
+				.isInstanceOf(BusinessRuleException.class)
+				.hasMessageContaining("solapa");
+		verify(eventoRepository, never()).save(any(Evento.class));
 	}
 
 	@Test

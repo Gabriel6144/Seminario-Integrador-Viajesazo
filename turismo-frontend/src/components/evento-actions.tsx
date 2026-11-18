@@ -4,6 +4,7 @@ import { PencilIcon, Trash2Icon } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { useBorrarEvento } from '@/api/eventos'
+import { useAuth } from '@/components/auth-provider'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -33,9 +34,12 @@ interface EventoActionsProps {
  * pantalla con un botón al lado es la forma más corta de perder datos sin querer.
  */
 export function EventoActions({ id, nombre, publicadorId, imagen, fecha }: EventoActionsProps) {
+  const { hasRole } = useAuth()
   const [isOpen, setIsOpen] = useState(false)
   const navigate = useNavigate()
   const borrar = useBorrarEvento()
+
+  if (!hasRole('PUBLICADOR')) return null
 
   function confirmarBaja() {
     borrar.mutate(

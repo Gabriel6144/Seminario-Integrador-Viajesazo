@@ -247,6 +247,45 @@ class EventoRepositoryTest {
 	}
 
 	@Test
+	@DisplayName("existe solapamiento si dos eventos del mismo publicador comparten un día")
+	void existsOverlappingSameDay() {
+		Evento primero = save("Primero", LocalDate.parse("2026-09-23"), LocalDate.parse("2026-09-23"));
+
+		assertThat(eventoRepository.existsOverlapping(
+				publisher.getId(),
+				LocalDate.parse("2026-09-23"),
+				LocalDate.parse("2026-09-23"),
+				null)).isTrue();
+		assertThat(eventoRepository.existsOverlapping(
+				publisher.getId(),
+				LocalDate.parse("2026-09-23"),
+				LocalDate.parse("2026-09-23"),
+				primero.getId())).isFalse();
+		assertThat(eventoRepository.existsOverlapping(
+				publisher.getId(),
+				LocalDate.parse("2026-09-24"),
+				LocalDate.parse("2026-09-24"),
+				null)).isFalse();
+	}
+
+	@Test
+	@DisplayName("días adyacentes no se solapan; multi-día sí choca con un día interno")
+	void existsOverlappingAdjacentAndMultiDay() {
+		save("Rango", LocalDate.parse("2026-09-20"), LocalDate.parse("2026-09-22"));
+
+		assertThat(eventoRepository.existsOverlapping(
+				publisher.getId(),
+				LocalDate.parse("2026-09-23"),
+				LocalDate.parse("2026-09-23"),
+				null)).isFalse();
+		assertThat(eventoRepository.existsOverlapping(
+				publisher.getId(),
+				LocalDate.parse("2026-09-21"),
+				LocalDate.parse("2026-09-21"),
+				null)).isTrue();
+	}
+
+	@Test
 	@DisplayName("US7: la paginación del listado completo parte los eventos sin perder ni duplicar")
 	void paginatesAllEvents() {
 		save("Primero", LocalDate.parse("2026-09-21"), LocalDate.parse("2026-09-21"));

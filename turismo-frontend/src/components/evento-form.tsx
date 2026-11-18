@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { PlusIcon, Trash2Icon } from 'lucide-react'
 import { Controller, useFieldArray, useForm, type FieldError as RhfFieldError } from 'react-hook-form'
 import { Link } from 'react-router-dom'
-import { useEffect, useRef, useState, type ComponentProps } from 'react'
+import { useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -25,6 +25,7 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { ImagenUploader } from '@/components/imagen-uploader'
 import { UbicacionSelector } from '@/components/ubicacion-selector'
+import { eachLocalDateInclusive } from '@/lib/dates'
 import {
   crearPropuestaSchema,
   formatValidationMessage,
@@ -60,6 +61,8 @@ interface EventoFormProps {
   cancelTo: string
   /** Coordenadas del evento en edición, para que el mapa del selector arranque centrado. */
   ubicacionInicial?: { latitud: number | null; longitud: number | null }
+  /** Días ISO ya ocupados por el publicador (alta): se muestran y se validan. */
+  fechasOcupadas?: string[]
 }
 
 /**
@@ -85,6 +88,7 @@ export function EventoForm({
   submitLabel,
   cancelTo,
   ubicacionInicial,
+  fechasOcupadas = [],
 }: EventoFormProps) {
   const [tipoRegistro, setTipoRegistro] = useState<TipoRegistro>(tipoFijo ?? 'EVENTO')
   const esActividad =
@@ -101,10 +105,11 @@ export function EventoForm({
   // En alta (sin fecha precargada) se exige que la fecha de inicio sea de hoy en adelante, igual que en Planificar.
   const esAlta = defaultValues.fechaInicio === ''
   const minFechaInicio = esAlta ? todayStr : undefined
+  const ocupadas = useMemo(() => new Set(fechasOcupadas), [fechasOcupadas])
 
   const form = useForm<EventoFormValues>({
     resolver: zodResolver(
-      crearPropuestaSchema(esActividad ? 'ACTIVIDAD' : 'EVENTO', minFechaInicio),
+      crearPropuestaSchema(esActividad ? 'ACTIVIDAD' : 'EVENTO', minFechaInicio, fechasOcupadas),
     ),
     defaultValues,
     // Errores al enviar, y de ahí en adelante mientras se corrige. Validar en cada tecla desde
@@ -193,10 +198,21 @@ export function EventoForm({
     ? { type: 'server', message: formatValidationMessage(activeServerError) }
     : undefined
 
+  const rangoTocaOcupado =
+    fechaInicio &&
+    fechaFin &&
+    fechaFin >= fechaInicio &&
+    eachLocalDateInclusive(fechaInicio, fechaFin).some((day) => ocupadas.has(day))
+
   const errorFechaInicio: RhfFieldError | undefined =
     minFechaInicio && fechaInicio && fechaInicio < minFechaInicio
       ? { type: 'validate', message: 'La fecha de inicio no puede ser anterior a la fecha actual.' }
-      : errors.fechaInicio
+      : rangoTocaOcupado
+        ? {
+            type: 'validate',
+            message: 'Ese rango incluye un día en el que ya tenés una propuesta agendada.',
+          }
+        : errors.fechaInicio
 
   const errorFechaFin: RhfFieldError | undefined =
     fechaInicio && fechaFin && fechaFin < fechaInicio
@@ -290,9 +306,62 @@ export function EventoForm({
         </div>
       ) : null}
 
+      {(esAlta || esActividad) && (
+        <FormSection
+          number={1}
+          title="Agenda de la propuesta"
+          icon={
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
+              <rect x="3" y="4" width="18" height="18" rx="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+          }
+        >
+          <FieldDescription>
+            Elegí el rango de fechas para agendar el evento o la actividad. Los días en los que ya
+            tenés propuestas quedan bloqueados.
+          </FieldDescription>
+          {fechasOcupadas.length > 0 ? (
+            <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              Días ocupados: {fechasOcupadas.slice(0, 12).join(', ')}
+              {fechasOcupadas.length > 12 ? ` (+${fechasOcupadas.length - 12} más)` : ''}
+            </p>
+          ) : null}
+          <FieldGroup>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <TextField
+                id="fechaInicioAgenda"
+                label="Fecha de inicio"
+                type="date"
+                error={errorFechaInicio}
+                inputProps={{
+                  min: minFechaInicio,
+                  ...register('fechaInicio'),
+                }}
+              />
+              <TextField
+                id="fechaFinAgenda"
+                label="Fecha de finalización"
+                type="date"
+                error={errorFechaFin}
+                inputProps={{
+                  min:
+                    fechaInicio && (!minFechaInicio || fechaInicio >= minFechaInicio)
+                      ? fechaInicio
+                      : minFechaInicio,
+                  ...register('fechaFin'),
+                }}
+              />
+            </div>
+          </FieldGroup>
+        </FormSection>
+      )}
+
       {/* Sección 1: Datos Principales */}
       <FormSection
-        number={1}
+        number={esAlta || esActividad ? 2 : 1}
         title={esActividad ? 'Datos Principales de la Actividad' : 'Datos Principales del Evento'}
         icon={
           <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
@@ -646,8 +715,8 @@ export function EventoForm({
         </FormSection>
       ) : (
         <FormSection
-          number={4}
-          title="Calendario y Horarios"
+          number={esAlta ? 5 : 4}
+          title={esAlta ? 'Horarios del evento' : 'Calendario y Horarios'}
           icon={
             <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
               <rect x="3" y="4" width="18" height="18" rx="2" />
@@ -657,35 +726,39 @@ export function EventoForm({
             </svg>
           }
         >
-          <FieldDescription>
-            La fecha de finalización no puede ser anterior a la de inicio.
-          </FieldDescription>
+          {!esAlta ? (
+            <FieldDescription>
+              La fecha de finalización no puede ser anterior a la de inicio.
+            </FieldDescription>
+          ) : null}
           <FieldGroup>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <TextField
-                id="fechaInicio"
-                label="Fecha de inicio"
-                type="date"
-                error={errorFechaInicio}
-                inputProps={{
-                  min: minFechaInicio,
-                  ...register('fechaInicio'),
-                }}
-              />
-              <TextField
-                id="fechaFin"
-                label="Fecha de finalización"
-                type="date"
-                error={errorFechaFin}
-                inputProps={{
-                  min:
-                    fechaInicio && (!minFechaInicio || fechaInicio >= minFechaInicio)
-                      ? fechaInicio
-                      : minFechaInicio,
-                  ...register('fechaFin'),
-                }}
-              />
-            </div>
+            {!esAlta ? (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <TextField
+                  id="fechaInicio"
+                  label="Fecha de inicio"
+                  type="date"
+                  error={errorFechaInicio}
+                  inputProps={{
+                    min: minFechaInicio,
+                    ...register('fechaInicio'),
+                  }}
+                />
+                <TextField
+                  id="fechaFin"
+                  label="Fecha de finalización"
+                  type="date"
+                  error={errorFechaFin}
+                  inputProps={{
+                    min:
+                      fechaInicio && (!minFechaInicio || fechaInicio >= minFechaInicio)
+                        ? fechaInicio
+                        : minFechaInicio,
+                    ...register('fechaFin'),
+                  }}
+                />
+              </div>
+            ) : null}
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <TextField

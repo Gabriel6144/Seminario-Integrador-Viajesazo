@@ -38,16 +38,26 @@ export function ViajeBorradorCard({ borrador, onDescartar, descartando }: Props)
       </header>
 
       {esBorrador ? (
-        <div className="rounded-2xl bg-slate-50 p-3">
-          <div className="mb-1.5 flex items-center justify-between text-xs font-medium text-slate-500">
-            <span>Progreso de armado</span>
-            <span className="font-bold text-amber-700">
-              Paso {borrador.pasoActual ?? '?'} / 8 ({progreso}%)
-            </span>
+        <div className="flex flex-col gap-2">
+          <div className="rounded-2xl bg-slate-50 p-3">
+            <div className="mb-1.5 flex items-center justify-between text-xs font-medium text-slate-500">
+              <span>Progreso de armado</span>
+              <span className="font-bold text-amber-700">
+                Paso {borrador.pasoActual ?? '?'} / 8 ({progreso}%)
+              </span>
+            </div>
+            <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200">
+              <div
+                className="h-full rounded-full bg-amber-500 transition-all duration-500"
+                style={{ width: `${progreso}%` }}
+              />
+            </div>
           </div>
-          <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200">
-            <div className="h-full rounded-full bg-amber-500 transition-all duration-500" style={{ width: `${progreso}%` }} />
-          </div>
+          {paso < 6 ? (
+            <p className="text-sm font-semibold text-red-600" role="status">
+              Falta definir dónde se alojará.
+            </p>
+          ) : null}
         </div>
       ) : (
         <div className="flex items-center gap-2 rounded-2xl bg-sky-50 p-3 text-xs font-medium text-sky-800">

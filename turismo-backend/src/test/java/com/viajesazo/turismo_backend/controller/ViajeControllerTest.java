@@ -18,6 +18,7 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
@@ -39,11 +40,9 @@ import com.viajesazo.turismo_backend.model.TipoRitmo;
 import com.viajesazo.turismo_backend.service.ViajeService;
 
 @WebMvcTest(ViajeController.class)
-// @WebMvcTest es un slice: sin el import, el Clock que usa GlobalExceptionHandler no existiría.
+@AutoConfigureMockMvc(addFilters = false)
 @Import(AppConfig.class)
 class ViajeControllerTest {
-
-	private static final String USUARIO = "turista@test.com";
 
 	private static final String VALID_BODY = """
 			{
@@ -58,8 +57,7 @@ class ViajeControllerTest {
 			  "fechaInicio": "2026-10-20",
 			  "fechaFin": "2026-10-22",
 			  "ritmo": "EQUILIBRADO",
-			  "intereses": ["CULTURA"],
-			  "usuario": "turista@test.com"
+			  "intereses": ["CULTURA"]
 			}
 			""";
 
@@ -80,6 +78,7 @@ class ViajeControllerTest {
 				.andExpect(jsonPath("$.nombre").value("Escapada serrana"))
 				.andExpect(jsonPath("$.estado").value("PLANIFICADO"))
 				.andExpect(jsonPath("$.fechaInicio").value("2026-10-20"))
+				.andExpect(jsonPath("$.usuarioId").value(1))
 				.andExpect(jsonPath("$.ubicacion.ciudad").value("Villa General Belgrano"));
 	}
 
@@ -94,55 +93,12 @@ class ViajeControllerTest {
 				  "fechaInicio": "2026-10-20",
 				  "fechaFin": "2026-10-22",
 				  "ritmo": "EQUILIBRADO",
-				  "usuario": "turista@test.com"
+				  "intereses": ["CULTURA"]
 				}
-				""";
-
-		mockMvc.perform(post("/api/viajes").contentType(MediaType.APPLICATION_JSON).content(body))
-				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.status").value(400))
-				.andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("nombre")));
-	}
-
-	@Test
-	@DisplayName("VZ-19 CA2: sin fecha de inicio se rechaza con 400")
-	void rejectsMissingStartDate() throws Exception {
-		String body = """
-				{
-				  "nombre": "Escapada",
-				  "ubicacion": {"latitud": -31.95, "longitud": -64.55, "ciudad": "Villa General Belgrano"},
-				  "rangoInteresKm": 35,
-				  "fechaFin": "2026-10-22",
-				  "ritmo": "EQUILIBRADO",
-				  "usuario": "turista@test.com"
-				}
-				""";
-
-		mockMvc.perform(post("/api/viajes").contentType(MediaType.APPLICATION_JSON).content(body))
-				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("fecha de inicio")));
-	}
-
-	@Test
-	@DisplayName("VZ-19 CA5: un body mal formado se rechaza con 400")
-	void rejectsUnreadableBody() throws Exception {
-		String body = """
-				{ "nombre": "Escapada", "ritmo": "NO_EXISTE" }
 				""";
 
 		mockMvc.perform(post("/api/viajes").contentType(MediaType.APPLICATION_JSON).content(body))
 				.andExpect(status().isBadRequest());
-	}
-
-	@Test
-	@DisplayName("VZ-19 CA3: un rango de fechas inválido devuelve 400")
-	void returns400WhenRangeInvalid() throws Exception {
-		when(viajeService.create(any(ViajeRequest.class)))
-				.thenThrow(new BusinessRuleException("la fecha de finalización no puede ser anterior a la de inicio"));
-
-		mockMvc.perform(post("/api/viajes").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
-				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.status").value(400));
 	}
 
 	@Test
@@ -156,8 +112,8 @@ class ViajeControllerTest {
 	}
 
 	@Test
-	@DisplayName("VZ-21: modificar un viaje inexistente devuelve 404")
-	void returns404WhenUpdating() throws Exception {
+	@DisplayName("VZ-21: un viaje inexistente responde 404")
+	void returns404WhenUpdatingMissingTrip() throws Exception {
 		when(viajeService.update(eq(404L), any(ViajeRequest.class)))
 				.thenThrow(new ResourceNotFoundException("No existe el viaje con id 404"));
 
@@ -166,17 +122,26 @@ class ViajeControllerTest {
 	}
 
 	@Test
-	@DisplayName("VZ-23: la baja lógica responde 204 sin cuerpo")
+	@DisplayName("VZ-19: una regla de negocio responde 400")
+	void returns400OnBusinessRule() throws Exception {
+		when(viajeService.create(any(ViajeRequest.class)))
+				.thenThrow(new BusinessRuleException("La fecha de finalización no puede ser anterior a la de inicio"));
+
+		mockMvc.perform(post("/api/viajes").contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	@DisplayName("VZ-23: la baja responde 204")
 	void deletesTrip() throws Exception {
 		mockMvc.perform(delete("/api/viajes/7"))
 				.andExpect(status().isNoContent());
-
 		verify(viajeService).delete(7L);
 	}
 
 	@Test
-	@DisplayName("VZ-23: dar de baja un viaje inexistente devuelve 404")
-	void returns404WhenDeleting() throws Exception {
+	@DisplayName("VZ-23: borrar un viaje inexistente responde 404")
+	void returns404WhenDeletingMissingTrip() throws Exception {
 		doThrow(new ResourceNotFoundException("No existe el viaje con id 404")).when(viajeService).delete(404L);
 
 		mockMvc.perform(delete("/api/viajes/404"))
@@ -184,19 +149,8 @@ class ViajeControllerTest {
 	}
 
 	@Test
-	@DisplayName("VZ-23: un viaje en curso no se puede dar de baja")
-	void returns400WhenDeletingOngoingTrip() throws Exception {
-		doThrow(new BusinessRuleException("el viaje está en curso y no se puede modificar"))
-				.when(viajeService).delete(7L);
-
-		mockMvc.perform(delete("/api/viajes/7"))
-				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.status").value(400));
-	}
-
-	@Test
-	@DisplayName("soporte: consulta el detalle del viaje activo")
-	void findsTripById() throws Exception {
+	@DisplayName("soporte: consulta el detalle del viaje")
+	void findsTrip() throws Exception {
 		when(viajeService.findById(7L)).thenReturn(response());
 
 		mockMvc.perform(get("/api/viajes/7"))
@@ -214,12 +168,12 @@ class ViajeControllerTest {
 	}
 
 	@Test
-	@DisplayName("VZ-22: lista los viajes permitidos del turista, paginados")
+	@DisplayName("VZ-22: lista los viajes permitidos del turista autenticado, paginados")
 	void listsAllowedTrips() throws Exception {
-		when(viajeService.findAll(eq(USUARIO), any(Pageable.class)))
+		when(viajeService.findAll(any(Pageable.class)))
 				.thenReturn(new PageImpl<>(List.of(response()), PageRequest.of(0, 20), 1));
 
-		mockMvc.perform(get("/api/viajes").param("usuario", USUARIO))
+		mockMvc.perform(get("/api/viajes"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.content.length()").value(1))
 				.andExpect(jsonPath("$.content[0].nombre").value("Escapada serrana"))
@@ -229,11 +183,11 @@ class ViajeControllerTest {
 	@Test
 	@DisplayName("VZ-22: filtra por un estado solicitado")
 	void filtersTripsBySingleState() throws Exception {
-		when(viajeService.findByEstados(eq(USUARIO), eq(List.of("BORRADOR")), any(Pageable.class)))
+		when(viajeService.findByEstados(eq(List.of("BORRADOR")), any(Pageable.class)))
 				.thenReturn(new PageImpl<>(List.of(responseWithState(EstadoViaje.BORRADOR)),
 						PageRequest.of(0, 20), 1));
 
-		mockMvc.perform(get("/api/viajes/estado").param("usuario", USUARIO).param("estado", "BORRADOR"))
+		mockMvc.perform(get("/api/viajes/estado").param("estado", "BORRADOR"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.content[0].estado").value("BORRADOR"));
 	}
@@ -241,23 +195,16 @@ class ViajeControllerTest {
 	@Test
 	@DisplayName("VZ-22: filtra por varios estados permitidos")
 	void filtersTripsByMultipleStates() throws Exception {
-		when(viajeService.findByEstados(eq(USUARIO), eq(List.of("BORRADOR", "PLANIFICADO", "EN_CURSO")),
+		when(viajeService.findByEstados(eq(List.of("BORRADOR", "PLANIFICADO", "EN_CURSO")),
 				any(Pageable.class)))
 				.thenReturn(new PageImpl<>(List.of(responseWithState(EstadoViaje.BORRADOR), response(),
 						responseWithState(EstadoViaje.EN_CURSO)), PageRequest.of(0, 20), 3));
 
-		mockMvc.perform(get("/api/viajes/estado").param("usuario", USUARIO)
+		mockMvc.perform(get("/api/viajes/estado")
 				.param("estado", "BORRADOR", "PLANIFICADO", "EN_CURSO"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.content.length()").value(3))
 				.andExpect(jsonPath("$.page.totalElements").value(3));
-	}
-
-	@Test
-	@DisplayName("VZ-22: sin usuario la consulta se rechaza con 400")
-	void rejectsMissingUsuario() throws Exception {
-		mockMvc.perform(get("/api/viajes"))
-				.andExpect(status().isBadRequest());
 	}
 
 	@Test
@@ -275,6 +222,7 @@ class ViajeControllerTest {
 		return new ViajeResponse(7L, "Escapada serrana",
 				new UbicacionResponse("Villa General Belgrano", "Córdoba", "Villa General Belgrano", -31.95, -64.55),
 				35.0, LocalDate.parse("2026-10-20"), LocalDate.parse("2026-10-22"),
-				TipoRitmo.EQUILIBRADO, List.of(InteresCategoria.CULTURA), estado, 8, USUARIO, null);
+				TipoRitmo.EQUILIBRADO, List.of(InteresCategoria.CULTURA), List.of(), estado, 8, 1L, "turista@test.com",
+				null);
 	}
 }

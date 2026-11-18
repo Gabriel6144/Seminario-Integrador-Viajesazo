@@ -1,0 +1,60 @@
+package com.viajesazo.turismo_backend.repository;
+
+import java.util.List;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import com.viajesazo.turismo_backend.model.CircuitoItem;
+
+public interface CircuitoItemRepository extends JpaRepository<CircuitoItem, Long> {
+
+	/**
+	 * Conteo de usuarios distintos cuya alternativa seleccionada del circuito incluye la propuesta
+	 * y esa propuesta tiene publicador (regla de inscripción automática).
+	 */
+	@Query("""
+			SELECT i.propuestaId, COUNT(DISTINCT v.usuario.id)
+			FROM CircuitoItem i
+			JOIN i.alternativa a
+			JOIN a.circuito c
+			JOIN c.viaje v
+			JOIN PropuestaTuristica p ON p.id = i.propuestaId
+			WHERE c.estrategiaSeleccionada IS NOT NULL
+			  AND a.estrategia = c.estrategiaSeleccionada
+			  AND p.publicador IS NOT NULL
+			GROUP BY i.propuestaId
+			ORDER BY COUNT(DISTINCT v.usuario.id) DESC, i.propuestaId ASC
+			""")
+	List<Object[]> countInscriptosGroupedByPropuesta();
+
+	@Query("""
+			SELECT COUNT(DISTINCT v.usuario.id)
+			FROM CircuitoItem i
+			JOIN i.alternativa a
+			JOIN a.circuito c
+			JOIN c.viaje v
+			JOIN PropuestaTuristica p ON p.id = i.propuestaId
+			WHERE c.estrategiaSeleccionada IS NOT NULL
+			  AND a.estrategia = c.estrategiaSeleccionada
+			  AND i.propuestaId = :propuestaId
+			  AND p.publicador IS NOT NULL
+			""")
+	long countInscriptosByPropuestaId(@Param("propuestaId") Long propuestaId);
+
+	@Query("""
+			SELECT DISTINCT v.usuario.id
+			FROM CircuitoItem i
+			JOIN i.alternativa a
+			JOIN a.circuito c
+			JOIN c.viaje v
+			JOIN PropuestaTuristica p ON p.id = i.propuestaId
+			WHERE c.estrategiaSeleccionada IS NOT NULL
+			  AND a.estrategia = c.estrategiaSeleccionada
+			  AND i.propuestaId = :propuestaId
+			  AND p.publicador IS NOT NULL
+			""")
+	List<Long> findUsuarioIdsInscriptosByPropuestaId(@Param("propuestaId") Long propuestaId);
+
+}

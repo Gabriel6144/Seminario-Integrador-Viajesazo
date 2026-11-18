@@ -1,4 +1,5 @@
-import type { ApiErrorResponse } from '@/types/api'
+import { clearAccessToken, getAccessToken, setAccessToken } from '@/lib/auth-session'
+import type { ApiErrorResponse, AuthTokenResponse } from '@/types/api'
 
 /**
  * Error normalizado de la API. Envuelve el cuerpo que devuelve `GlobalExceptionHandler`.
@@ -41,6 +42,109 @@ export function toUserMessage(error: unknown): string {
   return 'Ocurrió un error inesperado.'
 }
 
+/** Rutas de auth donde un 401 no debe disparar refresh (evitar bucles). */
+function isAuthPath(path: string): boolean {
+  return (
+    path.startsWith('/api/auth/login') ||
+    path.startsWith('/api/auth/refresh') ||
+    path.startsWith('/api/auth/logout')
+  )
+}
+
+/** Header anti-CSRF para refresh/logout (cookie HttpOnly). El backend lo exige. */
+export const VIAJESAZO_CSRF_HEADER = 'X-Viajesazo-CSRF'
+export const VIAJESAZO_CSRF_VALUE = '1'
+
+/** Single-flight: varios 401 concurrentes comparten un solo refresh. */
+let refreshPromise: Promise<boolean> | null = null
+
+async function tryRefreshAccessToken(): Promise<boolean> {
+  if (refreshPromise !== null) return refreshPromise
+
+  refreshPromise = (async () => {
+    try {
+      const response = await fetch('/api/auth/refresh', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          Accept: 'application/json',
+          [VIAJESAZO_CSRF_HEADER]: VIAJESAZO_CSRF_VALUE,
+        },
+      })
+      if (!response.ok) {
+        clearAccessToken()
+        return false
+      }
+      const body = (await response.json()) as AuthTokenResponse
+      setAccessToken(body.accessToken)
+      return true
+    } catch {
+      clearAccessToken()
+      return false
+    } finally {
+      refreshPromise = null
+    }
+  })()
+
+  return refreshPromise
+}
+
+function redirectToLogin(): void {
+  const path = window.location.pathname
+  if (path === '/login' || path === '/registro') return
+  const search = window.location.search
+  const next = encodeURIComponent(`${path}${search}`)
+  window.location.assign(`/login?next=${next}`)
+}
+
+/**
+ * Arma headers con Bearer. Para `FormData` solo se agrega `Authorization` si hay token y **no**
+ * se setea `Content-Type` (el boundary lo pone el navegador). Evitar `new Headers()` con
+ * multipart: undici/MSW en tests a veces falla al reparsear el body.
+ */
+function authHeaders(extra: HeadersInit | undefined, formData: boolean): HeadersInit | undefined {
+  const token = getAccessToken()
+  if (formData) {
+    const headers: Record<string, string> = { [VIAJESAZO_CSRF_HEADER]: VIAJESAZO_CSRF_VALUE }
+    if (token !== null) headers.Authorization = `Bearer ${token}`
+    return headers
+  }
+  const headers = new Headers(extra)
+  if (!headers.has('Accept')) headers.set('Accept', 'application/json')
+  if (!headers.has(VIAJESAZO_CSRF_HEADER)) headers.set(VIAJESAZO_CSRF_HEADER, VIAJESAZO_CSRF_VALUE)
+  if (token !== null) headers.set('Authorization', `Bearer ${token}`)
+  return headers
+}
+
+async function request<T>(
+  path: string,
+  init: RequestInit,
+  alreadyRetried = false,
+): Promise<T> {
+  const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData
+  const headers = authHeaders(isFormData ? undefined : init.headers, isFormData)
+  const response = await fetch(path, {
+    ...init,
+    credentials: 'include',
+    ...(headers !== undefined ? { headers } : {}),
+  })
+
+  if (response.status === 401 && !alreadyRetried && !isAuthPath(path)) {
+    const refreshed = await tryRefreshAccessToken()
+    if (refreshed) {
+      return request<T>(path, init, true)
+    }
+    clearAccessToken()
+    redirectToLogin()
+    throw new ApiError(401, await readErrorBody(response))
+  }
+
+  if (!response.ok) {
+    throw new ApiError(response.status, await readErrorBody(response))
+  }
+  return readBody<T>(response)
+}
+
 /**
  * Cliente HTTP de la API.
  *
@@ -48,17 +152,12 @@ export function toUserMessage(error: unknown): string {
  * `vite.config.ts`) reenvía `/api` a `http://localhost:8080`, así que el navegador las ve como
  * same-origin y nunca dispara el chequeo de CORS. Por eso el backend no necesita
  * `@CrossOrigin` ni `CorsConfiguration` en desarrollo.
+ *
+ * Todas las requests llevan `credentials: 'include'` para la cookie HttpOnly de refresh.
+ * El access token va solo en memoria (`auth-session`) como `Authorization: Bearer`.
  */
 export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(path, {
-    signal,
-    headers: { Accept: 'application/json' },
-  })
-
-  if (!response.ok) {
-    throw new ApiError(response.status, await readErrorBody(response))
-  }
-  return readBody<T>(response)
+  return request<T>(path, { method: 'GET', signal })
 }
 
 /** Verbos que escriben. `GET` queda aparte porque no lleva body ni `Content-Type`. */
@@ -104,16 +203,10 @@ export function apiPostForm<TResponse>(
   formData: FormData,
   signal?: AbortSignal,
 ): Promise<TResponse> {
-  return fetch(path, {
+  return request<TResponse>(path, {
     method: 'POST',
     signal,
-    headers: { Accept: 'application/json' },
     body: formData,
-  }).then(async (response) => {
-    if (!response.ok) {
-      throw new ApiError(response.status, await readErrorBody(response))
-    }
-    return readBody<TResponse>(response)
   })
 }
 
@@ -134,21 +227,13 @@ function write<TResponse>(
 ): Promise<TResponse> {
   const hasBody = body !== undefined
 
-  return fetch(path, {
+  return request<TResponse>(path, {
     method,
     signal,
     headers: {
-      Accept: 'application/json',
-      // Un DELETE sin body no lleva Content-Type: mandarlo vacío hace que algunos proxies
-      // descarten la request.
       ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
     },
     ...(hasBody ? { body: JSON.stringify(body) } : {}),
-  }).then(async (response) => {
-    if (!response.ok) {
-      throw new ApiError(response.status, await readErrorBody(response))
-    }
-    return readBody<TResponse>(response)
   })
 }
 

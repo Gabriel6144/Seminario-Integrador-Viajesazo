@@ -13,9 +13,8 @@ import com.viajesazo.turismo_backend.model.TipoPropuesta;
 import com.viajesazo.turismo_backend.model.TipoRegistro;
 
 /**
- * Vista común de eventos y actividades. Los campos que solo existen en un subtipo quedan en
- * {@code null}: {@code fechaInicio}/{@code fechaFin}/{@code horario*} para actividades y
- * {@code duracionMinutos} para eventos.
+ * Vista común de eventos y actividades. {@code horario*} es solo de eventos;
+ * {@code duracionMinutos} solo de actividades. Ambos subtipos exponen {@code fechaInicio}/{@code fechaFin}.
  */
 public record PropuestaResumenResponse(
 		Long id,

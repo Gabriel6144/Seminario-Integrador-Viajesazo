@@ -15,9 +15,11 @@ public record ViajeResponse(
     LocalDate fechaFin,
     TipoRitmo ritmo,
     List<InteresCategoria> interesesCategoria,
+    List<DiaRitmoResponse> diasPlan,
     EstadoViaje estado,
     Integer pasoActual,
-    String usuario,
+    Long usuarioId,
+    String usuarioEmail,
     CircuitoResponse circuito
 
 ) {}

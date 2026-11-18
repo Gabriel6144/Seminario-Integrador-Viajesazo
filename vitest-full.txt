@@ -1,0 +1,135 @@
+﻿node.exe : npm notice run turismo-frontend@0.0.0 npx
+En línea: 1 Carácter: 1
++ & "C:\Program Files\nodejs/node.exe" "C:\Users\Thiago Alejo Decalli\A ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm notice run ...ntend@0.0.0 npx:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+npm notice run ^"vitest^" run --reporter=dot
+
+ RUN  v5.0.2 C:/Users/Thiago Alejo Decalli/Documents/Seminario-Integrador-Viajesazo/turismo-frontend
+
+stderr | src/pages/evento-nuevo-page.test.tsx > EventoNuevoPage > agrega la URL de una imagen subida y la manda al 
+crear el evento
+AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  assert(typeof value === "string" && webidl.is.USVString(value) || webidl.is.File(value))
+
+    at multipartFormDataParser (node:internal/deps/undici/undici:6565:9)
+    at node:internal/deps/undici/undici:7040:34
+    at successSteps (node:internal/deps/undici/undici:7087:27)
+    at readAllBytes (node:internal/deps/undici/undici:6004:13) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+[MSW] Encountered an unhandled exception during the handler lookup for "POST http://localhost:5173/api/imagenes". 
+Please see the original error above.
+
+stderr | src/pages/evento-editar-page.test.tsx > EventoEditarPage > actualiza el nombre y lo refleja en el store
+No routes matched location "/eventos/1" 
+
+stderr | src/pages/evento-editar-page.test.tsx > EventoEditarPage > conserva las imágenes si el usuario no toca la 
+lista
+No routes matched location "/eventos/1" 
+
+stderr | src/pages/evento-editar-page.test.tsx > EventoEditarPage > borra las imágenes cuando el usuario quita la 
+última fila
+No routes matched location "/eventos/1" 
+
+stderr | src/pages/evento-editar-page.test.tsx > EventoEditarPage > reemplaza el publicador y actualiza el nombre 
+aplanado del evento
+No routes matched location "/eventos/1" 
+
+stderr | src/pages/evento-editar-page.test.tsx > EventoEditarPage > deja convertir los opcionales en null al vaciarlos
+No routes matched location "/eventos/1" 
+
+stderr | src/pages/evento-editar-page.test.tsx > EventoEditarPage > precarga el arancel de un evento arancelado y lo 
+limpia al pasar a gratuito
+No routes matched location "/eventos/3" 
+
+stderr | src/pages/publicador-nuevo-page.test.tsx > PublicadorNuevoPage > crea el publicador con el teléfono vacío 
+como null
+No routes matched location "/publicadores/4" 
+
+stderr | src/pages/publicador-nuevo-page.test.tsx > PublicadorNuevoPage > guarda el teléfono si el usuario lo completa
+No routes matched location "/publicadores/4" 
+
+stderr | src/pages/publicador-nuevo-page.test.tsx > PublicadorNuevoPage > deja reintentar tras un rechazo por email 
+duplicado
+No routes matched location "/publicadores/4" 
+
+stderr | src/components/imagen-uploader.test.tsx > ImagenUploader > sube el archivo y entrega la URL que devuelve el 
+backend
+AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  assert(typeof value === "string" && webidl.is.USVString(value) || webidl.is.File(value))
+
+    at multipartFormDataParser (node:internal/deps/undici/undici:6565:9)
+    at node:internal/deps/undici/undici:7040:34
+    at successSteps (node:internal/deps/undici/undici:7087:27)
+    at readAllBytes (node:internal/deps/undici/undici:6004:13) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+[MSW] Encountered an unhandled exception during the handler lookup for "POST http://localhost:5173/api/imagenes". 
+Please see the original error above.
+
+stderr | src/components/imagen-uploader.test.tsx > ImagenUploader > sube varios archivos elegidos de una sola vez
+AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  assert(typeof value === "string" && webidl.is.USVString(value) || webidl.is.File(value))
+
+    at multipartFormDataParser (node:internal/deps/undici/undici:6565:9)
+    at node:internal/deps/undici/undici:7040:34
+    at successSteps (node:internal/deps/undici/undici:7087:27)
+    at readAllBytes (node:internal/deps/undici/undici:6004:13) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+[MSW] Encountered an unhandled exception during the handler lookup for "POST http://localhost:5173/api/imagenes". 
+Please see the original error above.
+
+stderr | src/components/imagen-uploader.test.tsx > ImagenUploader > muestra el error del backend y no agrega ninguna 
+fila si rechaza el archivo
+AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+
+  assert(typeof value === "string" && webidl.is.USVString(value) || webidl.is.File(value))
+
+    at multipartFormDataParser (node:internal/deps/undici/undici:6565:9)
+    at node:internal/deps/undici/undici:7040:34
+    at successSteps (node:internal/deps/undici/undici:7087:27)
+    at readAllBytes (node:internal/deps/undici/undici:6004:13) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+[MSW] Encountered an unhandled exception during the handler lookup for "POST http://localhost:5173/api/imagenes". 
+Please see the original error above.
+
+stderr | src/pages/evento-detail-page.test.tsx > borrado de eventos desde el detalle > borra el evento al confirmar
+No routes matched location "/" 
+
+stderr | src/pages/evento-detail-page.test.tsx > borrado de eventos desde el detalle > vuelve al listado y no al 
+detalle, que ya no existe
+No routes matched location "/" 
+
+stderr | src/components/pagination-bar.test.tsx > PaginationBar > colapsa muchas páginas con elipsis
+Encountered two children with the same key, `gap`. Keys should be unique so that components maintain their identity 
+across updates. Non-unique keys may cause children to be duplicated and/or omitted — the behavior is unsupported and 
+could change in a future version.
+
