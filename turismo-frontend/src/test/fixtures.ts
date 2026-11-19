@@ -108,7 +108,7 @@ export const GASTRONOMIA_ESTANCIA: EventoResponse = {
   descripcion:
     'Recorrido patrimonial guiado por templos, claustros y museos fundacionales de la Manzana Jesuítica.',
   categoria: 'CULTURA',
-  tipoPropuesta: 'VISITA_GUIADA',
+  tipoPropuesta: 'JORNADA',
   modalidad: 'PEDESTRE',
   // Arancelado a propósito: es el único fixture que ejercita el bloque de arancel del detalle.
   tipoAcceso: 'DE_PAGO',
@@ -124,8 +124,7 @@ export const GASTRONOMIA_ESTANCIA: EventoResponse = {
   fechaInicio: '2026-10-05',
   fechaFin: '2026-10-05',
   horarioInicio: '12:30:00',
-  // Solo hora de inicio: el backend no obliga a informar la de fin.
-  horarioFin: null,
+  horarioFin: '15:00:00',
   imagenes: ['https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Manzana_Jesuitica_Cordoba.jpg/1200px-Manzana_Jesuitica_Cordoba.jpg'],
   publicadorId: 1,
   publicadorNombre: 'Turismo Córdoba',

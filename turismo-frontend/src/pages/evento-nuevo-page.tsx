@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 
@@ -9,7 +9,6 @@ import { EventoForm } from '@/components/evento-form'
 import { ErrorState } from '@/components/query-state'
 import { toUserMessage } from '@/lib/http'
 import { EVENTO_FORM_DEFAULT, toActividadRequest, toEventoRequest } from '@/lib/schemas'
-import type { PublicadorResponse } from '@/types/api'
 
 /**
  * Alta de propuesta turística (`POST /api/eventos` o `POST /api/actividades`).
@@ -23,26 +22,6 @@ export function EventoNuevoPage() {
   const crearEvento = useCrearEvento()
   const crearActividad = useCrearActividad()
   const [serverError, setServerError] = useState<string | null>(null)
-
-  const publicadores = useMemo((): PublicadorResponse[] => {
-    if (user?.publicadorId == null) return []
-    return [
-      {
-        id: user.publicadorId,
-        nombre: user.nombre,
-        email: user.email,
-        telefono: user.telefono,
-      },
-    ]
-  }, [user])
-
-  const defaultValues = useMemo(() => {
-    const base = { ...EVENTO_FORM_DEFAULT }
-    if (user?.publicadorId != null) {
-      base.publicadorId = String(user.publicadorId)
-    }
-    return base
-  }, [user?.publicadorId])
 
   if (user?.publicadorId == null) {
     return (
@@ -63,8 +42,7 @@ export function EventoNuevoPage() {
       </div>
 
       <EventoForm
-        defaultValues={defaultValues}
-        publicadores={publicadores}
+        defaultValues={EVENTO_FORM_DEFAULT}
         submitLabel="Crear propuesta"
         cancelTo="/publicador"
         isPending={crearEvento.isPending || crearActividad.isPending}

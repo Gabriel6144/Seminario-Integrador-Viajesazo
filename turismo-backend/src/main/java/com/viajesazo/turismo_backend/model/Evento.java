@@ -59,14 +59,26 @@ public class Evento extends PropuestaTuristica {
 
 	@Override
 	protected void validarInvariantesEspecificas() {
+		if (descripcion == null || descripcion.isBlank()) {
+			throw new InvariantViolationException("la descripción del evento es obligatoria");
+		}
+		if (categoria == null) {
+			throw new InvariantViolationException("la categoría del evento es obligatoria");
+		}
 		if (fechaInicio == null || fechaFin == null) {
 			throw new InvariantViolationException("las fechas de inicio y fin del evento son obligatorias");
 		}
 		if (fechaFin.isBefore(fechaInicio)) {
 			throw new InvariantViolationException("la fecha de finalización no puede ser anterior a la de inicio");
 		}
-		if (horarioInicio != null && horarioFin != null && !horarioFin.isAfter(horarioInicio)) {
+		if (horarioInicio == null || horarioFin == null) {
+			throw new InvariantViolationException("los horarios de inicio y fin del evento son obligatorios");
+		}
+		if (!horarioFin.isAfter(horarioInicio)) {
 			throw new InvariantViolationException("el horario de finalización debe ser posterior al de inicio");
+		}
+		if (imagenes == null || imagenes.isEmpty()) {
+			throw new InvariantViolationException("el evento debe tener al menos una imagen");
 		}
 		if (tipoAcceso == TipoAcceso.DE_PAGO) {
 			if (montoEstimado == null) {

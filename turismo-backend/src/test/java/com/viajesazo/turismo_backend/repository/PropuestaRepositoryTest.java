@@ -121,7 +121,7 @@ class PropuestaRepositoryTest {
 		assertThat(page.getContent()).extracting(PropuestaResumenResponse::duracionMinutos)
 				.containsExactly(120, 90);
 		assertThat(page.getContent()).allSatisfy(item -> {
-			assertThat(item.fechaInicio()).isNull();
+			assertThat(item.fechaInicio()).isNotNull();
 			assertThat(item.tipo()).isEqualTo(TipoRegistro.ACTIVIDAD);
 		});
 	}
@@ -369,6 +369,7 @@ class PropuestaRepositoryTest {
 		evento.setFechaFin(fin);
 		evento.setHorarioInicio(LocalTime.of(20, 0));
 		evento.setHorarioFin(LocalTime.of(23, 0));
+		evento.setImagenes(new java.util.ArrayList<>(List.of("https://cdn.test/evento.jpg")));
 		return evento;
 	}
 

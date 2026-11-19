@@ -47,6 +47,7 @@ public class PropuestaService {
 	@Transactional
 	public EventoResponse create(EventoRequest request) {
 		validateRange(request);
+		validateNotPast(request);
 		validateAcceso(request);
 		Evento evento = mapper.toEntity(request);
 		evento.setTipoAcceso(request.tipoAcceso() == null ? TipoAcceso.GRATUITO : request.tipoAcceso());
@@ -168,6 +169,12 @@ public class PropuestaService {
 	private Publicador resolvePublicadorForWrite(Long requestedPublicadorId, Publicador existing) {
 		UsuarioPrincipal principal = SecurityUtils.currentPrincipal();
 		if (principal.hasRole(Rol.ADMINISTRADOR)) {
+			if (requestedPublicadorId == null) {
+				if (existing != null) {
+					return existing;
+				}
+				throw new BusinessRuleException("el publicador es obligatorio para un administrador");
+			}
 			return getPublicadorOrThrow(requestedPublicadorId);
 		}
 		if (!principal.hasRole(Rol.PUBLICADOR) || principal.getPublicadorId() == null) {
@@ -203,6 +210,16 @@ public class PropuestaService {
 		if (request.horarioInicio() != null && request.horarioFin() != null
 				&& !request.horarioFin().isAfter(request.horarioInicio())) {
 			throw new BusinessRuleException("el horario de finalización debe ser posterior al de inicio");
+		}
+	}
+
+	/**
+	 * Un evento nuevo no puede empezar en el pasado. La regla aplica solo al alta: la edición de
+	 * un evento histórico se define en VZ-14.
+	 */
+	private void validateNotPast(EventoRequest request) {
+		if (request.fechaInicio().isBefore(LocalDate.now(clock))) {
+			throw new BusinessRuleException("la fecha de inicio no puede ser anterior a hoy");
 		}
 	}
 

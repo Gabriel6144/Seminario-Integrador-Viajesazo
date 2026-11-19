@@ -909,9 +909,6 @@ function validateEvento(body: Partial<EventoRequest>): string | null {
   if (body.fechaFin === undefined) {
     errores.push('fechaFin: la fecha de finalización es obligatoria')
   }
-  if (body.publicadorId === undefined) {
-    errores.push('publicadorId: el publicador es obligatorio')
-  }
   if (body.lugarRecinto === undefined || body.lugarRecinto.trim().length === 0) {
     errores.push('lugarRecinto: el lugar o recinto es obligatorio')
   }

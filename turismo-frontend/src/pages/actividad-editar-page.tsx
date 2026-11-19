@@ -11,7 +11,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { toUserMessage } from '@/lib/http'
 import { parseId } from '@/lib/parse-id'
 import { toActividadFormValues, toActividadRequest } from '@/lib/schemas'
-import type { PublicadorResponse } from '@/types/api'
 
 /**
  * Modificación de actividad turística — `PUT /api/actividades/{id}`.
@@ -39,14 +38,6 @@ export function ActividadEditarPage() {
   }
 
   const actual = actividad.data
-  const publicadores: PublicadorResponse[] = [
-    {
-      id: actual.publicadorId,
-      nombre: actual.publicadorNombre,
-      email: '',
-      telefono: null,
-    },
-  ]
 
   return (
     <div className="flex flex-col gap-6">
@@ -59,7 +50,6 @@ export function ActividadEditarPage() {
 
       <EventoForm
         defaultValues={toActividadFormValues(actual)}
-        publicadores={publicadores}
         tipoFijo="ACTIVIDAD"
         submitLabel="Guardar cambios"
         cancelTo={`/actividades/${id}`}

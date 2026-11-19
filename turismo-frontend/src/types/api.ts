@@ -72,6 +72,19 @@ export const CATEGORIA_LABELS: Record<Categoria, string> = {
   FAMILIAR_Y_RELAX: 'Familiar y relax',
 }
 
+/** Texto breve para ayudar a elegir la categoría en el formulario. */
+export const CATEGORIA_DESCRIPCIONES: Record<Categoria, string> = {
+  NATURALEZA: 'Aire libre, paisajes y ecoturismo.',
+  GASTRONOMIA: 'Sabores, ferias y experiencias culinarias.',
+  CULTURA: 'Arte, música, teatro y tradiciones.',
+  HISTORIA: 'Patrimonio, museos y sitios históricos.',
+  AVENTURA: 'Trekking, escalada y deportes de riesgo.',
+  VIDA_NOCTURNA: 'Bares, peñas y propuestas nocturnas.',
+  MUSICA: 'Recitales, festivales y música en vivo.',
+  COMPRAS: 'Artesanías, ferias y productos locales.',
+  FAMILIAR_Y_RELAX: 'Planes para toda la familia y descanso.',
+}
+
 export const TIPOS_REGISTRO = ['EVENTO', 'ACTIVIDAD'] as const
 export type TipoRegistro = (typeof TIPOS_REGISTRO)[number]
 
@@ -117,6 +130,19 @@ export const TIPO_PROPUESTA_LABELS: Record<TipoPropuesta, string> = {
   EXPOSICION: 'Exposición',
   VISITA_GUIADA: 'Visita guiada',
   FESTIVAL: 'Festival',
+}
+
+/** Texto breve para ayudar a elegir el tipo de propuesta en el formulario. */
+export const TIPO_PROPUESTA_DESCRIPCIONES: Record<TipoPropuesta, string> = {
+  FERIA: 'Stand y venta de productos o servicios.',
+  CONGRESO: 'Encuentro profesional con agenda y ponencias.',
+  ENCUENTRO: 'Reunión abierta de una comunidad o grupo.',
+  DEPORTIVO: 'Competencia, exhibición o actividad física.',
+  ESPECTACULO: 'Show, obra o presentación para público.',
+  JORNADA: 'Actividad de uno o varios días con programa.',
+  EXPOSICION: 'Muestra de arte, ciencia o productos.',
+  VISITA_GUIADA: 'Recorrido acompañado por un guía.',
+  FESTIVAL: 'Celebración con múltiples actividades y público.',
 }
 
 /**
@@ -305,7 +331,8 @@ export interface ActividadRequest {
   fechaFin: LocalDate
   disponibilidades: DisponibilidadItem[]
   imagenes: string[]
-  publicadorId: number
+  /** Opcional: un PUBLICADOR lo deriva del JWT. Un ADMIN lo indica explícitamente. */
+  publicadorId?: number | null
 }
 
 export interface PublicadorResponse {
@@ -359,7 +386,8 @@ export interface EventoRequest {
    * (`NullValuePropertyMappingStrategy.IGNORE`).
    */
   imagenes: string[] | null
-  publicadorId: number
+  /** Opcional: un PUBLICADOR lo deriva del JWT. Un ADMIN lo indica explícitamente. */
+  publicadorId?: number | null
 }
 
 /**

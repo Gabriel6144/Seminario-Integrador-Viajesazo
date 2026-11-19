@@ -5,7 +5,8 @@ import {
   DIAS_SEMANA,
   MODALIDADES,
   TIPOS_ACCESO,
-  TIPOS_PROPUESTA,
+  TIPOS_PROPUESTA_ACTIVIDAD,
+  TIPOS_PROPUESTA_EVENTO,
   type ActividadRequest,
   type ActividadResponse,
   type Categoria,
@@ -91,7 +92,7 @@ export function toPublicadorRequest(values: PublicadorFormValues): PublicadorReq
 
 /**
  * `categoria`, `tipoPropuesta` y `modalidad` arrancan en `''` mientras no se eligió nada en el
- * `<Select>`, igual que `publicadorId`, y son obligatorios al enviar el formulario.
+ * `<Select>`, y son obligatorios al enviar el formulario.
  */
 const categoriaSchema = z
   .string()
@@ -100,12 +101,14 @@ const categoriaSchema = z
     'La categoría es obligatoria.',
   )
 
-const tipoPropuestaSchema = z
-  .string()
-  .refine(
-    (value) => (TIPOS_PROPUESTA as readonly string[]).includes(value),
-    'El tipo de propuesta es obligatorio.',
-  )
+const tipoPropuestaSchema = (opciones: readonly string[]) =>
+  z
+    .string()
+    .min(1, 'El tipo de propuesta es obligatorio.')
+    .refine(
+      (value) => value === '' || opciones.includes(value),
+      'El tipo de propuesta no es compatible con este subtipo.',
+    )
 
 const modalidadSchema = z
   .string()
@@ -115,13 +118,14 @@ const modalidadSchema = z
   )
 
 /**
- * `publicadorId` es **string** y no number porque el `<Select>` de Radix entrega
- * `onValueChange` un string. Parsearlo recién en el adapter evita tener que coercionar a
- * número en cada render.
+ * La modalidad es opcional para eventos (VZ-13). Las actividades conservan la regla anterior.
  */
-const publicadorIdSchema = z
+const modalidadOpcionalSchema = z
   .string()
-  .refine((value) => /^\d+$/.test(value) && Number(value) > 0, 'El publicador es obligatorio.')
+  .refine(
+    (value) => value === '' || (MODALIDADES as readonly string[]).includes(value),
+    'La modalidad no es válida.',
+  )
 
 const imagenSchema = z.object({
   // Una fila agregada y no llenada no se manda como `""` al backend (que la rechaza con
@@ -164,10 +168,19 @@ export const disponibilidadSchema = z
  * `tipoAcceso` es `''` mientras no se eligió nada en el `<Select>` (como `categoria`). El adapter
  * lo traduce a `null`, y el backend aplica su default `GRATUITO`.
  */
-const tipoAccesoSchema = z.union([
-  z.literal(''),
-  z.enum(TIPOS_ACCESO, { message: 'El tipo de acceso no es válido.' }),
-])
+const tipoAccesoSchema = z
+  .union([
+    z.literal(''),
+    z.enum(TIPOS_ACCESO, { message: 'El tipo de acceso no es válido.' }),
+  ])
+  .superRefine((value, ctx) => {
+    if (value === '') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Elegí el tipo de acceso.',
+      })
+    }
+  })
 
 /** Decimal con hasta dos decimales. El vacío es válido acá; la obligatoriedad se exige si es `DE_PAGO`. */
 const montoEstimadoSchema = z
@@ -194,10 +207,14 @@ const sitioOficialSchema = z
 export const eventoSchema = z
   .object({
     nombre: z.string().trim().min(1, 'El nombre es obligatorio.'),
-    descripcion: z.string(),
+    descripcion: z
+      .string()
+      .trim()
+      .min(1, 'La descripción es obligatoria.')
+      .max(1000, 'La descripción no puede superar los 1000 caracteres.'),
     categoria: categoriaSchema,
-    tipoPropuesta: tipoPropuestaSchema,
-    modalidad: modalidadSchema,
+    tipoPropuesta: tipoPropuestaSchema(TIPOS_PROPUESTA_EVENTO),
+    modalidad: modalidadOpcionalSchema,
     tipoAcceso: tipoAccesoSchema,
     montoEstimado: montoEstimadoSchema,
     descripcionArancel: z.string(),
@@ -218,11 +235,13 @@ export const eventoSchema = z
     horarioInicio: z
       .string()
       .trim()
-      .refine((value) => value.length === 0 || ISO_TIME.test(value), 'El horario de inicio no tiene un formato válido.'),
+      .min(1, 'El horario de inicio es obligatorio.')
+      .regex(ISO_TIME, 'El horario de inicio no tiene un formato válido.'),
     horarioFin: z
       .string()
       .trim()
-      .refine((value) => value.length === 0 || ISO_TIME.test(value), 'El horario de finalización no tiene un formato válido.'),
+      .min(1, 'El horario de finalización es obligatorio.')
+      .regex(ISO_TIME, 'El horario de finalización no tiene un formato válido.'),
     duracionMinutos: z.string().optional(),
     disponibilidades: z
       .array(
@@ -233,8 +252,9 @@ export const eventoSchema = z
         }),
       )
       .optional(),
-    imagenes: z.array(imagenSchema),
-    publicadorId: publicadorIdSchema,
+    imagenes: z
+      .array(imagenSchema)
+      .min(1, 'Cargá al menos una imagen para el evento.'),
   })
   .refine((values) => values.fechaInicio.length === 0 || values.fechaFin.length === 0 || values.fechaFin >= values.fechaInicio, {
     message: 'La fecha de finalización no puede ser anterior a la de inicio.',
@@ -311,7 +331,7 @@ export const actividadSchema = z
     nombre: z.string().trim().min(1, 'El nombre es obligatorio.'),
     descripcion: z.string(),
     categoria: categoriaSchema,
-    tipoPropuesta: tipoPropuestaSchema,
+    tipoPropuesta: tipoPropuestaSchema(TIPOS_PROPUESTA_ACTIVIDAD),
     modalidad: modalidadSchema,
     tipoAcceso: tipoAccesoSchema,
     montoEstimado: z.string(),
@@ -345,7 +365,6 @@ export const actividadSchema = z
       ),
     disponibilidades: z.array(disponibilidadSchema).optional(),
     imagenes: z.array(imagenSchema),
-    publicadorId: publicadorIdSchema,
   })
   .refine(
     (values) =>
@@ -395,7 +414,6 @@ export function toActividadRequest(values: EventoFormValues): ActividadRequest {
       horaFin: item.horaFin.trim(),
     })),
     imagenes: values.imagenes.map((imagen) => imagen.url.trim()),
-    publicadorId: Number(values.publicadorId),
   }
 }
 
@@ -413,7 +431,7 @@ export function toEventoRequest(values: EventoFormValues): EventoRequest {
 
   return {
     nombre: values.nombre.trim(),
-    descripcion: blankToNull(values.descripcion),
+    descripcion: values.descripcion.trim(),
     categoria: values.categoria === '' ? null : (values.categoria as Categoria),
     tipoPropuesta: values.tipoPropuesta === '' ? null : (values.tipoPropuesta as TipoPropuesta),
     modalidad: values.modalidad === '' ? null : (values.modalidad as Modalidad),
@@ -428,10 +446,9 @@ export function toEventoRequest(values: EventoFormValues): EventoRequest {
     direccion: values.direccion.trim(),
     fechaInicio: values.fechaInicio.trim(),
     fechaFin: values.fechaFin.trim(),
-    horarioInicio: blankToNull(values.horarioInicio),
-    horarioFin: blankToNull(values.horarioFin),
+    horarioInicio: values.horarioInicio.trim(),
+    horarioFin: values.horarioFin.trim(),
     imagenes: values.imagenes.map((imagen) => imagen.url.trim()),
-    publicadorId: Number(values.publicadorId),
   }
 }
 
@@ -442,7 +459,7 @@ export const EVENTO_FORM_DEFAULT: EventoFormValues = {
   categoria: '',
   tipoPropuesta: '',
   modalidad: '',
-  tipoAcceso: 'GRATUITO',
+  tipoAcceso: '',
   montoEstimado: '',
   descripcionArancel: '',
   sitioOficial: '',
@@ -456,7 +473,6 @@ export const EVENTO_FORM_DEFAULT: EventoFormValues = {
   duracionMinutos: '',
   disponibilidades: [],
   imagenes: [],
-  publicadorId: '',
 }
 
 /**
@@ -465,8 +481,8 @@ export const EVENTO_FORM_DEFAULT: EventoFormValues = {
  * Es la inversa de `toEventoRequest` salvo en las imágenes: la respuesta trae `string[]` y el
  * formulario necesita filas `{ url }`.
  *
- * `categoria` y `publicadorId` vuelven como string porque es lo que espera el `<Select>`, y el
- * `??` de los opcionales es justamente el `null` que el formulario representa como `''`.
+ * `categoria` vuelve como string porque es lo que espera el `<Select>`, y el `??` de los
+ * opcionales es justamente el `null` que el formulario representa como `''`.
  */
 export function toEventoFormValues(evento: {
   nombre: string
@@ -486,7 +502,6 @@ export function toEventoFormValues(evento: {
   horarioInicio: string | null
   horarioFin: string | null
   imagenes: string[]
-  publicadorId: number
 }): EventoFormValues {
   return {
     nombre: evento.nombre,
@@ -511,7 +526,6 @@ export function toEventoFormValues(evento: {
     duracionMinutos: '',
     disponibilidades: [],
     imagenes: evento.imagenes.map((url) => ({ url })),
-    publicadorId: String(evento.publicadorId),
   }
 }
 
@@ -543,7 +557,6 @@ export function toActividadFormValues(actividad: ActividadResponse): EventoFormV
       horaFin: (item.horaFin ?? '').slice(0, 5),
     })),
     imagenes: actividad.imagenes.map((url) => ({ url })),
-    publicadorId: String(actividad.publicadorId),
   }
 }
 

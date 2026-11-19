@@ -47,6 +47,6 @@ public record ActividadRequest(
 		List<@NotBlank(message = "las URLs de imagen no pueden estar vacías")
 		String> imagenes,
 
-		@NotNull(message = "el publicador es obligatorio")
+		// Opcional: un PUBLICADOR lo deriva del JWT. Un ADMIN lo indica explícitamente.
 		Long publicadorId
 ) {}

@@ -11,7 +11,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { toUserMessage } from '@/lib/http'
 import { parseId } from '@/lib/parse-id'
 import { toEventoFormValues, toEventoRequest } from '@/lib/schemas'
-import type { PublicadorResponse } from '@/types/api'
 
 /**
  * Modificación de evento — `PUT /api/eventos/{id}`. US2.
@@ -44,14 +43,6 @@ export function EventoEditarPage() {
   }
 
   const actual = evento.data
-  const publicadores: PublicadorResponse[] = [
-    {
-      id: actual.publicadorId,
-      nombre: actual.publicadorNombre,
-      email: '',
-      telefono: null,
-    },
-  ]
 
   return (
     <div className="flex flex-col gap-6">
@@ -64,7 +55,6 @@ export function EventoEditarPage() {
 
       <EventoForm
         defaultValues={toEventoFormValues(actual)}
-        publicadores={publicadores}
         submitLabel="Guardar cambios"
         cancelTo={`/eventos/${id}`}
         isPending={actualizar.isPending}
