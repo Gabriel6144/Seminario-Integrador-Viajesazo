@@ -116,23 +116,6 @@ class ActividadControllerTest {
 	}
 
 	@Test
-	@DisplayName("US2: sin publicador se rechaza con 400")
-	void rejectsMissingPublisher() throws Exception {
-		String body = """
-				{
-				  "nombre": "Visita guiada",
-				  "localidad": "Cosquín",
-				  "direccion": "Av. San Martín 800",
-				  "duracionMinutos": 90
-				}
-				""";
-
-		mockMvc.perform(post("/api/actividades").contentType(MediaType.APPLICATION_JSON).content(body))
-				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("publicador")));
-	}
-
-	@Test
 	@DisplayName("US2: devuelve 404 cuando la actividad no existe")
 	void returnsNotFound() throws Exception {
 		when(actividadService.findById(99L)).thenThrow(new ResourceNotFoundException("No existe la actividad con id 99"));

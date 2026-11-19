@@ -59,6 +59,7 @@ class EventoControllerTest {
 			  "nombre": "Festival de Folklore",
 			  "descripcion": "Encuentro de syrigamis",
 			  "categoria": "CULTURA",
+			  "tipoPropuesta": "FESTIVAL",
 			  "tipoAcceso": "DE_PAGO",
 			  "montoEstimado": 25000,
 			  "sitioOficial": "https://festivaldecosquin.com",
@@ -130,6 +131,27 @@ class EventoControllerTest {
 		mockMvc.perform(post("/api/eventos").contentType(MediaType.APPLICATION_JSON).content(body))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("fecha de inicio")));
+	}
+
+	@Test
+	@DisplayName("US1: descripción, categoría, tipo, horarios e imágenes son obligatorios")
+	void rejectsMissingRequiredEventFields() throws Exception {
+		String body = """
+				{
+				  "nombre": "Festival",
+				  "fechaInicio": "2026-10-01",
+				  "fechaFin": "2026-10-03",
+				  "publicadorId": 1
+				}
+				""";
+
+		mockMvc.perform(post("/api/eventos").contentType(MediaType.APPLICATION_JSON).content(body))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("descripción")))
+				.andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("categoría")))
+				.andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("tipo de propuesta")))
+				.andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("horario de inicio")))
+				.andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("al menos una imagen")));
 	}
 
 	@Test

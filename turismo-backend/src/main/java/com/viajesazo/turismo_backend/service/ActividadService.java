@@ -130,6 +130,12 @@ public class ActividadService {
 	private Publicador resolvePublicadorForWrite(Long requestedPublicadorId, Publicador existing) {
 		UsuarioPrincipal principal = SecurityUtils.currentPrincipal();
 		if (principal.hasRole(Rol.ADMINISTRADOR)) {
+			if (requestedPublicadorId == null) {
+				if (existing != null) {
+					return existing;
+				}
+				throw new BusinessRuleException("el publicador es obligatorio para un administrador");
+			}
 			return getPublicadorOrThrow(requestedPublicadorId);
 		}
 		if (!principal.hasRole(Rol.PUBLICADOR) || principal.getPublicadorId() == null) {

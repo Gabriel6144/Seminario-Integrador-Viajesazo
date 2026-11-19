@@ -4,36 +4,47 @@ import { describe, expect, it, vi } from 'vitest'
 import { EventoMapa } from './evento-mapa'
 
 /**
- * Las fábricas de Leaflet devuelven objetos encadenables (`marker.bindPopup(...).addTo(map)...`),
- * así que el mock tiene que devolver `this` en cada paso. Se arma con `vi.hoisted` porque
- * `vi.mock` se eleva por encima de las variables del módulo.
+ * MapLibre es imperativo y en jsdom no hay WebGL, así que se mockea con fábricas
+ * encadenables. El mock guarda el contenido del popup y las coordenadas del marcador.
  */
-const { setView, marker, tileLayer, mapRemove } = vi.hoisted(() => {
-  const marker = { bindPopup: vi.fn(), addTo: vi.fn(), openPopup: vi.fn() }
-  marker.bindPopup.mockReturnValue(marker)
-  marker.addTo.mockReturnValue(marker)
-  marker.openPopup.mockReturnValue(marker)
-
-  const map = { setView: vi.fn(), remove: vi.fn() }
-  map.setView.mockReturnValue(map)
-
-  const tileLayer = { addTo: vi.fn() }
-
-  return { setView: map.setView, marker, tileLayer, mapRemove: map.remove, map }
-})
-
-vi.mock('leaflet', () => {
-  const map = { setView, remove: mapRemove }
-  setView.mockReturnValue(map)
-
-  return {
-    default: {
-      map: vi.fn(() => map),
-      tileLayer: vi.fn(() => tileLayer),
-      circleMarker: vi.fn(() => marker),
-    },
+const maplibre = vi.hoisted(() => {
+  const map = { remove: vi.fn(), jumpTo: vi.fn() }
+  const marker = {
+    setLngLat: vi.fn(),
+    setPopup: vi.fn(),
+    addTo: vi.fn(),
+    remove: vi.fn(),
   }
+  marker.setLngLat.mockReturnValue(marker)
+  marker.setPopup.mockReturnValue(marker)
+  marker.addTo.mockReturnValue(marker)
+
+  const popup = { setDOMContent: vi.fn() }
+  popup.setDOMContent.mockReturnValue(popup)
+
+  const mapCalls: unknown[] = []
+  return { map, marker, popup, mapCalls }
 })
+
+vi.mock('maplibre-gl', () => ({
+  Map: class {
+    constructor(...args: unknown[]) {
+      maplibre.mapCalls.push(args[0])
+      return maplibre.map
+    }
+  },
+  Marker: class {
+    constructor() {
+      return maplibre.marker
+    }
+  },
+  Popup: class {
+    constructor() {
+      return maplibre.popup
+    }
+  },
+  setWorkerUrl: vi.fn(),
+}))
 
 function renderMapa() {
   return render(
@@ -65,9 +76,12 @@ describe('EventoMapa', () => {
   it('centra el mapa en las coordenadas que devolvió el backend', () => {
     renderMapa()
 
-    expect(setView).toHaveBeenCalledWith([-30.9816, -64.0959], 15)
-    expect(marker.addTo).toHaveBeenCalled()
-    expect(marker.openPopup).toHaveBeenCalled()
+    expect(maplibre.mapCalls[0]).toEqual(
+      expect.objectContaining({ center: [-64.0959, -30.9816], zoom: 15 }),
+    )
+    expect(maplibre.marker.setLngLat).toHaveBeenCalledWith([-64.0959, -30.9816])
+    expect(maplibre.marker.addTo).toHaveBeenCalled()
+    expect(maplibre.popup.setDOMContent).toHaveBeenCalled()
   })
 
   it('destruye el mapa al desmontar', () => {
@@ -75,6 +89,7 @@ describe('EventoMapa', () => {
 
     unmount()
 
-    expect(mapRemove).toHaveBeenCalled()
+    expect(maplibre.map.remove).toHaveBeenCalled()
+    expect(maplibre.marker.remove).toHaveBeenCalled()
   })
 })

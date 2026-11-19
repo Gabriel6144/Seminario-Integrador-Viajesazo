@@ -667,6 +667,7 @@ export function updateEvento(id: number, request: EventoRequest): EventoResponse
   if (evento === undefined) return undefined
 
   const esDePago = request.tipoAcceso === 'DE_PAGO'
+  const publicadorId = request.publicadorId ?? evento.publicadorId
   const actualizado: EventoResponse = {
     ...evento,
     nombre: request.nombre,
@@ -688,8 +689,8 @@ export function updateEvento(id: number, request: EventoRequest): EventoResponse
     horarioInicio: request.horarioInicio,
     horarioFin: request.horarioFin,
     imagenes: request.imagenes === null ? evento.imagenes : [...request.imagenes],
-    publicadorId: request.publicadorId,
-    publicadorNombre: findPublicador(request.publicadorId)?.nombre ?? '',
+    publicadorId,
+    publicadorNombre: findPublicador(publicadorId)?.nombre ?? '',
   }
 
   eventos[eventos.indexOf(evento)] = actualizado
@@ -698,6 +699,7 @@ export function updateEvento(id: number, request: EventoRequest): EventoResponse
 
 export function createEvento(request: EventoRequest): EventoResponse {
   const esDePago = request.tipoAcceso === 'DE_PAGO'
+  const publicadorId = request.publicadorId ?? 1
   const created: EventoResponse = {
     id: nextEventoId++,
     nombre: request.nombre,
@@ -722,8 +724,8 @@ export function createEvento(request: EventoRequest): EventoResponse {
     horarioInicio: request.horarioInicio,
     horarioFin: request.horarioFin,
     imagenes: request.imagenes ?? [],
-    publicadorId: request.publicadorId,
-    publicadorNombre: findPublicador(request.publicadorId)?.nombre ?? '',
+    publicadorId,
+    publicadorNombre: findPublicador(publicadorId)?.nombre ?? '',
   }
   eventos.push(created)
   return created
