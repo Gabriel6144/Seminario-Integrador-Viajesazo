@@ -21,12 +21,18 @@ function renderListado(initialEntry = '/') {
  * "estoy en la 0" y el botón nunca quedaría marcado.
  */
 function paginaDe(eventos: EventoResponse[]) {
-  return http.get('/api/eventos', ({ request }) => {
+  // La página lista `GET /api/propuestas` (no `/api/eventos`).
+  return http.get('/api/propuestas', ({ request }) => {
     const params = new URL(request.url).searchParams
     const size = Number(params.get('size') ?? 12)
     const number = Number(params.get('page') ?? 0)
+    const content = eventos.slice(number * size, number * size + size).map((evento) => ({
+      ...evento,
+      tipo: 'EVENTO' as const,
+      duracionMinutos: null,
+    }))
     return HttpResponse.json(
-      page(eventos.slice(number * size, number * size + size), {
+      page(content, {
         number,
         size,
         totalElements: eventos.length,
@@ -35,11 +41,11 @@ function paginaDe(eventos: EventoResponse[]) {
   })
 }
 
-/** Registra las URLs pedidas a `/api/eventos` mientras corre el callback. */
+/** Registra las URLs pedidas a `/api/propuestas` mientras corre el callback. */
 async function captureRequests(action: () => Promise<void>): Promise<string[]> {
   const requests: string[] = []
   server.events.on('request:start', ({ request }) => {
-    if (request.url.includes('/api/eventos')) requests.push(request.url)
+    if (request.url.includes('/api/propuestas')) requests.push(request.url)
   })
   try {
     await action()
@@ -101,13 +107,13 @@ describe('EventosPage', () => {
 
     renderListado()
 
-    expect(await screen.findByText('Todavía no hay eventos')).toBeInTheDocument()
+    expect(await screen.findByText('Todavía no hay propuestas turísticas')).toBeInTheDocument()
     expect(screen.queryByText('No se pudo cargar la información')).not.toBeInTheDocument()
   })
 
   it('muestra el mensaje del backend cuando la API falla', async () => {
     server.use(
-      http.get('/api/eventos', () =>
+      http.get('/api/propuestas', () =>
         HttpResponse.json(errorBody(500, 'Ocurrió un error inesperado en el servidor.'), {
           status: 500,
         }),

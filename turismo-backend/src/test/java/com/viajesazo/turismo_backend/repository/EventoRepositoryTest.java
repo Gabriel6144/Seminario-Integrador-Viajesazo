@@ -247,6 +247,45 @@ class EventoRepositoryTest {
 	}
 
 	@Test
+	@DisplayName("existe solapamiento si dos eventos del mismo publicador comparten un día")
+	void existsOverlappingSameDay() {
+		Evento primero = save("Primero", LocalDate.parse("2026-09-23"), LocalDate.parse("2026-09-23"));
+
+		assertThat(eventoRepository.existsOverlapping(
+				publisher.getId(),
+				LocalDate.parse("2026-09-23"),
+				LocalDate.parse("2026-09-23"),
+				null)).isTrue();
+		assertThat(eventoRepository.existsOverlapping(
+				publisher.getId(),
+				LocalDate.parse("2026-09-23"),
+				LocalDate.parse("2026-09-23"),
+				primero.getId())).isFalse();
+		assertThat(eventoRepository.existsOverlapping(
+				publisher.getId(),
+				LocalDate.parse("2026-09-24"),
+				LocalDate.parse("2026-09-24"),
+				null)).isFalse();
+	}
+
+	@Test
+	@DisplayName("días adyacentes no se solapan; multi-día sí choca con un día interno")
+	void existsOverlappingAdjacentAndMultiDay() {
+		save("Rango", LocalDate.parse("2026-09-20"), LocalDate.parse("2026-09-22"));
+
+		assertThat(eventoRepository.existsOverlapping(
+				publisher.getId(),
+				LocalDate.parse("2026-09-23"),
+				LocalDate.parse("2026-09-23"),
+				null)).isFalse();
+		assertThat(eventoRepository.existsOverlapping(
+				publisher.getId(),
+				LocalDate.parse("2026-09-21"),
+				LocalDate.parse("2026-09-21"),
+				null)).isTrue();
+	}
+
+	@Test
 	@DisplayName("US7: la paginación del listado completo parte los eventos sin perder ni duplicar")
 	void paginatesAllEvents() {
 		save("Primero", LocalDate.parse("2026-09-21"), LocalDate.parse("2026-09-21"));
@@ -276,11 +315,15 @@ class EventoRepositoryTest {
 	private Evento save(String name, LocalDate from, LocalDate to, Publicador owner) {
 		return eventoRepository.save(Evento.builder()
 				.nombre(name)
+				.descripcion("Evento de prueba")
 				.tipoPropuesta(TipoPropuesta.FESTIVAL)
 				.categoria(InteresCategoria.CULTURA)
 				.ubicacion(persistUbicacion())
 				.fechaInicio(from)
 				.fechaFin(to)
+				.horarioInicio(LocalTime.of(10, 0))
+				.horarioFin(LocalTime.of(12, 0))
+				.imagenes(List.of("https://cdn.test/evento.jpg"))
 				.estadoPropuesta(initialState)
 				.publicador(owner)
 				.build());
@@ -289,6 +332,7 @@ class EventoRepositoryTest {
 	private Evento saveTimed(String name, LocalDate date, LocalTime startTime) {
 		return eventoRepository.save(Evento.builder()
 				.nombre(name)
+				.descripcion("Evento de prueba")
 				.tipoPropuesta(TipoPropuesta.FESTIVAL)
 				.categoria(InteresCategoria.CULTURA)
 				.ubicacion(persistUbicacion())
@@ -296,6 +340,7 @@ class EventoRepositoryTest {
 				.fechaFin(date)
 				.horarioInicio(startTime)
 				.horarioFin(startTime.plusHours(3))
+				.imagenes(List.of("https://cdn.test/evento.jpg"))
 				.estadoPropuesta(initialState)
 				.publicador(publisher)
 				.build());

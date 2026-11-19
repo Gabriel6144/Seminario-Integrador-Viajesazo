@@ -32,7 +32,7 @@ public class ViajeController {
 
     private final ViajeService viajeService;
 
-    /** VZ-19: registrar viaje. */
+    /** VZ-19: registrar viaje del turista autenticado. */
     @PostMapping
     public ResponseEntity<ViajeResponse> create(@Valid @RequestBody ViajeRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(viajeService.create(request));
@@ -65,11 +65,10 @@ public class ViajeController {
         return ResponseEntity.status(HttpStatus.CREATED).body(viajeService.saveDraft(request));
     }
 
-    /** Lista los borradores de un turista, paginados. */
+    /** Lista los borradores del turista autenticado, paginados. */
     @GetMapping("/borradores")
-    public PagedModel<ViajeResponse> listDrafts(@RequestParam String usuario,
-            @PageableDefault(size = 20) Pageable pageable) {
-        return new PagedModel<>(viajeService.listDrafts(usuario, pageable));
+    public PagedModel<ViajeResponse> listDrafts(@PageableDefault(size = 20) Pageable pageable) {
+        return new PagedModel<>(viajeService.listDrafts(pageable));
     }
 
     /** Modifica/reanuda un borrador. */
@@ -98,25 +97,21 @@ public class ViajeController {
     }
 
     /**
-     * VZ-22: listado de viajes permitidos del turista, paginado con {@code ?usuario=&page=&size=}.
+     * VZ-22: listado de viajes permitidos del turista autenticado, paginado.
      * Sin viajes devuelve una página vacía con 200.
      */
     @GetMapping
-    public PagedModel<ViajeResponse> findAll(@RequestParam String usuario,
-            @PageableDefault(size = 20) Pageable pageable) {
-        return new PagedModel<>(viajeService.findAll(usuario, pageable));
+    public PagedModel<ViajeResponse> findAll(@PageableDefault(size = 20) Pageable pageable) {
+        return new PagedModel<>(viajeService.findAll(pageable));
     }
 
     /**
-     * VZ-22: listado de viajes permitidos filtrado por uno o más estados, paginado con {@code ?usuario=&estado=&page=&size=}.
-     * Sin viajes devuelve una página vacía con 200.
-     * Solo acepta BORRADOR, PLANIFICADO y EN_CURSO.
+     * VZ-22: listado filtrado por uno o más estados. Solo acepta BORRADOR, PLANIFICADO y EN_CURSO.
      */
     @GetMapping("/estado")
-    public PagedModel<ViajeResponse> findByEstado(@RequestParam String usuario,
-            @RequestParam List<String> estado,
+    public PagedModel<ViajeResponse> findByEstado(@RequestParam List<String> estado,
             @PageableDefault(size = 20) Pageable pageable) {
-        return new PagedModel<>(viajeService.findByEstados(usuario, estado, pageable));
+        return new PagedModel<>(viajeService.findByEstados(estado, pageable));
     }
 
 }

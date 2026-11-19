@@ -11,6 +11,7 @@ describe('CircuitoPage', () => {
   })
 
   it('muestra el circuito elegido día por día e incluye los días vacíos', async () => {
+    const usuario = user()
     renderRoute({
       route: '/viajes/:id/circuito',
       initialEntry: '/viajes/2/circuito',
@@ -22,7 +23,9 @@ describe('CircuitoPage', () => {
     ).toBeInTheDocument()
     expect(screen.getByText('Día 1')).toBeInTheDocument()
     expect(screen.getByText('Día 2')).toBeInTheDocument()
-    expect(screen.getByText('Sin actividades programadas.')).toBeInTheDocument()
+    // El detalle muestra un día a la vez; el vacío aparece al elegir el Día 2.
+    await usuario.click(screen.getByRole('button', { name: /día 2/i }))
+    expect(await screen.findByText('Sin actividades programadas.')).toBeInTheDocument()
     expect(screen.getByText(/Este circuito quedó desactualizado/i)).toBeInTheDocument()
     expect(screen.getByText(/fechas del viaje/i)).toBeInTheDocument()
   })
@@ -71,7 +74,9 @@ describe('CircuitoPage', () => {
         screen.queryByText('Festival de Doma y Folklore de Jesús María'),
       ).not.toBeInTheDocument()
     })
-    expect(screen.getAllByText('Sin actividades programadas.')).toHaveLength(2)
+    // Tras borrar, el view-model salta al próximo día con paradas; el vacío se ve en el Día 2.
+    await usuario.click(screen.getByRole('button', { name: /día 2/i }))
+    expect(await screen.findByText('Sin actividades programadas.')).toBeInTheDocument()
   })
 
   it('conserva la parada si se cancela la eliminación', async () => {
@@ -127,7 +132,12 @@ describe('CircuitoPage', () => {
       children: <CircuitoPage />,
     })
 
-    await screen.findByText('Circuito Peatonal Histórico Córdoba Jesuítica')
+    await screen.findByText('Festival de Doma y Folklore de Jesús María')
+    // Peatonal está en el Día 3 del viaje 2.
+    await usuario.click(screen.getByRole('button', { name: /día 3/i }))
+    expect(
+      await screen.findByText('Circuito Peatonal Histórico Córdoba Jesuítica'),
+    ).toBeInTheDocument()
     await usuario.click(
       screen.getByRole('button', { name: /sustituir circuito peatonal histórico/i }),
     )

@@ -1,19 +1,11 @@
 import { useEffect, useRef } from 'react'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
+import * as maplibregl from 'maplibre-gl'
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
+import 'maplibre-gl/dist/maplibre-gl.css'
 
-/**
- * Mapa de OpenStreetMap (Leaflet) con la ubicación de un evento.
- *
- * Pensado para los tests: nunca se monta de verdad en jsdom. En el detalle se mockea, y acá se
- * testea con `leaflet` mockeado, igual que se hace con los componentes de Radix que jsdom no
- * soporta. El que sí se ejecuta es el contrato: los props se muestran y el marcador va en las
- * coordenadas que pasó el backend.
- *
- * El ícono del marcador se pinta con `divIcon` (HTML/CSS) a propósito: el `Icon.Default` de
- * Leaflet busca imágenes en un path que el build no copia, y un asset roto en un mapa de un
- * evento no es un detalle menor.
- */
+maplibregl.setWorkerUrl(workerUrl)
+
+const STYLE_URL = 'https://tiles.openfreemap.org/styles/bright'
 
 export interface EventoMapaProps {
   nombre: string
@@ -23,33 +15,35 @@ export interface EventoMapaProps {
   longitud: number
 }
 
+/**
+ * Mapa del detalle del evento con MapLibre, alineado al motor de VZ-30.
+ * Solo muestra el marcador y su popup; no dibuja rutas ni selector de estilos.
+ */
 export function EventoMapa({ nombre, lugar, localidad, latitud, longitud }: EventoMapaProps) {
-  const container = useRef<HTMLDivElement | null>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    const el = container.current
+    const el = containerRef.current
     if (el === null) return
 
-    // `scrollWheelZoom: false`: si no, el scroll de la página se queda "atrapado" en el mapa.
-    const map = L.map(el, { scrollWheelZoom: false }).setView([latitud, longitud], 15)
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    }).addTo(map)
-
-    L.circleMarker([latitud, longitud], {
-      radius: 12,
-      color: '#bb0413',
-      weight: 2,
-      fillColor: '#bb0413',
-      fillOpacity: 1,
+    const map = new maplibregl.Map({
+      container: el,
+      style: STYLE_URL,
+      center: [longitud, latitud],
+      zoom: 15,
+      attributionControl: false,
     })
-      .bindPopup(popupContent(nombre, lugar))
+
+    const popup = new maplibregl.Popup({ offset: 24 }).setDOMContent(
+      popupContent(nombre, lugar),
+    )
+    const marker = new maplibregl.Marker()
+      .setLngLat([longitud, latitud])
+      .setPopup(popup)
       .addTo(map)
-      .openPopup()
 
     return () => {
+      marker.remove()
       map.remove()
     }
   }, [latitud, longitud, nombre, lugar])
@@ -59,7 +53,7 @@ export function EventoMapa({ nombre, lugar, localidad, latitud, longitud }: Even
   return (
     <div className="relative z-0 isolate overflow-hidden rounded-xl border bg-white shadow-sm">
       <div
-        ref={container}
+        ref={containerRef}
         role="img"
         aria-label={`Mapa de la ubicación de ${nombre}`}
         className="relative z-0 h-72 w-full"
@@ -69,10 +63,6 @@ export function EventoMapa({ nombre, lugar, localidad, latitud, longitud }: Even
   )
 }
 
-/**
- * El contenido del popup se arma con el DOM y no con un string de HTML: `bindPopup` acepta un
- * elemento y así el nombre del evento no puede inyectar markup.
- */
 function popupContent(nombre: string, lugar: string): HTMLElement {
   const strong = document.createElement('strong')
   strong.textContent = nombre

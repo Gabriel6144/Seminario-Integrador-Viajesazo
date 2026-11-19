@@ -1,14 +1,23 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 
 import { queryKeys } from '@/api/queries'
-import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/http'
-import type { ActividadRequest, ActividadResponse } from '@/types/api'
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from '@/lib/http'
+import type {
+  ActividadRequest,
+  ActividadResponse,
+  LocalDate,
+  ReprogramarEventoRequest,
+} from '@/types/api'
 
 function invalidateActividadViews(queryClient: QueryClient, publicadorId: number): void {
   void queryClient.invalidateQueries({ queryKey: queryKeys.propuestasAll() })
   void queryClient.invalidateQueries({ queryKey: queryKeys.actividadesAll() })
   void queryClient.invalidateQueries({ queryKey: queryKeys.eventosAll() })
+  void queryClient.invalidateQueries({ queryKey: queryKeys.agendaAll() })
   void queryClient.invalidateQueries({ queryKey: queryKeys.publicadorEventosAll(publicadorId) })
+  void queryClient.invalidateQueries({ queryKey: queryKeys.publicadorAgenda() })
+  void queryClient.invalidateQueries({ queryKey: queryKeys.publicadorDashboard() })
+  void queryClient.invalidateQueries({ queryKey: queryKeys.publicadorFechasOcupadas() })
 }
 
 /** `GET /api/actividades/{id}` — detalle de actividad turística. */
@@ -70,6 +79,33 @@ export function useBorrarActividad() {
     onSuccess: (_data, { id, publicadorId }) => {
       invalidateActividadViews(queryClient, publicadorId)
       queryClient.removeQueries({ queryKey: queryKeys.actividad(id) })
+    },
+  })
+}
+
+interface ReprogramarActividadVariables {
+  id: number
+  fechaInicio: LocalDate
+}
+
+/**
+ * `PATCH /api/actividades/{id}/reprogramar` — mueve fechas preservando duración.
+ * Refresca Mi Agenda y listados relacionados (sin preview/notificaciones).
+ */
+export function useReprogramarActividad() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, fechaInicio }: ReprogramarActividadVariables) =>
+      apiPatch<ActividadResponse, ReprogramarEventoRequest>(`/api/actividades/${id}/reprogramar`, {
+        fechaInicio,
+      }),
+    onSuccess: (actividad) => {
+      invalidateActividadViews(queryClient, actividad.publicadorId)
+      void queryClient.invalidateQueries({ queryKey: queryKeys.actividad(actividad.id) })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.publicadorAgenda() })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.publicadorFechasOcupadas() })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.publicadorDashboard() })
     },
   })
 }

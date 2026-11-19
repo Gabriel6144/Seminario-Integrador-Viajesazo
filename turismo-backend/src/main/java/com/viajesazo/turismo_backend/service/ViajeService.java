@@ -1,7 +1,9 @@
 package com.viajesazo.turismo_backend.service;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
@@ -11,15 +13,18 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.viajesazo.turismo_backend.dto.request.ViajeBorradorRequest;
 import com.viajesazo.turismo_backend.dto.request.ViajeRequest;
-import com.viajesazo.turismo_backend.dto.response.ViajeResponse;
 import com.viajesazo.turismo_backend.dto.response.CircuitoResponse;
+import com.viajesazo.turismo_backend.dto.response.ViajeResponse;
 import com.viajesazo.turismo_backend.exception.BusinessRuleException;
 import com.viajesazo.turismo_backend.exception.ResourceNotFoundException;
 import com.viajesazo.turismo_backend.mapper.ViajeMapper;
 import com.viajesazo.turismo_backend.model.EstadoViaje;
+import com.viajesazo.turismo_backend.model.Usuario;
 import com.viajesazo.turismo_backend.model.Viaje;
+import com.viajesazo.turismo_backend.repository.UsuarioRepository;
 import com.viajesazo.turismo_backend.repository.ViajeRepository;
-import java.util.ArrayList;
+import com.viajesazo.turismo_backend.security.SecurityUtils;
+
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -27,23 +32,28 @@ import lombok.RequiredArgsConstructor;
 public class ViajeService {
 
 	private final ViajeRepository viajeRepository;
+	private final UsuarioRepository usuarioRepository;
 	private final ViajeMapper mapper;
 	private final Clock clock;
 	private final CircuitoService circuitoService;
 
-	/** VZ-19: registra el viaje. Nace {@code PLANIFICADO} y asociado a su turista. */
+	/** VZ-19: registra el viaje. Nace {@code PLANIFICADO} y asociado al turista autenticado. */
 	@Transactional
 	public ViajeResponse create(ViajeRequest request) {
 		validateCreationDate(request);
 		Viaje viaje = mapper.toEntity(request);
+		viaje.setUsuario(currentUsuario());
 		viaje.setEstado(EstadoViaje.PLANIFICADO);
+		if (viaje.getCreadoEn() == null) {
+			viaje.setCreadoEn(Instant.now(clock));
+		}
 		return withCircuit(mapper.toResponse(viajeRepository.save(viaje)), viaje.getId());
 	}
 
-	/** VZ-21: modifica una plantilla activa. Un viaje dado de baja responde 404. */
+	/** VZ-21: modifica una plantilla activa. Un viaje dado de baja o ajeno responde 404. */
 	@Transactional
 	public ViajeResponse update(Long id, ViajeRequest request) {
-		Viaje viaje = getOrThrow(id);
+		Viaje viaje = getOwnedOrThrow(id);
 		viaje.validarEditable();
 
 		validateUpdateDate(request, viaje);
@@ -59,23 +69,27 @@ public class ViajeService {
 	 */
 	@Transactional
 	public void delete(Long id) {
-		Viaje viaje = getOrThrow(id);
+		Viaje viaje = getOwnedOrThrow(id);
 		viaje.cancelar();
 		viajeRepository.save(viaje);
 	}
 
-	/** Soporte de VZ-21: detalle para editar. Inactivos → 404. */
+	/** Soporte de VZ-21: detalle para editar. Inactivos o ajenos → 404. */
 	@Transactional(readOnly = true)
 	public ViajeResponse findById(Long id) {
-		return withCircuit(mapper.toResponse(getOrThrow(id)), id);
+		return withCircuit(mapper.toResponse(getOwnedOrThrow(id)), id);
 	}
 
-	/** Guarda (crea) un borrador parcial. */
+	/** Guarda (crea) un borrador parcial del turista autenticado. */
 	@Transactional
 	public ViajeResponse saveDraft(ViajeBorradorRequest request) {
 		Viaje viaje = mapper.toEntity(request);
+		viaje.setUsuario(currentUsuario());
 		validateDraftRange(request, viaje);
 		viaje.setEstado(EstadoViaje.BORRADOR);
+		if (viaje.getCreadoEn() == null) {
+			viaje.setCreadoEn(Instant.now(clock));
+		}
 		if (viaje.getInteresesCategoria() == null) {
 			viaje.setInteresesCategoria(new ArrayList<>());
 		}
@@ -85,7 +99,8 @@ public class ViajeService {
 	/** Actualiza un borrador existente, aplicando solo campos no nulos. */
 	@Transactional
 	public ViajeResponse updateDraft(Long id, ViajeBorradorRequest request) {
-		Viaje viaje = viajeRepository.findByIdAndUsuarioAndEstado(id, request.usuario(), EstadoViaje.BORRADOR)
+		Viaje viaje = viajeRepository
+				.findByIdAndUsuarioAndEstado(id, currentUsuario(), EstadoViaje.BORRADOR)
 				.orElseThrow(() -> new ResourceNotFoundException("No existe el borrador con id " + id));
 		mapper.updateEntity(request, viaje);
 		validateDraftRange(request, viaje);
@@ -99,13 +114,17 @@ public class ViajeService {
 		if (request.interesesCategoria() != null) {
 			viaje.setInteresesCategoria(new ArrayList<>(request.interesesCategoria()));
 		}
+		if (request.diasPlan() != null) {
+			viaje.setDiasPlan(new ArrayList<>(request.diasPlan().stream().map(mapper::toDiaPlan).toList()));
+		}
 		return withCircuit(mapper.toResponse(viajeRepository.save(viaje)), viaje.getId());
 	}
 
-	/** Listado de borradores del turista, paginado. */
+	/** Listado de borradores del turista autenticado, paginado. */
 	@Transactional(readOnly = true)
-	public Page<ViajeResponse> listDrafts(String usuario, Pageable pageable) {
-		return viajeRepository.findByUsuarioAndEstadoOrderByIdDesc(usuario, EstadoViaje.BORRADOR, pageable)
+	public Page<ViajeResponse> listDrafts(Pageable pageable) {
+		return viajeRepository
+				.findByUsuarioAndEstadoOrderByIdDesc(currentUsuario(), EstadoViaje.BORRADOR, pageable)
 				.map(mapper::toResponse);
 	}
 
@@ -114,6 +133,7 @@ public class ViajeService {
 	public ViajeResponse findDraftById(Long id) {
 		Viaje viaje = viajeRepository.findByIdAndEstado(id, EstadoViaje.BORRADOR)
 				.orElseThrow(() -> new ResourceNotFoundException("No existe el borrador con id " + id));
+		assertOwner(viaje);
 		return withCircuit(mapper.toResponse(viaje), id);
 	}
 
@@ -122,6 +142,7 @@ public class ViajeService {
 	public ViajeResponse completeDraft(Long id) {
 		Viaje viaje = viajeRepository.findByIdAndEstado(id, EstadoViaje.BORRADOR)
 				.orElseThrow(() -> new ResourceNotFoundException("No existe el borrador con id " + id));
+		assertOwner(viaje);
 		viaje.planificar(clock);
 		viaje.setPasoActual(8);
 		return withCircuit(mapper.toResponse(viajeRepository.save(viaje)), id);
@@ -132,6 +153,7 @@ public class ViajeService {
 	public void deleteDraft(Long id) {
 		Viaje viaje = viajeRepository.findByIdAndEstado(id, EstadoViaje.BORRADOR)
 				.orElseThrow(() -> new ResourceNotFoundException("No existe el borrador con id " + id));
+		assertOwner(viaje);
 		viaje.cancelar();
 		viajeRepository.save(viaje);
 	}
@@ -162,26 +184,19 @@ public class ViajeService {
 	}
 
 	private void validateUpdateDate(ViajeRequest request, Viaje viaje) {
-		// Validación: la nueva fecha de finalización no puede ser anterior a la fecha de inicio.
 		if (request.fechaFin().isBefore(request.fechaInicio())) {
 			throw new BusinessRuleException("La nueva fecha de finalización no puede ser anterior a la de inicio");
 		}
-		// Validación: la nueva fecha de inicio debe ser distinto a la fecha fin guardada
 		if (!request.fechaInicio().equals(viaje.getFechaInicio())) {
-			// Validación: no se puede modificar la fecha de inicio si el viaje ya comenzó.
-			// es opcional y lo hace mas robusto, porque ya sabemos que los viajes en curso no se pueden modificar.
 			if (viaje.getFechaInicio().isBefore(LocalDate.now(clock))) {
 				throw new BusinessRuleException("No se puede modificar la fecha de inicio de un viaje que ya comenzó");
 			}
-			// Validación: la nueva fecha de inicio no puede ser anterior a hoy
 			if (request.fechaInicio().isBefore(LocalDate.now(clock))) {
 				throw new BusinessRuleException("La nueva fecha de inicio no puede ser anterior a hoy");
 			}
 		}
 
-		// Validación: la nueva fecha de finalización debe ser distinto a la fecha fin guardada
 		if (!request.fechaFin().equals(viaje.getFechaFin())) {
-			// Validación: la nueva fecha de finalizacion no puede ser anterior a hoy.
 			if (request.fechaFin().isBefore(LocalDate.now(clock))) {
 				throw new BusinessRuleException("La nueva fecha de finalizacion no puede ser anterior a hoy");
 			}
@@ -192,76 +207,68 @@ public class ViajeService {
 		}
 	}
 
-	
 	private void validateDraftRange(ViajeBorradorRequest request, Viaje viaje) {
-		// Validación: la nueva fecha de finalización no puede ser anterior a la fecha de inicio.
+		if (request.fechaInicio() == null || request.fechaFin() == null) {
+			return;
+		}
 		if (request.fechaFin().isBefore(request.fechaInicio())) {
 			throw new BusinessRuleException("La nueva fecha de finalización no puede ser anterior a la de inicio");
 		}
-		// Validación: la nueva fecha de inicio debe ser distinto a la fecha fin guardada
-		if (!request.fechaInicio().equals(viaje.getFechaInicio())) {
-			// Validación: no se puede modificar la fecha de inicio si el viaje ya comenzó.
-			// es opcional y lo hace mas robusto, porque ya sabemos que los viajes en curso no se pueden modificar.
+		if (viaje.getFechaInicio() != null && !request.fechaInicio().equals(viaje.getFechaInicio())) {
 			if (viaje.getFechaInicio().isBefore(LocalDate.now(clock))) {
 				throw new BusinessRuleException("No se puede modificar la fecha de inicio de un viaje que ya comenzó");
 			}
-			// Validación: la nueva fecha de inicio no puede ser anterior a hoy
 			if (request.fechaInicio().isBefore(LocalDate.now(clock))) {
 				throw new BusinessRuleException("La nueva fecha de inicio no puede ser anterior a hoy");
 			}
 		}
-		// Validación: la nueva fecha de finalización debe ser distinto a la fecha fin guardada
-		if (!request.fechaFin().equals(viaje.getFechaFin())) {
-			// Validación: la nueva fecha de finalizacion no puede ser anterior a hoy.
+		if (viaje.getFechaFin() != null && !request.fechaFin().equals(viaje.getFechaFin())) {
 			if (request.fechaFin().isBefore(LocalDate.now(clock))) {
 				throw new BusinessRuleException("La nueva fecha de finalizacion no puede ser anterior a hoy");
 			}
 			if (viaje.getFechaFin().isBefore(LocalDate.now(clock))) {
 				throw new BusinessRuleException("La nueva fecha de finalizacion no puede ser anterior a la fecha de inicio");
 			}
-
 		}
 	}
 
-
-
-	/** VZ-22: listado de viajes permitidos del turista, paginado. */
+	/** VZ-22: listado de viajes permitidos del turista autenticado, paginado. */
 	@Transactional(readOnly = true)
-	public Page<ViajeResponse> findAll(String usuario, Pageable pageable) {
+	public Page<ViajeResponse> findAll(Pageable pageable) {
 		return viajeRepository
-				.findByUsuarioAndEstadoInOrderByFechaInicioAsc(usuario,
+				.findByUsuarioAndEstadoInOrderByFechaInicioAsc(currentUsuario(),
 						List.of(EstadoViaje.BORRADOR, EstadoViaje.PLANIFICADO, EstadoViaje.EN_CURSO), pageable)
 				.map(mapper::toResponse);
 	}
 
-	private Viaje getOrThrow(Long id) {
-		return viajeRepository
+	private Viaje getOwnedOrThrow(Long id) {
+		Viaje viaje = viajeRepository
 				.findByIdAndEstadoNotIn(id, List.of(EstadoViaje.BORRADOR, EstadoViaje.CANCELADO))
 				.orElseThrow(() -> new ResourceNotFoundException("No existe el viaje con id " + id));
+		assertOwner(viaje);
+		return viaje;
 	}
 
-	// VZ-22: listado de viajes permitidos del turista filtrado por estado, paginado.
 	@Transactional(readOnly = true)
-	public Page<ViajeResponse> findByEstado(String usuario, String estado, Pageable pageable) {
+	public Page<ViajeResponse> findByEstado(String estado, Pageable pageable) {
 		EstadoViaje estadoEnum;
 		try {
 			estadoEnum = EstadoViaje.valueOf(estado);
 		} catch (IllegalArgumentException e) {
 			throw new BusinessRuleException("Estado inválido: " + estado);
 		}
-		return findByEstadoEnums(usuario, List.of(estadoEnum), pageable);
+		return findByEstadoEnums(List.of(estadoEnum), pageable);
 	}
 
 	@Transactional(readOnly = true)
-	public Page<ViajeResponse> findByEstados(String usuario, List<String> estados, Pageable pageable) {
+	public Page<ViajeResponse> findByEstados(List<String> estados, Pageable pageable) {
 		List<EstadoViaje> estadosEnum = estados.stream().map(this::parseEstado).toList();
-		return findByEstadoEnums(usuario, estadosEnum, pageable);
+		return findByEstadoEnums(estadosEnum, pageable);
 	}
 
-	private Page<ViajeResponse> findByEstadoEnums(String usuario, List<EstadoViaje> estados,
-			Pageable pageable) {
+	private Page<ViajeResponse> findByEstadoEnums(List<EstadoViaje> estados, Pageable pageable) {
 		return viajeRepository
-				.findByUsuarioAndEstadoInOrderByFechaInicioAsc(usuario, estados, pageable)
+				.findByUsuarioAndEstadoInOrderByFechaInicioAsc(currentUsuario(), estados, pageable)
 				.map(mapper::toResponse);
 	}
 
@@ -281,7 +288,21 @@ public class ViajeService {
 		CircuitoResponse circuit = circuitoService.selected(viajeId);
 		return new ViajeResponse(response.id(), response.nombre(), response.ubicacion(),
 				response.rangoInteresKm(), response.fechaInicio(), response.fechaFin(), response.ritmo(),
-				response.interesesCategoria(), response.estado(), response.pasoActual(), response.usuario(), circuit);
+				response.interesesCategoria(), response.diasPlan(), response.estado(), response.pasoActual(),
+				response.usuarioId(), response.usuarioEmail(), circuit);
+	}
+
+	private Usuario currentUsuario() {
+		Long id = SecurityUtils.currentUsuarioId();
+		return usuarioRepository.findByIdAndActivoTrue(id)
+				.orElseThrow(() -> new ResourceNotFoundException("No existe el usuario con id " + id));
+	}
+
+	private void assertOwner(Viaje viaje) {
+		Long currentId = SecurityUtils.currentUsuarioId();
+		if (viaje.getUsuario() == null || !viaje.getUsuario().getId().equals(currentId)) {
+			throw new ResourceNotFoundException("No existe el viaje con id " + viaje.getId());
+		}
 	}
 
 }

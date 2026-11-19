@@ -30,8 +30,16 @@ export const queryKeys = {
   eventos: (page: number, size: number) => ['eventos', { page, size }] as const,
   eventosAll: () => ['eventos'] as const,
   evento: (id: number) => ['evento', id] as const,
-  propuestas: (page: number, size: number, tipo?: string) =>
-    tipo ? (['propuestas', { page, size, tipo }] as const) : (['propuestas', { page, size }] as const),
+  propuestas: (page: number, size: number, tipo?: string, publicadorId?: number) =>
+    [
+      'propuestas',
+      {
+        page,
+        size,
+        ...(tipo ? { tipo } : {}),
+        ...(publicadorId != null ? { publicadorId } : {}),
+      },
+    ] as const,
   propuestasAll: () => ['propuestas'] as const,
   actividad: (id: number) => ['actividad', id] as const,
   actividadesAll: () => ['actividades'] as const,
@@ -58,14 +66,27 @@ export const queryKeys = {
    */
   publicadorEventosAll: (id: number) => ['publicador', id, 'eventos'] as const,
 
+  me: () => ['auth', 'me'] as const,
+
   /**
-   * Usuarios del sistema (plantilla frontend; contrato backend pendiente).
+   * Usuarios del sistema (listado admin).
    * `list` incluye filtros de UI para cachear búsquedas por separado.
    */
   usuarios: (page: number, size: number, q = '', rol: string = 'TODOS') =>
     ['usuarios', { page, size, q, rol }] as const,
   usuariosAll: () => ['usuarios'] as const,
   usuario: (id: number) => ['usuario', id] as const,
+
+  adminDashboard: () => ['admin', 'dashboard'] as const,
+  publicadorInscriptos: () => ['publicador', 'inscriptos'] as const,
+  publicadorDashboard: () => ['publicador', 'dashboard'] as const,
+  publicadorAgenda: () => ['publicador', 'agenda'] as const,
+  publicadorFechasOcupadas: () => ['publicador', 'fechas-ocupadas'] as const,
+
+  reprogramarPreview: (eventoId: number, fechaInicio: string) =>
+    ['eventos', eventoId, 'reprogramar', 'preview', fechaInicio] as const,
+  notificaciones: () => ['notificaciones'] as const,
+  meGusta: (propuestaId: number) => ['me-gusta', propuestaId] as const,
 }
 
 /** Construye `?page=&size=` omitiendo los valores por defecto. */

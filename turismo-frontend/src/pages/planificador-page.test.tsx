@@ -49,7 +49,7 @@ async function reachCircuitStep(user: User): Promise<void> {
 describe('PlanificadorPage', () => {
   it('renderiza la bienvenida (paso 1) y avanza al paso 2 al clickear Empecemos', async () => {
     const user = userEvent.setup()
-    renderWithProviders(<PlanificadorPage />)
+    renderWithProviders(<PlanificadorPage />, { authenticated: true })
 
     expect(screen.getByText('¡Córdoba te espera!')).toBeInTheDocument()
 
@@ -65,7 +65,7 @@ describe('PlanificadorPage', () => {
 
   it('permite cambiar el nombre con las sugerencias rápidas', async () => {
     const user = userEvent.setup()
-    renderWithProviders(<PlanificadorPage />)
+    renderWithProviders(<PlanificadorPage />, { authenticated: true })
 
     await user.click(screen.getByRole('button', { name: /empecemos/i }))
 
@@ -77,7 +77,7 @@ describe('PlanificadorPage', () => {
 
   it('bloquea el avance al paso 3 si no se ingresó un nombre de viaje y muestra advertencia', async () => {
     const user = userEvent.setup()
-    renderWithProviders(<PlanificadorPage />)
+    renderWithProviders(<PlanificadorPage />, { authenticated: true })
 
     await user.click(screen.getByRole('button', { name: /empecemos/i }))
 
@@ -95,7 +95,7 @@ describe('PlanificadorPage', () => {
 
   it('avanza al paso 3 cuando se ingresa un nombre y valida las fechas', async () => {
     const user = userEvent.setup()
-    renderWithProviders(<PlanificadorPage />)
+    renderWithProviders(<PlanificadorPage />, { authenticated: true })
 
     await user.click(screen.getByRole('button', { name: /empecemos/i }))
 
@@ -116,7 +116,7 @@ describe('PlanificadorPage', () => {
 
   it('rechaza fecha de llegada anterior a la fecha actual y no permite avanzar', async () => {
     const user = userEvent.setup()
-    renderWithProviders(<PlanificadorPage />)
+    renderWithProviders(<PlanificadorPage />, { authenticated: true })
 
     await user.click(screen.getByRole('button', { name: /empecemos/i }))
     await user.click(screen.getByRole('button', { name: 'Aventura cordobesa' }))
@@ -140,7 +140,7 @@ describe('PlanificadorPage', () => {
 
   it('permite navegar hacia atrás y abrir el modal de salida', async () => {
     const user = userEvent.setup()
-    renderWithProviders(<PlanificadorPage />)
+    renderWithProviders(<PlanificadorPage />, { authenticated: true })
 
     await user.click(screen.getByRole('button', { name: /empecemos/i }))
 
@@ -162,7 +162,7 @@ describe('PlanificadorPage', () => {
 
   it('guarda el borrador enviando la mutación al backend', async () => {
     const user = userEvent.setup()
-    renderWithProviders(<PlanificadorPage />)
+    renderWithProviders(<PlanificadorPage />, { authenticated: true })
 
     await user.click(screen.getByRole('button', { name: /empecemos/i }))
 
@@ -178,7 +178,7 @@ describe('PlanificadorPage', () => {
 
   it('crea el viaje, genera el circuito y permite elegir una alternativa', async () => {
     const user = userEvent.setup()
-    renderWithProviders(<PlanificadorPage />)
+    renderWithProviders(<PlanificadorPage />, { authenticated: true })
 
     await reachCircuitStep(user)
 
@@ -186,10 +186,12 @@ describe('PlanificadorPage', () => {
     expect(screen.getAllByText(/según tus intereses/i).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/para descubrir/i).length).toBeGreaterThan(0)
 
-    await user.click(screen.getAllByRole('button', { name: /ver circuito/i })[0])
+    await user.click(screen.getAllByRole('button', { name: /ver detalle/i })[0])
 
-    expect(await screen.findByText(/circuito peatonal histórico/i)).toBeInTheDocument()
-    expect(screen.getByText(/semana gastronómica/i)).toBeInTheDocument()
+    expect(
+      (await screen.findAllByText(/circuito peatonal histórico/i)).length,
+    ).toBeGreaterThan(0)
+    expect(screen.getAllByText(/semana gastronómica/i).length).toBeGreaterThan(0)
 
     await user.click(screen.getByRole('button', { name: /confirmar y guardar circuito/i }))
 
@@ -201,7 +203,7 @@ describe('PlanificadorPage', () => {
 
   it('regenera el circuito después de confirmar el reemplazo', async () => {
     const user = userEvent.setup()
-    renderWithProviders(<PlanificadorPage />)
+    renderWithProviders(<PlanificadorPage />, { authenticated: true })
 
     await reachCircuitStep(user)
 

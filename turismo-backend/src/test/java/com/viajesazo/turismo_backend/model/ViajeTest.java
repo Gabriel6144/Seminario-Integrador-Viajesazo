@@ -45,6 +45,8 @@ class ViajeTest {
 	@DisplayName("no se puede planificar un viaje con fecha de inicio pasada")
 	void rejectsPastStartDate() {
 		Viaje viaje = viaje(EstadoViaje.BORRADOR);
+		viaje.setFechaInicio(LocalDate.parse("2026-10-10"));
+		viaje.setFechaFin(LocalDate.parse("2026-10-12"));
 
 		assertThatThrownBy(() -> viaje.planificar(CLOCK))
 				.isInstanceOf(BusinessRuleException.class)
@@ -147,7 +149,12 @@ class ViajeTest {
 				.ritmo(TipoRitmo.EQUILIBRADO)
 				.interesesCategoria(List.of(InteresCategoria.CULTURA))
 				.estado(estado)
-				.usuario("turista@test.com")
+				.usuario(com.viajesazo.turismo_backend.model.Usuario.builder()
+						.id(1L)
+						.nombre("Turista")
+						.email("turista@test.com")
+						.contrasena("hash")
+						.build())
 				.build();
 	}
 }

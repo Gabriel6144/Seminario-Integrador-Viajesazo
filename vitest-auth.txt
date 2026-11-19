@@ -1,0 +1,356 @@
+﻿node.exe : npm notice run turismo-frontend@0.0.0 npx
+En línea: 1 Carácter: 1
++ & "C:\Program Files\nodejs/node.exe" "C:\Users\Thiago Alejo Decalli\A ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm notice run ...ntend@0.0.0 npx:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+npm notice run ^"vitest^" run src/lib/http.test.ts src/pages/login-page.test.tsx src/components/require-auth.test.tsx 
+src/pages/borradores-page.test.tsx --reporter=verbose
+
+ RUN  v5.0.2 C:/Users/Thiago Alejo Decalli/Documents/Seminario-Integrador-Viajesazo/turismo-frontend
+
+ × src/pages/borradores-page.test.tsx > BorradoresPage > lista los borradores y los circuitos ya confirmados del usuario 835ms
+   → Unable to find an element with the text: Circuito confirmado. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"flex flex-col gap-6"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"flex flex-wrap items-start justify-between gap-4"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"flex flex-col gap-1"[39m
+        [36m>[39m
+          [36m<h2[39m
+            [33mclass[39m=[32m"font-heading text-2xl font-bold tracking-tight text-[#191c1e]"[39m
+          [36m>[39m
+            [0mMis Viajes[0m
+          [36m</h2>[39m
+          [36m<p[39m
+            [33mclass[39m=[32m"text-sm text-[#3f484e]"[39m
+          [36m>[39m
+            [0mTus viajes y los borradores que todavía podés retomar.[0m
+          [36m</p>[39m
+        [36m</div>[39m
+        [36m<a[39m
+          [33mclass[39m=[32m"group/button inline-flex shrink-0 items-center justify-center border border-transparent bg-clip-padding font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 gap-1 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5 h-12 rounded-xl bg-[#00658d] px-6 text-white shadow-md hover:bg-[#65b7e8]"[39m
+          [33mdata-discover[39m=[32m"true"[39m
+          [33mdata-size[39m=[32m"sm"[39m
+          [33mdata-slot[39m=[32m"button"[39m
+          [33mdata-variant[39m=[32m"default"[39m
+          [33mhref[39m=[32m"/planificar"[39m
+        [36m>[39m
+          [0m+ Planificar un viaje nuevo[0m
+        [36m</a>[39m
+      [36m</div>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33maria-pressed[39m=[32m"true"[39m
+          [33mclass[39m=[32m"flex cursor-pointer items-center gap-3.5 rounded-2xl border bg-white p-4 text-left shadow-sm transition-all sm:gap-4 border-[#00658d] ring-2 ring-[#00658d]/25"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#c6e7ff] text-[#00658d] sm:h-12 sm:w-12"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"material-symbols-outlined text-xl sm:text-2xl"[39m
+            [36m>[39m
+              [0mluggage[0m
+            [36m</span>[39m
+          [36m</div>[39m
+          [36m<div>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"block text-xs font-medium uppercase tracking-wider text-[#70787f]"[39m
+            [36m>[39m
+              [0mTotal guardados[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"font-heading text-lg font-bold text-[#191c1e]"[39m
+            [36m>[39m
+              [0m2[0m
+              [0m [0m
+              [0mviajes en total[0m
+            [36m</span>[39m
+          [36m</div>[39m
+        [36m</button>[39m
+        [36m<button[39m
+          [33maria-pressed[39m=[32m"false"[39m
+          [33mclass[39m=[32m"flex cursor-pointer items-center gap-3.5 rounded-2xl border bg-white p-4 text-left shadow-sm transition-all sm:gap-4 border-[#bfc8cf]/40 hover:border-amber-400 hover:shadow-md"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-amber-200/50 bg-amber-50 text-amber-700 sm:h-12 sm:w-12"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"material-symbols-outlined text-xl sm:text-2xl"[39m
+            [36m>[39m
+              [0medit_calendar[0m
+            [36m</span>[39m
+          [36m</div>[39m
+          [36m<div>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"block text-xs font-medium uppercase tracking-wider text-[#70787f]"[39m
+            [36m>[39m
+              [0mBorradores activos[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"font-heading text-lg font-bold text-amber-700"[39m
+            [36m>[39m
+              [0m1[0m
+              [0m en planificación[0m
+            [36m</span>[39m
+          [36m</div>[39m
+        [36m</button>[39m
+        [36m<button[39m
+          [33maria-pressed[39m=[32m"false"[39m
+          [33mclass[39m=[32m"flex cursor-pointer items-center gap-3.5 rounded-2xl border bg-white p-4 text-left shadow-sm transition-all sm:gap-4 border-[#bfc8cf]/40 hover:border-sky-400 hover:shadow-md"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-sky-200/50 bg-sky-50 text-sky-700 sm:h-12 sm:w-12"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"material-symbols-outlined text-xl sm:text-2xl"[39m
+            [36m>[39m
+              [0mroute[0m
+            [36m</span>[39m
+          [36m</div>[39m
+          [36m<div>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"block text-xs font-medium uppercase tracking-wider text-[#70787f]"[39m
+            [36m>[39m
+              [0mViajes (sin borrador)[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"font-heading text-lg font-bold text-sky-800"[39m
+            [36m>[39m
+              [0m1[0m
+              [0m [0m
+              [0mviaje[0m
+            [36m</span>[39m
+          [36m</div>[39m
+        [36m</button>[39m
+      [36m</div>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"relative w-full sm:w-80 md:w-96"[39m
+        [36m>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"material-symbols-outlined pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-xl text-[#70787f]"[39m
+          [36m>[39m
+            [0msearch[0m
+          [36m</span>[39m
+          [36m<input[39m
+            [33mclass[39m=[32m"w-full rounded-xl border border-[#bfc8cf]/60 bg-white py-2.5 pr-4 pl-11 text-sm text-[#191c1e] shadow-sm outline-none transition-colors placeholder:text-[#70787f]/70 focus:border-[#00658d] focus:ring-1 focus:ring-[#00658d]"[39m
+            [33mplace...
+ ✓ src/pages/login-page.test.tsx > LoginPage > inicia sesión y navega al next 2495ms
+ ✓ src/pages/login-page.test.tsx > LoginPage > muestra error con credenciales inválidas 981ms
+ ✓ src/lib/http.test.ts > apiGet > devuelve el cuerpo parseado cuando hay JSON 101ms
+ ✓ src/lib/http.test.ts > apiGet > devuelve null cuando la respuesta es 200 sin cuerpo 45ms
+ ✓ src/lib/http.test.ts > apiGet > lanza ApiError con el mensaje del backend y el status 11ms
+ ✓ src/lib/http.test.ts > apiPost > envía el cuerpo como JSON y devuelve la respuesta 10ms
+ ✓ src/lib/http.test.ts > apiPost > manda null en los opcionales, no undefined 10ms
+ ✓ src/lib/http.test.ts > apiPut > envía el cuerpo y devuelve el recurso actualizado 38ms
+ ✓ src/lib/http.test.ts > apiDelete > devuelve null ante un 204 sin cuerpo sin parsear nada 4ms
+ ✓ src/lib/http.test.ts > apiDelete > propaga el error si el borrado falla 11ms
+ ✓ src/lib/http.test.ts > auth headers y refresh > manda Authorization Bearer cuando hay access token 20ms
+ ✓ src/lib/http.test.ts > auth headers y refresh > ante 401 refresca una vez y reintenta 70ms
+ ✓ src/components/require-auth.test.tsx > RequireAuth / RequireRole > redirige a login si no hay sesión 186ms
+ ✓ src/components/require-auth.test.tsx > RequireAuth / RequireRole > deja pasar a una ruta autenticada 13ms
+ ✓ src/components/require-auth.test.tsx > RequireAuth / RequireRole > bloquea alta de evento sin rol PUBLICADOR/ADMINISTRADOR 70ms
+ ✓ src/components/require-auth.test.tsx > RequireAuth / RequireRole > permite alta de evento con rol PUBLICADOR 78ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/pages/borradores-page.test.tsx > BorradoresPage > lista los borradores y los circuitos ya confirmados del 
+usuario
+TestingLibraryElementError: Unable to find an element with the text: Circuito confirmado. This could be because the 
+text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your 
+matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"flex flex-col gap-6"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"flex flex-wrap items-start justify-between gap-4"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"flex flex-col gap-1"[39m
+        [36m>[39m
+          [36m<h2[39m
+            [33mclass[39m=[32m"font-heading text-2xl font-bold tracking-tight text-[#191c1e]"[39m
+          [36m>[39m
+            [0mMis Viajes[0m
+          [36m</h2>[39m
+          [36m<p[39m
+            [33mclass[39m=[32m"text-sm text-[#3f484e]"[39m
+          [36m>[39m
+            [0mTus viajes y los borradores que todavía podés retomar.[0m
+          [36m</p>[39m
+        [36m</div>[39m
+        [36m<a[39m
+          [33mclass[39m=[32m"group/button inline-flex shrink-0 items-center justify-center border 
+border-transparent bg-clip-padding font-medium whitespace-nowrap transition-all outline-none select-none 
+focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-y-px 
+disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 
+aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 
+[&_svg]:pointer-events-none [&_svg]:shrink-0 gap-1 text-[0.8rem] in-data-[slot=button-group]:rounded-lg 
+has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5 h-12 
+rounded-xl bg-[#00658d] px-6 text-white shadow-md hover:bg-[#65b7e8]"[39m
+          [33mdata-discover[39m=[32m"true"[39m
+          [33mdata-size[39m=[32m"sm"[39m
+          [33mdata-slot[39m=[32m"button"[39m
+          [33mdata-variant[39m=[32m"default"[39m
+          [33mhref[39m=[32m"/planificar"[39m
+        [36m>[39m
+          [0m+ Planificar un viaje nuevo[0m
+        [36m</a>[39m
+      [36m</div>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33maria-pressed[39m=[32m"true"[39m
+          [33mclass[39m=[32m"flex cursor-pointer items-center gap-3.5 rounded-2xl border bg-white p-4 text-left 
+shadow-sm transition-all sm:gap-4 border-[#00658d] ring-2 ring-[#00658d]/25"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#c6e7ff] 
+text-[#00658d] sm:h-12 sm:w-12"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"material-symbols-outlined text-xl sm:text-2xl"[39m
+            [36m>[39m
+              [0mluggage[0m
+            [36m</span>[39m
+          [36m</div>[39m
+          [36m<div>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"block text-xs font-medium uppercase tracking-wider text-[#70787f]"[39m
+            [36m>[39m
+              [0mTotal guardados[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"font-heading text-lg font-bold text-[#191c1e]"[39m
+            [36m>[39m
+              [0m2[0m
+              [0m [0m
+              [0mviajes en total[0m
+            [36m</span>[39m
+          [36m</div>[39m
+        [36m</button>[39m
+        [36m<button[39m
+          [33maria-pressed[39m=[32m"false"[39m
+          [33mclass[39m=[32m"flex cursor-pointer items-center gap-3.5 rounded-2xl border bg-white p-4 text-left 
+shadow-sm transition-all sm:gap-4 border-[#bfc8cf]/40 hover:border-amber-400 hover:shadow-md"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border 
+border-amber-200/50 bg-amber-50 text-amber-700 sm:h-12 sm:w-12"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"material-symbols-outlined text-xl sm:text-2xl"[39m
+            [36m>[39m
+              [0medit_calendar[0m
+            [36m</span>[39m
+          [36m</div>[39m
+          [36m<div>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"block text-xs font-medium uppercase tracking-wider text-[#70787f]"[39m
+            [36m>[39m
+              [0mBorradores activos[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"font-heading text-lg font-bold text-amber-700"[39m
+            [36m>[39m
+              [0m1[0m
+              [0m en planificación[0m
+            [36m</span>[39m
+          [36m</div>[39m
+        [36m</button>[39m
+        [36m<button[39m
+          [33maria-pressed[39m=[32m"false"[39m
+          [33mclass[39m=[32m"flex cursor-pointer items-center gap-3.5 rounded-2xl border bg-white p-4 text-left 
+shadow-sm transition-all sm:gap-4 border-[#bfc8cf]/40 hover:border-sky-400 hover:shadow-md"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border 
+border-sky-200/50 bg-sky-50 text-sky-700 sm:h-12 sm:w-12"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"material-symbols-outlined text-xl sm:text-2xl"[39m
+            [36m>[39m
+              [0mroute[0m
+            [36m</span>[39m
+          [36m</div>[39m
+          [36m<div>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"block text-xs font-medium uppercase tracking-wider text-[#70787f]"[39m
+            [36m>[39m
+              [0mViajes (sin borrador)[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"font-heading text-lg font-bold text-sky-800"[39m
+            [36m>[39m
+              [0m1[0m
+              [0m [0m
+              [0mviaje[0m
+            [36m</span>[39m
+          [36m</div>[39m
+        [36m</button>[39m
+      [36m</div>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"flex flex-col items-stretch justify-between gap-3 sm:flex-row sm:items-center"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"relative w-full sm:w-80 md:w-96"[39m
+        [36m>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"material-symbols-outlined pointer-events-none absolute top-1/2 left-3.5 
+-translate-y-1/2 text-xl text-[#70787f]"[39m
+          [36m>[39m
+            [0msearch[0m
+          [36m</span>[39m
+          [36m<input[39m
+            [33mclass[39m=[32m"w-full rounded-xl border border-[#bfc8cf]/60 bg-white py-2.5 pr-4 pl-11 text-sm 
+text-[#191c1e] shadow-sm outline-none transition-colors placeholder:text-[#70787f]/70 focus:border-[#00658d] 
+focus:ring-1 focus:ring-[#00658d]"[39m
+            [33mplace...
+ ❯ Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ ❯ node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ ❯ src/pages/borradores-page.test.tsx:16:19
+
+ Test Files  1 failed | 3 passed (4)
+      Tests  1 failed | 16 passed (17)
+   Start at  22:48:45
+   Duration  64.32s (environment 51%, import 18%, setup 18%, tests 9%, transform 5%)
+
+Environment  jsdom was created 4 times · 28.22s total, 51% of tracked time
+             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)
+             learn more: https://vitest.dev/guide/improving-performance#test-environments
+
+     14|     expect(screen.getByText('Borrador de ejemplo')).toBeInTheDocument()
+     15|     expect(screen.getByText('Circuito confirmado de ejemplo')).toBeInT…
+     16|     expect(screen.getByText('Circuito confirmado')).toBeInTheDocument()
+       |                   ^
+     17|     expect(screen.getByRole('link', { name: /ver circuito/i })).toHave…
+     18|       'href',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

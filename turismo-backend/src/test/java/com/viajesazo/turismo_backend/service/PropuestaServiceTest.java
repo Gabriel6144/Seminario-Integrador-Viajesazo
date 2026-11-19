@@ -17,6 +17,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import com.viajesazo.turismo_backend.dto.request.EventoRequest;
+import com.viajesazo.turismo_backend.dto.request.ReprogramarEventoRequest;
 import com.viajesazo.turismo_backend.dto.response.EventoResponse;
 import com.viajesazo.turismo_backend.exception.BusinessRuleException;
 import com.viajesazo.turismo_backend.exception.ResourceNotFoundException;
@@ -39,13 +41,16 @@ import com.viajesazo.turismo_backend.model.Evento;
 import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.model.Modalidad;
 import com.viajesazo.turismo_backend.model.Publicador;
+import com.viajesazo.turismo_backend.model.Rol;
 import com.viajesazo.turismo_backend.model.TipoAcceso;
 import com.viajesazo.turismo_backend.model.TipoPropuesta;
 import com.viajesazo.turismo_backend.model.Ubicacion;
+import com.viajesazo.turismo_backend.model.Usuario;
 import com.viajesazo.turismo_backend.repository.EventoRepository;
 import com.viajesazo.turismo_backend.repository.EstadoPropuestaRepository;
 import com.viajesazo.turismo_backend.repository.PublicadorRepository;
 import com.viajesazo.turismo_backend.repository.UbicacionRepository;
+import com.viajesazo.turismo_backend.security.TestSecuritySupport;
 
 @ExtendWith(MockitoExtension.class)
 class PropuestaServiceTest {
@@ -65,14 +70,19 @@ class PropuestaServiceTest {
 	@Mock
 	private GeocodingService geocodingService;
 
+	@Mock
+	private NotificacionService notificacionService;
+
 	private PropuestaService service;
 
 	@BeforeEach
 	void setUp() {
+		Usuario admin = Usuario.builder().id(99L).nombre("Admin").email("admin@test.com").contrasena("hash").build();
+		TestSecuritySupport.authenticate(admin, null, Rol.ADMINISTRADOR);
 		Clock clock = Clock.fixed(LocalDate.parse("2026-09-23").atStartOfDay(ZoneId.of("America/Argentina/Buenos_Aires")).toInstant(),
 				ZoneId.of("America/Argentina/Buenos_Aires"));
 		service = new PropuestaService(eventoRepository, publicadorRepository, estadoPropuestaRepository, ubicacionRepository, clock, new EventoMapperImpl(),
-				geocodingService);
+				geocodingService, notificacionService);
 		// La mayoría de los tests no ejercita el camino de la geocodificación; queda lenient para
 		// que los que fallan antes (validaciones) no rompan por strict stubs.
 		lenient().when(geocodingService.geocode(any(), any(), any())).thenReturn(Optional
@@ -81,6 +91,11 @@ class PropuestaServiceTest {
 				.thenReturn(Optional.of(initialState()));
 		lenient().when(ubicacionRepository.save(any(Ubicacion.class)))
 				.thenAnswer(invocation -> invocation.getArgument(0));
+	}
+
+	@AfterEach
+	void tearDown() {
+		TestSecuritySupport.clear();
 	}
 
 	@Test
@@ -129,18 +144,14 @@ class PropuestaServiceTest {
 	}
 
 	@Test
-	@DisplayName("US1: sin lista de imágenes, el evento se guarda con la lista vacía y no con null")
-	void savesEmptyImagesWhenNoneGiven() {
+	@DisplayName("US1: un evento sin imágenes se rechaza porque la imagen es obligatoria")
+	void rejectsEventWithoutImages() {
 		when(publicadorRepository.findById(1L)).thenReturn(Optional.of(publisher()));
-		when(eventoRepository.save(any(Evento.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-		EventoRequest request = new EventoRequest("Evento", null, null, null, TipoPropuesta.FESTIVAL, null, null, null, null,
-				"Plaza San Martín", "Córdoba", "Av. Colón 100, Córdoba",
-				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-02"), null, null, null, 1L);
-
-		EventoResponse result = service.create(request);
-
-		assertThat(result.imagenes()).isEmpty();
+		assertThatThrownBy(() -> service.create(requestWithoutImages()))
+				.isInstanceOf(com.viajesazo.turismo_backend.exception.InvariantViolationException.class)
+				.hasMessageContaining("al menos una imagen");
+		verify(eventoRepository, never()).save(any(Evento.class));
 	}
 
 	@Test
@@ -148,9 +159,7 @@ class PropuestaServiceTest {
 	void failsWhenPublisherNotFound() {
 		when(publicadorRepository.findById(99L)).thenReturn(Optional.empty());
 
-		EventoRequest request = new EventoRequest("Festival de Folklore", null, null, null, TipoPropuesta.FESTIVAL, null, null, null, null,
-				"Plaza San Martín", "Córdoba", "Av. Colón 100, Córdoba",
-				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-03"), null, null, null, 99L);
+		EventoRequest request = requestWithPublisher(99L);
 
 		assertThatThrownBy(() -> service.create(request))
 				.isInstanceOf(ResourceNotFoundException.class)
@@ -161,9 +170,7 @@ class PropuestaServiceTest {
 	@Test
 	@DisplayName("la fecha de finalización no puede ser anterior a la de inicio")
 	void rejectsInvalidDateRange() {
-		EventoRequest request = new EventoRequest("Evento", null, null, null, TipoPropuesta.FESTIVAL, null, null, null, null,
-				"Plaza San Martín", "Córdoba", "Av. Colón 100, Córdoba",
-				LocalDate.parse("2026-10-10"), LocalDate.parse("2026-10-01"), null, null, null, 1L);
+		EventoRequest request = requestWithDates(LocalDate.parse("2026-10-10"), LocalDate.parse("2026-10-01"));
 
 		assertThatThrownBy(() -> service.create(request))
 				.isInstanceOf(BusinessRuleException.class)
@@ -172,12 +179,47 @@ class PropuestaServiceTest {
 	}
 
 	@Test
+	@DisplayName("US1: un PUBLICADOR no necesita publicadorId, se deriva de la sesión")
+	void derivesPublisherFromPrincipal() {
+		Usuario publicadorUser = Usuario.builder()
+				.id(5L)
+				.nombre("Publicador")
+				.email("publicador@test.com")
+				.contrasena("hash")
+				.build();
+		TestSecuritySupport.authenticate(publicadorUser, 1L, Rol.PUBLICADOR);
+		when(publicadorRepository.findById(1L)).thenReturn(Optional.of(publisher()));
+		when(eventoRepository.save(any(Evento.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		EventoResponse result = service.create(requestWithPublisher(null));
+
+		assertThat(result.publicadorId()).isEqualTo(1L);
+	}
+
+	@Test
+	@DisplayName("US1: un ADMINISTRADOR sin publicadorId no puede crear un evento")
+	void adminRequiresPublisherOnCreate() {
+		assertThatThrownBy(() -> service.create(requestWithPublisher(null)))
+				.isInstanceOf(BusinessRuleException.class)
+				.hasMessageContaining("publicador");
+		verify(eventoRepository, never()).save(any(Evento.class));
+	}
+
+	@Test
+	@DisplayName("US1: un evento nuevo no puede empezar antes de hoy")
+	void rejectsPastStartDate() {
+		EventoRequest request = requestWithDates(LocalDate.parse("2026-09-22"), LocalDate.parse("2026-09-23"));
+
+		assertThatThrownBy(() -> service.create(request))
+				.isInstanceOf(BusinessRuleException.class)
+				.hasMessageContaining("anterior a hoy");
+		verify(eventoRepository, never()).save(any(Evento.class));
+	}
+
+	@Test
 	@DisplayName("el horario de finalización debe ser posterior al de inicio")
 	void rejectsInvalidTimeRange() {
-		EventoRequest request = new EventoRequest("Evento", null, null, null, TipoPropuesta.FESTIVAL, null, null, null, null,
-				"Plaza San Martín", "Córdoba", "Av. Colón 100, Córdoba",
-				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-02"),
-				LocalTime.of(22, 0), LocalTime.of(20, 0), null, 1L);
+		EventoRequest request = requestWithTimes(LocalTime.of(22, 0), LocalTime.of(20, 0));
 
 		assertThatThrownBy(() -> service.create(request))
 				.isInstanceOf(BusinessRuleException.class)
@@ -187,9 +229,8 @@ class PropuestaServiceTest {
 	@Test
 	@DisplayName("un evento arancelado exige monto estimado")
 	void rejectsPaidEventWithoutAmount() {
-		EventoRequest request = new EventoRequest("Evento", null, null, null, null, TipoAcceso.DE_PAGO, null, null,
-				"https://evento.gob.ar", "Plaza San Martín", "Córdoba", "Av. Colón 100, Córdoba",
-				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-02"), null, null, null, 1L);
+		EventoRequest request = requestWithAccess(TipoAcceso.DE_PAGO, null,
+				"https://evento.gob.ar");
 
 		assertThatThrownBy(() -> service.create(request))
 				.isInstanceOf(BusinessRuleException.class)
@@ -200,9 +241,7 @@ class PropuestaServiceTest {
 	@Test
 	@DisplayName("un evento arancelado exige link al sitio oficial")
 	void rejectsPaidEventWithoutSite() {
-		EventoRequest request = new EventoRequest("Evento", null, null, null, null, TipoAcceso.DE_PAGO, new BigDecimal("1500"),
-				null, null, "Plaza San Martín", "Córdoba", "Av. Colón 100, Córdoba",
-				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-02"), null, null, null, 1L);
+		EventoRequest request = requestWithAccess(TipoAcceso.DE_PAGO, new BigDecimal("1500"), null);
 
 		assertThatThrownBy(() -> service.create(request))
 				.isInstanceOf(BusinessRuleException.class)
@@ -228,9 +267,7 @@ class PropuestaServiceTest {
 		when(publicadorRepository.findById(1L)).thenReturn(Optional.of(publisher()));
 		when(eventoRepository.save(any(Evento.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-		EventoRequest request = new EventoRequest("Evento", null, null, null, TipoPropuesta.FESTIVAL, null, null, null, null,
-				"Plaza San Martín", "Córdoba", "Av. Colón 100, Córdoba",
-				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-01"), null, null, null, 1L);
+		EventoRequest request = requestWithDates(LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-01"));
 
 		assertThat(service.create(request).nombre()).isEqualTo("Evento");
 	}
@@ -257,6 +294,35 @@ class PropuestaServiceTest {
 		assertThatThrownBy(() -> service.update(404L, request()))
 				.isInstanceOf(ResourceNotFoundException.class)
 				.hasMessageContaining("404");
+	}
+
+	@Test
+	@DisplayName("reprogramar preserva la duración y no geocodifica")
+	void reprogramsEventPreservingDuration() {
+		Evento evento = persistedEvent();
+		when(eventoRepository.findById(7L)).thenReturn(Optional.of(evento));
+		when(eventoRepository.save(any(Evento.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+		EventoResponse result = service.reprogramar(7L, new ReprogramarEventoRequest(LocalDate.parse("2026-12-01")));
+
+		assertThat(result.fechaInicio()).isEqualTo(LocalDate.parse("2026-12-01"));
+		assertThat(result.fechaFin()).isEqualTo(LocalDate.parse("2026-12-02"));
+		verify(notificacionService).notificarReprogramacion(
+				any(Evento.class),
+				eq(LocalDate.parse("2026-09-25")),
+				eq(LocalDate.parse("2026-09-26")));
+		verify(geocodingService, never()).geocode(any(), any(), any());
+	}
+
+	@Test
+	@DisplayName("reprogramar a un día anterior a hoy responde BusinessRuleException")
+	void reprogramRejectsPastDate() {
+		when(eventoRepository.findById(7L)).thenReturn(Optional.of(persistedEvent()));
+
+		assertThatThrownBy(() -> service.reprogramar(7L, new ReprogramarEventoRequest(LocalDate.parse("2026-09-22"))))
+				.isInstanceOf(BusinessRuleException.class)
+				.hasMessageContaining("anterior a hoy");
+		verify(eventoRepository, never()).save(any(Evento.class));
 	}
 
 	@Test
@@ -391,6 +457,48 @@ class PropuestaServiceTest {
 				LocalTime.of(20, 0), LocalTime.of(23, 30), List.of("https://cdn.cordoba.gob.ar/folklore.jpg"), 1L);
 	}
 
+	private EventoRequest requestWithDates(LocalDate inicio, LocalDate fin) {
+		return new EventoRequest("Evento", "Descripción del evento", InteresCategoria.CULTURA, null,
+				TipoPropuesta.FESTIVAL, null, null, null, null,
+				"Plaza San Martín", "Córdoba", "Av. Colón 100, Córdoba",
+				inicio, fin, LocalTime.of(10, 0), LocalTime.of(12, 0),
+				List.of("https://cdn.test/evento.jpg"), 1L);
+	}
+
+	private EventoRequest requestWithTimes(LocalTime inicio, LocalTime fin) {
+		return new EventoRequest("Evento", "Descripción del evento", InteresCategoria.CULTURA, null,
+				TipoPropuesta.FESTIVAL, null, null, null, null,
+				"Plaza San Martín", "Córdoba", "Av. Colón 100, Córdoba",
+				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-02"), inicio, fin,
+				List.of("https://cdn.test/evento.jpg"), 1L);
+	}
+
+	private EventoRequest requestWithAccess(TipoAcceso acceso, BigDecimal monto, String sitio) {
+		return new EventoRequest("Evento", "Descripción del evento", InteresCategoria.CULTURA, null,
+				TipoPropuesta.FESTIVAL, acceso, monto, null, sitio,
+				"Plaza San Martín", "Córdoba", "Av. Colón 100, Córdoba",
+				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-02"),
+				LocalTime.of(10, 0), LocalTime.of(12, 0),
+				List.of("https://cdn.test/evento.jpg"), 1L);
+	}
+
+	private EventoRequest requestWithPublisher(Long publicadorId) {
+		return new EventoRequest("Evento", "Descripción del evento", InteresCategoria.CULTURA, null,
+				TipoPropuesta.FESTIVAL, null, null, null, null,
+				"Plaza San Martín", "Córdoba", "Av. Colón 100, Córdoba",
+				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-02"),
+				LocalTime.of(10, 0), LocalTime.of(12, 0),
+				List.of("https://cdn.test/evento.jpg"), publicadorId);
+	}
+
+	private EventoRequest requestWithoutImages() {
+		return new EventoRequest("Evento", "Descripción del evento", InteresCategoria.CULTURA, null,
+				TipoPropuesta.FESTIVAL, null, null, null, null,
+				"Plaza San Martín", "Córdoba", "Av. Colón 100, Córdoba",
+				LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-02"),
+				LocalTime.of(10, 0), LocalTime.of(12, 0), List.of(), 1L);
+	}
+
 	private Publicador publisher() {
 		return Publicador.builder().id(1L).nombre("Turismo Córdoba").email("info@cordoba.gob.ar").build();
 	}
@@ -399,11 +507,15 @@ class PropuestaServiceTest {
 		Evento evento = Evento.builder()
 				.id(7L)
 				.nombre("Evento Original")
+				.descripcion("Evento original de prueba")
 				.tipoPropuesta(TipoPropuesta.FESTIVAL)
 				.categoria(InteresCategoria.CULTURA)
 				.estadoPropuesta(initialState())
 				.fechaInicio(LocalDate.parse("2026-09-25"))
 				.fechaFin(LocalDate.parse("2026-09-26"))
+				.horarioInicio(LocalTime.of(10, 0))
+				.horarioFin(LocalTime.of(12, 0))
+				.imagenes(new java.util.ArrayList<>(List.of("https://cdn.test/original.jpg")))
 				.publicador(publisher())
 				.build();
 		evento.setUbicacion(Ubicacion.builder().id(10L).localidad("Alta Gracia").direccion("Av. Belgrano 100").latitud(new BigDecimal("-31.65500000")).longitud(new BigDecimal("-64.42970000")).build());

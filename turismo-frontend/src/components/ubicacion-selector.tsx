@@ -17,10 +17,12 @@ import { buscarLugar, geocodificarInverso, type LugarEncontrado } from '@/lib/ge
  * Leaflet.
  */
 
-// Carga diferida: `ubicacion-preview-mapa` importa `leaflet` y su CSS, y no queremos que ese peso
-// entre en cualquier test o pantalla que renderice el formulario.
-const UbicacionPreviewMapa = lazy(() =>
-  import('./ubicacion-preview-mapa').then((module) => ({ default: module.UbicacionPreviewMapa })),
+// Carga diferida: el mapa usa MapLibre y no queremos que ese peso entre en cualquier test o
+// pantalla que renderice el formulario.
+const EventoUbicacionMapa = lazy(() =>
+  import('./evento-form/evento-mapa-selector').then((module) => ({
+    default: module.EventoMapaSelector,
+  })),
 )
 
 export interface UbicacionSelectorProps {
@@ -162,7 +164,7 @@ export function UbicacionSelector({
 
       {preview === null ? null : (
         <Suspense fallback={<div className="h-64 w-full rounded-lg border bg-muted" />}>
-          <UbicacionPreviewMapa
+          <EventoUbicacionMapa
             lat={preview.lat}
             lng={preview.lng}
             onCoordsChange={handleCoordsChange}

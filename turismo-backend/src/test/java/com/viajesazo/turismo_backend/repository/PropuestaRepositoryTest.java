@@ -121,7 +121,7 @@ class PropuestaRepositoryTest {
 		assertThat(page.getContent()).extracting(PropuestaResumenResponse::duracionMinutos)
 				.containsExactly(120, 90);
 		assertThat(page.getContent()).allSatisfy(item -> {
-			assertThat(item.fechaInicio()).isNull();
+			assertThat(item.fechaInicio()).isNotNull();
 			assertThat(item.tipo()).isEqualTo(TipoRegistro.ACTIVIDAD);
 		});
 	}
@@ -369,6 +369,7 @@ class PropuestaRepositoryTest {
 		evento.setFechaFin(fin);
 		evento.setHorarioInicio(LocalTime.of(20, 0));
 		evento.setHorarioFin(LocalTime.of(23, 0));
+		evento.setImagenes(new java.util.ArrayList<>(List.of("https://cdn.test/evento.jpg")));
 		return evento;
 	}
 
@@ -386,6 +387,8 @@ class PropuestaRepositoryTest {
 		actividad.setUbicacion(ubicacion);
 		actividad.setLugarRecinto("Cabildo");
 		actividad.setDuracionMinutos(duracion);
+		actividad.setFechaInicio(LocalDate.parse("2026-10-01"));
+		actividad.setFechaFin(LocalDate.parse("2026-12-31"));
 		actividad.setDisponibilidades(List.of(Disponibilidad.builder()
 				.diaSemana(java.time.DayOfWeek.MONDAY)
 				.horaInicio(LocalTime.of(9, 0))

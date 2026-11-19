@@ -4,6 +4,19 @@ import { userEvent } from '@testing-library/user-event'
 import type { ReactElement, ReactNode } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
+import { AuthProvider } from '@/components/auth-provider'
+import { clearAccessToken, setAccessToken } from '@/lib/auth-session'
+import type { UsuarioResponse } from '@/types/api'
+
+const DEMO_TURISTA: UsuarioResponse = {
+  id: 1,
+  nombre: 'Turista Demo',
+  email: 'turista@test.com',
+  telefono: null,
+  roles: ['TURISTA'],
+  publicadorId: null,
+}
+
 /**
  * `QueryClient` de tests.
  *
@@ -16,18 +29,53 @@ function createTestQueryClient(): QueryClient {
   return new QueryClient({
     defaultOptions: {
       queries: { retry: false, staleTime: 0, gcTime: 0 },
+      mutations: { retry: false },
     },
   })
 }
 
-/** Envoltorio mínimo: solo los providers que casi todos los tests necesitan. */
-export function renderWithProviders(ui: ReactElement, options?: Omit<RenderOptions, 'wrapper'>) {
+interface ProviderOptions {
+  user?: UsuarioResponse | null
+  /** Sesión de turista (o el `user` pasado) sin bootstrap de red. */
+  authenticated?: boolean
+}
+
+function TestAuthShell({
+  children,
+  user = null,
+  authenticated = false,
+}: {
+  children: ReactNode
+} & ProviderOptions) {
+  const initialUser = authenticated ? (user ?? DEMO_TURISTA) : (user ?? null)
+  if (initialUser !== null) {
+    setAccessToken('test-access-token')
+  } else {
+    clearAccessToken()
+  }
+  return (
+    <AuthProvider initialUser={initialUser} skipBootstrap>
+      {children}
+    </AuthProvider>
+  )
+}
+
+/**
+ * Por defecto: anónimo sin refresh. Pasar `{ authenticated: true }` para sesión de turista.
+ */
+export function renderWithProviders(
+  ui: ReactElement,
+  options?: Omit<RenderOptions, 'wrapper'> & ProviderOptions,
+) {
+  const { user, authenticated, ...renderOptions } = options ?? {}
   const client = createTestQueryClient()
   const result: RenderResult = render(
     <QueryClientProvider client={client}>
-      <MemoryRouter>{ui}</MemoryRouter>
+      <TestAuthShell user={user} authenticated={authenticated}>
+        <MemoryRouter>{ui}</MemoryRouter>
+      </TestAuthShell>
     </QueryClientProvider>,
-    options,
+    renderOptions,
   )
   return { ...result, client }
 }
@@ -37,26 +85,28 @@ export function renderWithProviders(ui: ReactElement, options?: Omit<RenderOptio
  *
  * Necesario para las páginas que usan `useParams` o `useSearchParams`: sin un `<Routes>` la
  * location no tiene params y el hook devuelve `undefined`.
- *
- * @param path patrón de la ruta, con `:id` si hace falta (ej. `/eventos/:id`)
  */
 export function renderRoute({
   route,
   initialEntry = '/',
   children,
+  user,
+  authenticated,
 }: {
   route: string
   initialEntry?: string
   children: ReactNode
-}) {
+} & ProviderOptions) {
   const client = createTestQueryClient()
   const result = render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[initialEntry]}>
-        <Routes>
-          <Route path={route} element={children} />
-        </Routes>
-      </MemoryRouter>
+      <TestAuthShell user={user} authenticated={authenticated}>
+        <MemoryRouter initialEntries={[initialEntry]}>
+          <Routes>
+            <Route path={route} element={children} />
+          </Routes>
+        </MemoryRouter>
+      </TestAuthShell>
     </QueryClientProvider>,
   )
   return { ...result, client }

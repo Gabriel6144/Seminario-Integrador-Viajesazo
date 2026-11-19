@@ -52,6 +52,7 @@ const RHYTHM_LABELS: Record<TipoRitmo, string> = {
   TRANQUILO: 'Tranquilo',
   EQUILIBRADO: 'Equilibrado',
   INTENSIVO: 'Intensivo',
+  MANUAL: 'Manual',
 }
 
 function locationLabel(
@@ -119,9 +120,7 @@ export function CircuitoPage() {
         void query.refetch()
       },
       (error: unknown) => {
-        toast.error(
-          error instanceof Error ? error.message : 'No pudimos regenerar el circuito',
-        )
+        toast.error(toUserMessage(error) || 'No pudimos regenerar el circuito')
       },
     )
   }
@@ -138,8 +137,13 @@ export function CircuitoPage() {
 
   const richCircuito = useMemo(() => {
     if (!alternativaSeleccionada) return null
-    return toCircuitoRecomendado(alternativaSeleccionada, 'Equilibrado')
-  }, [alternativaSeleccionada])
+    return toCircuitoRecomendado(
+      alternativaSeleccionada,
+      'Equilibrado',
+      viajeQuery.data?.fechaInicio ?? undefined,
+      viajeQuery.data?.fechaFin ?? undefined,
+    )
+  }, [alternativaSeleccionada, viajeQuery.data?.fechaInicio, viajeQuery.data?.fechaFin])
 
   useEffect(() => {
     if (richCircuito) {
@@ -305,9 +309,7 @@ export function CircuitoPage() {
         toast.success('Parada eliminada correctamente')
       },
       (error: unknown) => {
-        toast.error(
-          error instanceof Error ? error.message : 'No pudimos eliminar la parada',
-        )
+        toast.error(toUserMessage(error) || 'No pudimos eliminar la parada')
       },
     )
   }
@@ -341,9 +343,7 @@ export function CircuitoPage() {
         toast.success('Parada reemplazada correctamente')
       },
       (error: unknown) => {
-        toast.error(
-          error instanceof Error ? error.message : 'No pudimos reemplazar la parada',
-        )
+        toast.error(toUserMessage(error) || 'No pudimos reemplazar la parada')
       },
     )
   }

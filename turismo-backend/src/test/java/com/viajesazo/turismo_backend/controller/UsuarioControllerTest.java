@@ -11,9 +11,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.List;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -32,12 +35,13 @@ import com.viajesazo.turismo_backend.exception.ResourceNotFoundException;
 import com.viajesazo.turismo_backend.service.UsuarioService;
 
 @WebMvcTest(UsuarioController.class)
+@AutoConfigureMockMvc(addFilters = false)
 // Mismo motivo que en PublicadorControllerTest: GlobalExceptionHandler necesita el Clock de AppConfig.
 @Import(AppConfig.class)
 class UsuarioControllerTest {
 
 	private static final String BODY_VALIDO = """
-			{ "nombre": "Ana Pérez", "email": "ana@mail.com", "telefono": "351-5551234", "contrasena": "secreta123" }
+			{ "nombre": "Ana Pérez", "email": "ana@mail.com", "telefono": "351-5551234", "contrasena": "secreta123", "rol": "TURISTA" }
 			""";
 
 	@Autowired
@@ -50,7 +54,7 @@ class UsuarioControllerTest {
 	@DisplayName("registra el usuario, responde 201 y no devuelve la contraseña")
 	void createsUser() throws Exception {
 		when(usuarioService.create(any(UsuarioRequest.class)))
-				.thenReturn(new UsuarioResponse(1L, "Ana Pérez", "ana@mail.com", "351-5551234"));
+				.thenReturn(new UsuarioResponse(1L, "Ana Pérez", "ana@mail.com", "351-5551234", java.util.Set.of(com.viajesazo.turismo_backend.model.Rol.TURISTA), null));
 
 		mockMvc.perform(post("/api/usuarios").contentType(MediaType.APPLICATION_JSON).content(BODY_VALIDO))
 				.andExpect(status().isCreated())
@@ -76,7 +80,7 @@ class UsuarioControllerTest {
 		mockMvc.perform(post("/api/usuarios")
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
-								{ "nombre": "Ana Pérez", "email": "no-es-un-email", "contrasena": "secreta123" }
+								{ "nombre": "Ana Pérez", "email": "no-es-un-email", "contrasena": "secreta123", "rol": "TURISTA" }
 								"""))
 				.andExpect(status().isBadRequest());
 
@@ -89,7 +93,7 @@ class UsuarioControllerTest {
 		mockMvc.perform(post("/api/usuarios")
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("""
-								{ "nombre": "Ana Pérez", "email": "ana@mail.com", "contrasena": "corta" }
+								{ "nombre": "Ana Pérez", "email": "ana@mail.com", "contrasena": "corta", "rol": "TURISTA" }
 								"""))
 				.andExpect(status().isBadRequest());
 
@@ -124,6 +128,20 @@ class UsuarioControllerTest {
 		when(usuarioService.findById(99L)).thenThrow(new ResourceNotFoundException("No existe el usuario con id 99"));
 
 		mockMvc.perform(get("/api/usuarios/99")).andExpect(status().isNotFound());
+	}
+
+	@Test
+	@DisplayName("listado admin paginado responde content")
+	void searchUsers() throws Exception {
+		when(usuarioService.search(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.isNull(),
+				any(org.springframework.data.domain.Pageable.class)))
+				.thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(
+						new UsuarioResponse(1L, "Ana", "ana@mail.com", null,
+								java.util.Set.of(com.viajesazo.turismo_backend.model.Rol.TURISTA), null))));
+
+		mockMvc.perform(get("/api/usuarios").param("page", "0").param("size", "12"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.content[0].email").value("ana@mail.com"));
 	}
 
 	// --- Baja ---

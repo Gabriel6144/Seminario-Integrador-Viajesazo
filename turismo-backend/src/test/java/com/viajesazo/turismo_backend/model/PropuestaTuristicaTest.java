@@ -54,6 +54,34 @@ class PropuestaTuristicaTest {
 	}
 
 	@Test
+	@DisplayName("un evento exige descripción, categoría, horarios y al menos una imagen")
+	void rejectsEventWithoutRequiredFields() {
+		Evento sinDescripcion = eventoValido();
+		sinDescripcion.setDescripcion(" ");
+		assertThatThrownBy(sinDescripcion::validarInvariantes)
+				.isInstanceOf(InvariantViolationException.class)
+				.hasMessageContaining("descripción");
+
+		Evento sinCategoria = eventoValido();
+		sinCategoria.setCategoria(null);
+		assertThatThrownBy(sinCategoria::validarInvariantes)
+				.isInstanceOf(InvariantViolationException.class)
+				.hasMessageContaining("categoría");
+
+		Evento sinHorario = eventoValido();
+		sinHorario.setHorarioInicio(null);
+		assertThatThrownBy(sinHorario::validarInvariantes)
+				.isInstanceOf(InvariantViolationException.class)
+				.hasMessageContaining("horarios");
+
+		Evento sinImagenes = eventoValido();
+		sinImagenes.setImagenes(List.of());
+		assertThatThrownBy(sinImagenes::validarInvariantes)
+				.isInstanceOf(InvariantViolationException.class)
+				.hasMessageContaining("al menos una imagen");
+	}
+
+	@Test
 	@DisplayName("un evento arancelado exige monto y sitio oficial")
 	void rejectsPaidEventWithoutAmount() {
 		Evento evento = eventoValido();
@@ -132,6 +160,8 @@ class PropuestaTuristicaTest {
 	void rejectsNonPositiveDuration() {
 		Actividad actividad = actividadValida();
 		actividad.setDuracionMinutos(0);
+		actividad.setFechaInicio(LocalDate.parse("2026-10-01"));
+		actividad.setFechaFin(LocalDate.parse("2026-12-31"));
 
 		assertThatThrownBy(actividad::validarInvariantes)
 				.isInstanceOf(InvariantViolationException.class)
@@ -156,6 +186,7 @@ class PropuestaTuristicaTest {
 	private Evento eventoValido() {
 		return Evento.builder()
 				.nombre("Festival de Folklore")
+				.descripcion("Encuentro de Syrigamis")
 				.tipoPropuesta(TipoPropuesta.FESTIVAL)
 				.categoria(InteresCategoria.CULTURA)
 				.estadoPropuesta(estado("INICIADO"))
@@ -169,6 +200,9 @@ class PropuestaTuristicaTest {
 						.build())
 				.fechaInicio(LocalDate.parse("2026-10-01"))
 				.fechaFin(LocalDate.parse("2026-10-02"))
+				.horarioInicio(LocalTime.of(20, 0))
+				.horarioFin(LocalTime.of(23, 30))
+				.imagenes(List.of("https://cdn.cordoba.gob.ar/folklore.jpg"))
 				.build();
 	}
 
@@ -181,6 +215,8 @@ class PropuestaTuristicaTest {
 		actividad.setPublicador(Publicador.builder().id(1L).nombre("Turismo Córdoba").build());
 		actividad.setUbicacion(Ubicacion.builder().id(1L).localidad("Córdoba").build());
 		actividad.setDuracionMinutos(90);
+		actividad.setFechaInicio(LocalDate.parse("2026-10-01"));
+		actividad.setFechaFin(LocalDate.parse("2026-12-31"));
 		actividad.setDisponibilidades(List.of(Disponibilidad.builder()
 				.diaSemana(DayOfWeek.TUESDAY)
 				.horaInicio(LocalTime.of(9, 0))

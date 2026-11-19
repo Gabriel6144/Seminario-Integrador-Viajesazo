@@ -9,6 +9,8 @@ interface Paso8ResumenProps {
   radiusKm: number
   interests: string[]
   rhythm: string
+  totalEventos: number
+  totalActividades: number
   onEditStep: (step: number) => void
   onGenerate: () => void
 }
@@ -22,9 +24,15 @@ export function Paso8Resumen({
   radiusKm,
   interests,
   rhythm,
+  totalEventos,
+  totalActividades,
   onEditStep,
   onGenerate,
 }: Paso8ResumenProps) {
+  const ritmoLabel =
+    rhythm === 'Manual'
+      ? `${totalEventos} eventos · ${totalActividades} actividades`
+      : rhythm
   return (
     <div className="flex min-h-[500px] w-full flex-col justify-between">
       <div>
@@ -137,7 +145,7 @@ export function Paso8Resumen({
             <span className="material-symbols-outlined text-xl text-sky-600">speed</span>
             <div>
               <span className="block text-[10px] font-semibold uppercase text-slate-400">Ritmo</span>
-              <span className="text-sm font-bold text-slate-800">{rhythm}</span>
+              <span className="text-sm font-bold text-slate-800">{ritmoLabel}</span>
             </div>
           </div>
           <button

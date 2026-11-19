@@ -14,6 +14,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
@@ -35,6 +36,7 @@ import com.viajesazo.turismo_backend.service.PropuestaQueryService;
 import com.viajesazo.turismo_backend.service.PropuestaService;
 
 @WebMvcTest(AgendaController.class)
+@AutoConfigureMockMvc(addFilters = false)
 // @WebMvcTest es un slice: solo carga beans web, así que el Clock que inyecta
 // GlobalExceptionHandler no existiría. Se importa la configuración real en vez de duplicarla.
 @Import(AppConfig.class)

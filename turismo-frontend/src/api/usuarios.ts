@@ -2,35 +2,68 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 
 import { PAGE_SIZE } from '@/api/eventos'
 import { queryKeys } from '@/api/queries'
-import { ApiError, apiGet, apiPatch, apiPost } from '@/lib/http'
-import type { Page, RolUsuario, UsuarioRequest, UsuarioResponse } from '@/types/api'
+import { ApiError, apiGet, apiPost } from '@/lib/http'
+import type {
+  BajaUsuarioResponse,
+  Page,
+  RolUsuario,
+  UsuarioBajaRequest,
+  UsuarioRequest,
+  UsuarioResponse,
+} from '@/types/api'
 
 /**
- * Módulo de usuarios (PLANTILLA FRONTEND).
+ * Usuarios.
  *
- * El backend de usuarios todavía no está implementado. Para que las pantallas se puedan ver y
- * probar sin API, este módulo usa un store mock en memoria por defecto.
- *
- * Contrato esperado (ajustar cuando el backend esté listo):
- * - GET    /api/usuarios?page=&size=&q=&rol=  -> Page<UsuarioResponse>
- * - POST   /api/usuarios                      -> UsuarioResponse (201)
- * - PATCH  /api/usuarios/:id/baja             -> UsuarioResponse (o {estado})  [sugerido]
- *
- * Conexión al backend real:
- * 1. Definir `VITE_USE_USUARIOS_MOCK=false` (o eliminar el uso del mock).
- * 2. Ajustar paths/shape en las llamadas HTTP de abajo si difieren.
- * 3. Alinear tipos en `src/types/api.ts` y handlers/fixtures de MSW.
+ * Registro público: siempre `POST /api/usuarios`.
+ * Listado admin: `GET /api/usuarios` (paginado). `VITE_USE_USUARIOS_MOCK=true` fuerza mock offline.
  */
-const USE_MOCK = (import.meta.env.VITE_USE_USUARIOS_MOCK ?? 'true') !== 'false'
+const USE_MOCK = (import.meta.env.VITE_USE_USUARIOS_MOCK ?? 'false') === 'true'
 
 const MOCK_DELAY_MS = 250
 
+interface MockUsuario extends UsuarioResponse {
+  activo: boolean
+}
+
 let nextId = 5
-let mockUsuarios: UsuarioResponse[] = [
-  { id: 1, nombre: 'Juan', apellido: 'Pérez', email: 'juan@email.com', rol: 'TURISTA', estado: 'ACTIVO', fechaAlta: '2026-10-12' },
-  { id: 2, nombre: 'Carolina', apellido: 'Gómez', email: 'carolina.turismo@cordoba.gob.ar', rol: 'PUBLICADOR', estado: 'ACTIVO', fechaAlta: '2026-09-05' },
-  { id: 3, nombre: 'Martín', apellido: 'Soria', email: 'msoria@viajesazo.com', rol: 'ADMINISTRADOR', estado: 'ACTIVO', fechaAlta: '2026-01-18' },
-  { id: 4, nombre: 'Lucía', apellido: 'Benítez', email: 'lucia.b@gmail.com', rol: 'TURISTA', estado: 'ACTIVO', fechaAlta: '2026-08-02' },
+let mockUsuarios: MockUsuario[] = [
+  {
+    id: 1,
+    nombre: 'Juan Pérez',
+    email: 'juan@email.com',
+    telefono: null,
+    roles: ['TURISTA'],
+    publicadorId: null,
+    activo: true,
+  },
+  {
+    id: 2,
+    nombre: 'Carolina Gómez',
+    email: 'carolina.turismo@cordoba.gob.ar',
+    telefono: '351-5550001',
+    roles: ['PUBLICADOR'],
+    publicadorId: 1,
+    activo: true,
+  },
+  {
+    id: 3,
+    nombre: 'Martín Soria',
+    email: 'msoria@viajesazo.com',
+    telefono: null,
+    roles: ['ADMINISTRADOR'],
+    publicadorId: null,
+    activo: true,
+  },
+  {
+    id: 4,
+    nombre: 'Lucía Benítez',
+    email: 'lucia.b@gmail.com',
+    telefono: null,
+    roles: ['TURISTA'],
+    publicadorId: null,
+    activo: true,
+  },
 ]
 
 function delay<T>(value: T): Promise<T> {
@@ -63,17 +96,20 @@ export interface UsuariosFilters {
 function listMock(page: number, size: number, filters: UsuariosFilters): Page<UsuarioResponse> {
   const q = normalize((filters.q ?? '').trim())
   const rol = filters.rol ?? 'TODOS'
-  let items = [...mockUsuarios]
-  if (rol !== 'TODOS') items = items.filter((u) => u.rol === rol)
+  let items = mockUsuarios.filter((u) => u.activo)
+  if (rol !== 'TODOS') items = items.filter((u) => u.roles.includes(rol))
   if (q.length > 0) {
     items = items.filter((u) => {
-      const haystack = normalize(`${u.nombre} ${u.apellido} ${u.email}`)
+      const haystack = normalize(`${u.nombre} ${u.email}`)
       return haystack.includes(q)
     })
   }
-  // Más recientes primero por id (plantilla); ajustar al orden real del backend.
   items.sort((a, b) => b.id - a.id)
-  return toPage(items, page, size)
+  return toPage(
+    items.map(({ activo: _activo, ...rest }) => rest),
+    page,
+    size,
+  )
 }
 
 async function fetchUsuarios(
@@ -85,8 +121,12 @@ async function fetchUsuarios(
   if (USE_MOCK) {
     return delay(listMock(page, size, filters))
   }
-  const params = new URLSearchParams({ page: String(page), size: String(size) })
-  if (filters.q?.trim()) params.set('q', filters.q.trim())
+  const params = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+  })
+  const q = (filters.q ?? '').trim()
+  if (q.length > 0) params.set('q', q)
   if (filters.rol && filters.rol !== 'TODOS') params.set('rol', filters.rol)
   return apiGet<Page<UsuarioResponse>>(`/api/usuarios?${params.toString()}`, signal)
 }
@@ -110,17 +150,18 @@ export function useCrearUsuario() {
         if (mockUsuarios.some((u) => u.email.toLowerCase() === email)) {
           throw new ApiError(400, { status: 400, message: 'ya existe un usuario con ese email' })
         }
-        const created: UsuarioResponse = {
+        const created: MockUsuario = {
           id: nextId++,
           nombre: request.nombre.trim(),
-          apellido: request.apellido.trim(),
           email: request.email.trim(),
-          rol: request.rol,
-          estado: 'ACTIVO',
-          fechaAlta: new Date().toISOString().slice(0, 10),
+          telefono: request.telefono,
+          roles: ['TURISTA'],
+          publicadorId: null,
+          activo: true,
         }
         mockUsuarios = [created, ...mockUsuarios]
-        return delay(created)
+        const { activo: _activo, ...response } = created
+        return delay(response)
       }
       return apiPost<UsuarioResponse, UsuarioRequest>('/api/usuarios', request)
     },
@@ -133,18 +174,22 @@ export function useCrearUsuario() {
 export function useBajaUsuario() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async ({ id, contrasena }: { id: number; contrasena: string }) => {
       if (USE_MOCK) {
-        const idx = mockUsuarios.findIndex((u) => u.id === id)
+        const idx = mockUsuarios.findIndex((u) => u.id === id && u.activo)
         if (idx === -1) throw new ApiError(404, { status: 404, message: 'No existe el usuario' })
-        const updated: UsuarioResponse = { ...mockUsuarios[idx], estado: 'INACTIVO' }
-        mockUsuarios = mockUsuarios.map((u) => (u.id === id ? updated : u))
-        return delay(updated)
+        mockUsuarios = mockUsuarios.map((u) => (u.id === id ? { ...u, activo: false } : u))
+        const result: BajaUsuarioResponse = {
+          id,
+          mensaje: 'la cuenta se dio de baja correctamente',
+          viajesCancelados: 0,
+        }
+        return delay(result)
       }
-      // Contrato sugerido; ajustar método/path según backend (p.ej. DELETE o PATCH con body).
-      return apiPatch<UsuarioResponse, { estado: 'INACTIVO' }>(`/api/usuarios/${id}/baja`, {
-        estado: 'INACTIVO',
-      })
+      return apiPost<BajaUsuarioResponse, UsuarioBajaRequest>(
+        `/api/usuarios/${id}/baja?confirmar=true`,
+        { contrasena },
+      )
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.usuariosAll() })
@@ -154,4 +199,12 @@ export function useBajaUsuario() {
 
 export function getUsuariosMockState() {
   return { useMock: USE_MOCK }
+}
+
+/** Expuesto para tests MSW / demos: busca por email en el mock. */
+export function findMockUsuarioByEmail(email: string): UsuarioResponse | undefined {
+  const found = mockUsuarios.find((u) => u.email.toLowerCase() === email.toLowerCase() && u.activo)
+  if (found === undefined) return undefined
+  const { activo: _activo, ...rest } = found
+  return rest
 }

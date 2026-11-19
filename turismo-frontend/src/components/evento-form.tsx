@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { PlusIcon, Trash2Icon } from 'lucide-react'
-import { Controller, useFieldArray, useForm, type FieldError as RhfFieldError } from 'react-hook-form'
+import { Controller, useFieldArray, useForm, type FieldError as RhfFieldError, type FieldPath } from 'react-hook-form'
 import { Link } from 'react-router-dom'
 import { useEffect, useRef, useState, type ComponentProps } from 'react'
 
@@ -25,6 +25,9 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { ImagenUploader } from '@/components/imagen-uploader'
 import { UbicacionSelector } from '@/components/ubicacion-selector'
+import { AgendaPublicadorModal } from '@/components/evento-form/agenda-publicador-modal'
+import { FechaRangoCards } from '@/components/evento-form/fecha-rango-cards'
+import { HoraRangoCards } from '@/components/evento-form/hora-rango-cards'
 import {
   crearPropuestaSchema,
   formatValidationMessage,
@@ -33,21 +36,24 @@ import {
 import {
   CATEGORIA_LABELS,
   CATEGORIAS,
+  CATEGORIA_DESCRIPCIONES,
   DIA_SEMANA_LABELS,
   DIAS_SEMANA,
   MODALIDAD_LABELS,
   MODALIDADES,
   TIPO_ACCESO_LABELS,
+  TIPO_PROPUESTA_DESCRIPCIONES,
   TIPO_PROPUESTA_LABELS,
   TIPOS_ACCESO,
-  TIPOS_PROPUESTA,
-  type PublicadorResponse,
+  TIPOS_PROPUESTA_ACTIVIDAD,
+  TIPOS_PROPUESTA_EVENTO,
+  type Categoria,
+  type TipoPropuesta,
   type TipoRegistro,
 } from '@/types/api'
 
 interface EventoFormProps {
   defaultValues: EventoFormValues
-  publicadores: PublicadorResponse[]
   onSubmit: (values: EventoFormValues) => void
   /** Si se provee, habilita el selector "Evento / Actividad" para crear cualquiera de las dos propuestas. */
   onSubmitActividad?: (values: EventoFormValues) => void
@@ -76,7 +82,6 @@ interface EventoFormProps {
  */
 export function EventoForm({
   defaultValues,
-  publicadores,
   onSubmit,
   onSubmitActividad,
   tipoFijo,
@@ -107,13 +112,16 @@ export function EventoForm({
       crearPropuestaSchema(esActividad ? 'ACTIVIDAD' : 'EVENTO', minFechaInicio),
     ),
     defaultValues,
-    // Errores al enviar, y de ahí en adelante mientras se corrige. Validar en cada tecla desde
-    // el arranque marca campos en rojo antes de que el usuario haya terminado de escribirlos.
-    mode: 'onSubmit',
+    // Valida al salir de cada campo y luego en cada cambio: el usuario ve qué falta mientras
+    // completa, sin que todo el formulario se marque en rojo desde el primer render.
+    mode: 'onTouched',
+    reValidateMode: 'onChange',
   })
 
-  const { register, control, formState, watch, setValue, clearErrors } = form
+  const { register, control, formState, watch, setValue, getValues, clearErrors, trigger } = form
   const { errors } = formState
+  const [seccionAbierta, setSeccionAbierta] = useState('datos')
+  const [agendaAbierta, setAgendaAbierta] = useState(false)
   const { fields, append, remove } = useFieldArray({ control, name: 'imagenes' })
   const {
     fields: disponibilidadFields,
@@ -121,15 +129,30 @@ export function EventoForm({
     remove: removeDisponibilidad,
   } = useFieldArray({ control, name: 'disponibilidades' })
 
-  const tiposPropuestaOpciones = TIPOS_PROPUESTA
+  const tiposPropuestaOpciones = esActividad
+    ? TIPOS_PROPUESTA_ACTIVIDAD
+    : TIPOS_PROPUESTA_EVENTO
 
   const cambiarTipoRegistro = (nuevoTipo: TipoRegistro) => {
     setTipoRegistro(nuevoTipo)
+    const opciones = nuevoTipo === 'ACTIVIDAD' ? TIPOS_PROPUESTA_ACTIVIDAD : TIPOS_PROPUESTA_EVENTO
+    const actual = getValues('tipoPropuesta')
+    if (actual !== '' && !(opciones as readonly string[]).includes(actual)) {
+      setValue('tipoPropuesta', '')
+    }
     clearErrors()
   }
 
   // El bloque de arancel solo se muestra (y solo se exige) cuando el evento es arancelado.
   const esDePago = watch('tipoAcceso') === 'DE_PAGO'
+  const categoriaSeleccionada = watch('categoria')
+  const tipoPropuestaSeleccionado = watch('tipoPropuesta')
+  const nombreValor = watch('nombre')
+  const descripcionValor = watch('descripcion')
+  const lugarValor = watch('lugarRecinto')
+  const localidadValor = watch('localidad')
+  const direccionValor = watch('direccion')
+  const tipoAccesoValor = watch('tipoAcceso')
   const montoEstimado = watch('montoEstimado')
   const sitioOficial = watch('sitioOficial')
   const fechaInicio = watch('fechaInicio')
@@ -138,6 +161,7 @@ export function EventoForm({
   const horarioFin = watch('horarioFin')
   const duracionMinutos = watch('duracionMinutos') ?? ''
   const disponibilidades = watch('disponibilidades') ?? []
+  const imagenesValor = watch('imagenes') ?? []
 
   const ubicacionRef = useRef<HTMLDivElement>(null)
   const [dismissedServerError, setDismissedServerError] = useState<string | null>(null)
@@ -157,9 +181,6 @@ export function EventoForm({
 
   const esErrorImagenesServidor =
     activeServerError !== null && /im[aá]gen/i.test(activeServerError)
-
-  const esErrorPublicadorServidor =
-    activeServerError !== null && /publicador/i.test(activeServerError)
 
   useEffect(() => {
     if (
@@ -208,6 +229,8 @@ export function EventoForm({
       ? { type: 'validate', message: 'El horario de finalización debe ser posterior al de inicio.' }
       : errors.horarioFin
 
+  const errorImagenesArray = imagenArrayError(errors.imagenes)
+
   const errorDuracionMinutos: RhfFieldError | undefined =
     esActividad &&
     duracionMinutos.trim().length > 0 &&
@@ -215,17 +238,79 @@ export function EventoForm({
       ? { type: 'validate', message: 'La duración de la actividad debe ser mayor a cero.' }
       : errors.duracionMinutos
 
-  const errorPublicador: RhfFieldError | undefined = esErrorPublicadorServidor
-    ? { type: 'server', message: formatValidationMessage(activeServerError) }
-    : errors.publicadorId
-
   const generalServerError =
     activeServerError !== null &&
     !esErrorUbicacionServidor &&
-    !esErrorImagenesServidor &&
-    !esErrorPublicadorServidor
+    !esErrorImagenesServidor
       ? formatValidationMessage(activeServerError)
       : null
+
+  const seccionesFormulario = [
+    {
+      id: 'datos',
+      label: 'Datos',
+      ok:
+        nombreValor.trim() !== '' &&
+        descripcionValor.trim() !== '' &&
+        categoriaSeleccionada !== '' &&
+        tipoPropuestaSeleccionado !== '',
+    },
+    {
+      id: 'fechas',
+      label: 'Fechas',
+      ok: fechaInicio !== '' && fechaFin !== '',
+    },
+    {
+      id: 'horarios',
+      label: 'Horarios',
+      ok: esActividad
+        ? (duracionMinutos ?? '').trim() !== ''
+        : horarioInicio !== '' && horarioFin !== '',
+    },
+    {
+      id: 'ubicacion',
+      label: 'Ubicación',
+      ok: lugarValor.trim() !== '' && localidadValor.trim() !== '' && direccionValor.trim() !== '',
+    },
+    {
+      id: 'imagenes',
+      label: 'Imágenes',
+      ok: esActividad || imagenesValor.length > 0,
+    },
+    {
+      id: 'acceso',
+      label: 'Acceso',
+      ok:
+        tipoAccesoValor !== '' &&
+        (tipoAccesoValor !== 'DE_PAGO' ||
+          (montoEstimado.trim() !== '' && sitioOficial.trim() !== '')),
+    },
+  ]
+  const completadas = seccionesFormulario.filter((seccion) => seccion.ok).length
+
+  const camposPorSeccion: Record<string, FieldPath<EventoFormValues>[]> = {
+    datos: ['nombre', 'descripcion', 'categoria', 'tipoPropuesta', 'modalidad'],
+    fechas: ['fechaInicio', 'fechaFin'],
+    horarios: esActividad
+      ? ['duracionMinutos', 'disponibilidades']
+      : ['horarioInicio', 'horarioFin'],
+    ubicacion: ['lugarRecinto', 'localidad', 'direccion'],
+    imagenes: ['imagenes'],
+    acceso: ['tipoAcceso', 'montoEstimado', 'sitioOficial'],
+  }
+  const siguiente: Record<string, string> = {
+    datos: 'fechas',
+    fechas: 'horarios',
+    horarios: 'ubicacion',
+    ubicacion: 'imagenes',
+    imagenes: 'acceso',
+  }
+  const continuarSeccion = async (id: string) => {
+    const ok = await trigger(camposPorSeccion[id] ?? [])
+    if (ok && siguiente[id] !== undefined) {
+      setSeccionAbierta(siguiente[id])
+    }
+  }
 
   return (
     <form
@@ -290,9 +375,69 @@ export function EventoForm({
         </div>
       ) : null}
 
+      <FormProgress secciones={seccionesFormulario} completadas={completadas} />
+      <FormSectionNav
+        secciones={seccionesFormulario}
+        activa={seccionAbierta}
+        onSelect={setSeccionAbierta}
+      />
+
+      <FormSection
+          id="fechas"
+          open={seccionAbierta === 'fechas'}
+          completed={seccionesFormulario[1].ok}
+          onToggle={() => setSeccionAbierta('fechas')}
+          onContinue={() => void continuarSeccion('fechas')}
+          onBack={() => setSeccionAbierta('datos')}
+          number={1}
+          title="Agenda de la propuesta"
+          icon={
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
+              <rect x="3" y="4" width="18" height="18" rx="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+          }
+        >
+          <FieldDescription>
+            Elegí el rango de fechas para agendar el evento o la actividad. Podés tener más de una
+            propuesta el mismo día.
+          </FieldDescription>
+          <div className="flex flex-col gap-3">
+            <FechaRangoCards
+              fechaInicio={fechaInicio}
+              fechaFin={fechaFin}
+              min={minFechaInicio}
+              errorInicio={errorFechaInicio}
+              errorFin={errorFechaFin}
+              onChangeInicio={(value) =>
+                setValue('fechaInicio', value, { shouldValidate: true, shouldDirty: true })
+              }
+              onChangeFin={(value) =>
+                setValue('fechaFin', value, { shouldValidate: true, shouldDirty: true })
+              }
+            />
+            <Button
+              type="button"
+              variant="outline"
+              className="self-start"
+              onClick={() => setAgendaAbierta(true)}
+            >
+              <span className="material-symbols-outlined text-lg">calendar_month</span>
+              Ver mi agenda
+            </Button>
+          </div>
+        </FormSection>
+
       {/* Sección 1: Datos Principales */}
       <FormSection
-        number={1}
+        id="datos"
+        open={seccionAbierta === 'datos'}
+        completed={seccionesFormulario[0].ok}
+        onToggle={() => setSeccionAbierta('datos')}
+        onContinue={() => void continuarSeccion('datos')}
+        number={esAlta || esActividad ? 2 : 1}
         title={esActividad ? 'Datos Principales de la Actividad' : 'Datos Principales del Evento'}
         icon={
           <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
@@ -307,15 +452,20 @@ export function EventoForm({
           <TextField
             id="nombre"
             label="Nombre del evento"
+            required
             error={errors.nombre}
             inputProps={register('nombre')}
           />
 
           <Field data-invalid={errors.descripcion !== undefined}>
-            <FieldLabel htmlFor="descripcion">Descripción completa</FieldLabel>
+            <FieldLabel htmlFor="descripcion">
+              Descripción completa <span className="text-destructive">*</span>
+            </FieldLabel>
             <Textarea
               id="descripcion"
               rows={3}
+              aria-label="Descripción completa"
+              aria-required="true"
               aria-invalid={errors.descripcion !== undefined}
               {...register('descripcion')}
             />
@@ -327,9 +477,16 @@ export function EventoForm({
             name="categoria"
             render={({ field }) => (
               <Field data-invalid={errors.categoria !== undefined}>
-                <FieldLabel htmlFor="categoria">Categoría turística</FieldLabel>
+                <FieldLabel htmlFor="categoria">
+                  Categoría turística <span className="text-destructive">*</span>
+                </FieldLabel>
                 <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger id="categoria" aria-invalid={errors.categoria !== undefined}>
+                  <SelectTrigger
+                    id="categoria"
+                    aria-label="Categoría turística"
+                    aria-required="true"
+                    aria-invalid={errors.categoria !== undefined}
+                  >
                     <SelectValue placeholder="Elegí una categoría" />
                   </SelectTrigger>
                   <SelectContent>
@@ -341,6 +498,15 @@ export function EventoForm({
                   </SelectContent>
                 </Select>
                 <FieldError>{errors.categoria?.message}</FieldError>
+                {categoriaSeleccionada !== '' ? (
+                  <FieldDescription>
+                    {CATEGORIA_DESCRIPCIONES[categoriaSeleccionada as Categoria]}
+                  </FieldDescription>
+                ) : (
+                  <FieldDescription>
+                    Elegí la categoría que mejor describe la experiencia.
+                  </FieldDescription>
+                )}
               </Field>
             )}
           />
@@ -350,9 +516,16 @@ export function EventoForm({
             name="tipoPropuesta"
             render={({ field }) => (
               <Field data-invalid={errors.tipoPropuesta !== undefined}>
-                <FieldLabel htmlFor="tipoPropuesta">Tipo de propuesta</FieldLabel>
+                <FieldLabel htmlFor="tipoPropuesta">
+                  Tipo de propuesta <span className="text-destructive">*</span>
+                </FieldLabel>
                 <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger id="tipoPropuesta" aria-invalid={errors.tipoPropuesta !== undefined}>
+                  <SelectTrigger
+                    id="tipoPropuesta"
+                    aria-label="Tipo de propuesta"
+                    aria-required="true"
+                    aria-invalid={errors.tipoPropuesta !== undefined}
+                  >
                     <SelectValue placeholder="Elegí un tipo de propuesta" />
                   </SelectTrigger>
                   <SelectContent>
@@ -364,6 +537,17 @@ export function EventoForm({
                   </SelectContent>
                 </Select>
                 <FieldError>{errors.tipoPropuesta?.message}</FieldError>
+                {tipoPropuestaSeleccionado !== '' ? (
+                  <FieldDescription>
+                    {TIPO_PROPUESTA_DESCRIPCIONES[tipoPropuestaSeleccionado as TipoPropuesta]}
+                  </FieldDescription>
+                ) : (
+                  <FieldDescription>
+                    {esActividad
+                      ? 'Solo se ofrecen visitas guiadas y actividades deportivas.'
+                      : 'Las visitas guiadas se cargan como Actividad.'}
+                  </FieldDescription>
+                )}
               </Field>
             )}
           />
@@ -373,9 +557,13 @@ export function EventoForm({
             name="modalidad"
             render={({ field }) => (
               <Field data-invalid={errors.modalidad !== undefined}>
-                <FieldLabel htmlFor="modalidad">Modalidad</FieldLabel>
+                <FieldLabel htmlFor="modalidad">Modalidad (opcional)</FieldLabel>
                 <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger id="modalidad" aria-invalid={errors.modalidad !== undefined}>
+                  <SelectTrigger
+                    id="modalidad"
+                    aria-label="Modalidad"
+                    aria-invalid={errors.modalidad !== undefined}
+                  >
                     <SelectValue placeholder="Elegí una modalidad" />
                   </SelectTrigger>
                   <SelectContent>
@@ -395,6 +583,11 @@ export function EventoForm({
 
       {/* Sección 2: Acceso y Arancel */}
       <FormSection
+        id="acceso"
+        open={seccionAbierta === 'acceso'}
+        completed={seccionesFormulario[5].ok}
+        onToggle={() => setSeccionAbierta('acceso')}
+        onBack={() => setSeccionAbierta('imagenes')}
         number={2}
         title="Tipo de Acceso y Arancel"
         icon={
@@ -434,6 +627,7 @@ export function EventoForm({
                 id="montoEstimado"
                 label="Monto estimado"
                 type="number"
+                required={esDePago}
                 description="Obligatorio para un evento arancelado."
                 error={errorMontoEstimado}
                 inputProps={{ step: '0.01', min: '0', ...register('montoEstimado') }}
@@ -441,6 +635,7 @@ export function EventoForm({
               <TextField
                 id="sitioOficial"
                 label="Sitio oficial de la boletería o entradas"
+                required={esDePago}
                 description="URL completa, con http:// o https://."
                 error={errorSitioOficial}
                 inputProps={{ type: 'url', ...register('sitioOficial') }}
@@ -465,6 +660,12 @@ export function EventoForm({
       {/* Sección 3: Ubicación */}
       <div ref={ubicacionRef}>
         <FormSection
+          id="ubicacion"
+          open={seccionAbierta === 'ubicacion'}
+          completed={seccionesFormulario[3].ok}
+          onToggle={() => setSeccionAbierta('ubicacion')}
+          onContinue={() => void continuarSeccion('ubicacion')}
+          onBack={() => setSeccionAbierta('horarios')}
           number={3}
           title="Ubicación en Córdoba"
           icon={
@@ -494,6 +695,7 @@ export function EventoForm({
             <TextField
               id="lugarRecinto"
               label="Lugar o recinto"
+              required
               description="Ej.: Anfiteatro José Hernández, Plaza San Martín."
               error={errors.lugarRecinto ?? (errorUbicacionServidor ? { type: 'server', message: '' } : undefined)}
               inputProps={register('lugarRecinto', { onChange: dismissServerError })}
@@ -501,12 +703,14 @@ export function EventoForm({
             <TextField
               id="localidad"
               label="Ciudad / Localidad"
+              required
               error={errors.localidad ?? (errorUbicacionServidor ? { type: 'server', message: '' } : undefined)}
               inputProps={register('localidad', { onChange: dismissServerError })}
             />
             <TextField
               id="direccion"
               label="Dirección exacta o referencia"
+              required
               error={errors.direccion ?? errorUbicacionServidor}
               inputProps={register('direccion', { onChange: dismissServerError })}
             />
@@ -517,6 +721,12 @@ export function EventoForm({
       {/* Sección 4: Calendario y Horarios (Evento) o Duración y Disponibilidad Semanal (Actividad) */}
       {esActividad ? (
         <FormSection
+          id="horarios"
+          open={seccionAbierta === 'horarios'}
+          completed={seccionesFormulario[2].ok}
+          onToggle={() => setSeccionAbierta('horarios')}
+          onContinue={() => void continuarSeccion('horarios')}
+          onBack={() => setSeccionAbierta('fechas')}
           number={4}
           title="Duración y Disponibilidad Semanal"
           icon={
@@ -534,6 +744,7 @@ export function EventoForm({
               id="duracionMinutos"
               label="Duración estimada (en minutos)"
               type="number"
+              required
               description="Obligatorio. Debe ser un entero mayor a 0 (ej.: 90)."
               error={errorDuracionMinutos}
               inputProps={{
@@ -646,8 +857,14 @@ export function EventoForm({
         </FormSection>
       ) : (
         <FormSection
-          number={4}
-          title="Calendario y Horarios"
+          id="horarios"
+          open={seccionAbierta === 'horarios'}
+          completed={seccionesFormulario[2].ok}
+          onToggle={() => setSeccionAbierta('horarios')}
+          onContinue={() => void continuarSeccion('horarios')}
+          onBack={() => setSeccionAbierta('fechas')}
+          number={3}
+          title="Horarios del evento"
           icon={
             <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
               <rect x="3" y="4" width="18" height="18" rx="2" />
@@ -657,60 +874,31 @@ export function EventoForm({
             </svg>
           }
         >
-          <FieldDescription>
-            La fecha de finalización no puede ser anterior a la de inicio.
-          </FieldDescription>
           <FieldGroup>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <TextField
-                id="fechaInicio"
-                label="Fecha de inicio"
-                type="date"
-                error={errorFechaInicio}
-                inputProps={{
-                  min: minFechaInicio,
-                  ...register('fechaInicio'),
-                }}
-              />
-              <TextField
-                id="fechaFin"
-                label="Fecha de finalización"
-                type="date"
-                error={errorFechaFin}
-                inputProps={{
-                  min:
-                    fechaInicio && (!minFechaInicio || fechaInicio >= minFechaInicio)
-                      ? fechaInicio
-                      : minFechaInicio,
-                  ...register('fechaFin'),
-                }}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <TextField
-                id="horarioInicio"
-                label="Horario de inicio"
-                type="time"
-                description="Opcional."
-                error={errors.horarioInicio}
-                inputProps={register('horarioInicio')}
-              />
-              <TextField
-                id="horarioFin"
-                label="Horario de finalización"
-                type="time"
-                description="Opcional, y solo se compara si también cargás el de inicio."
-                error={errorHorarioFin}
-                inputProps={register('horarioFin')}
-              />
-            </div>
+            <HoraRangoCards
+              horarioInicio={horarioInicio}
+              horarioFin={horarioFin}
+              errorInicio={errors.horarioInicio}
+              errorFin={errorHorarioFin}
+              onChangeInicio={(value) =>
+                setValue('horarioInicio', value, { shouldValidate: true, shouldDirty: true })
+              }
+              onChangeFin={(value) =>
+                setValue('horarioFin', value, { shouldValidate: true, shouldDirty: true })
+              }
+            />
           </FieldGroup>
         </FormSection>
       )}
 
       {/* Sección 5: Imágenes */}
       <FormSection
+        id="imagenes"
+        open={seccionAbierta === 'imagenes'}
+        completed={seccionesFormulario[4].ok}
+        onToggle={() => setSeccionAbierta('imagenes')}
+        onContinue={() => void continuarSeccion('imagenes')}
+        onBack={() => setSeccionAbierta('ubicacion')}
         number={5}
         title="Imágenes del Evento"
         icon={
@@ -722,8 +910,9 @@ export function EventoForm({
         }
       >
         <FieldDescription>
-          Subí archivos o pegá URLs completas, una por fila. Para sacar todas, quitá las filas: una
-          lista vacía las borra del evento.
+          {esActividad
+            ? 'Subí archivos o pegá URLs completas, una por fila. Para sacar todas, quitá las filas: una lista vacía las borra de la actividad.'
+            : 'Obligatoria: cargá al menos una imagen. Podés subir archivos o pegar URLs completas, una por fila.'}
         </FieldDescription>
 
         <ImagenUploader
@@ -736,6 +925,8 @@ export function EventoForm({
         {esErrorImagenesServidor ? (
           <FieldError>{formatValidationMessage(activeServerError)}</FieldError>
         ) : null}
+
+        {errorImagenesArray ? <FieldError>{errorImagenesArray}</FieldError> : null}
 
         <FieldGroup>
           {fields.length === 0 ? (
@@ -791,47 +982,18 @@ export function EventoForm({
         </FieldGroup>
       </FormSection>
 
-      {/* Sección 6: Publicador */}
-      <FormSection
-        number={6}
-        title="Publicador"
-        icon={
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
-            <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6" />
-          </svg>
+      <AgendaPublicadorModal
+        open={agendaAbierta}
+        onOpenChange={setAgendaAbierta}
+        fechaInicio={fechaInicio}
+        fechaFin={fechaFin}
+        onSelectInicio={(fecha) =>
+          setValue('fechaInicio', fecha, { shouldValidate: true, shouldDirty: true })
         }
-      >
-        <FieldGroup>
-          <Controller
-            control={control}
-            name="publicadorId"
-            render={({ field }) => (
-              <Field data-invalid={errorPublicador !== undefined}>
-                <FieldLabel htmlFor="publicadorId">Publicador</FieldLabel>
-                <Select
-                  value={field.value}
-                  onValueChange={(val) => {
-                    dismissServerError()
-                    field.onChange(val)
-                  }}
-                >
-                  <SelectTrigger id="publicadorId" aria-invalid={errorPublicador !== undefined}>
-                    <SelectValue placeholder="Elegí un publicador" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {publicadores.map((publicador) => (
-                      <SelectItem key={publicador.id} value={String(publicador.id)}>
-                        {publicador.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FieldError>{errorPublicador?.message}</FieldError>
-              </Field>
-            )}
-          />
-        </FieldGroup>
-      </FormSection>
+        onSelectFin={(fecha) =>
+          setValue('fechaFin', fecha, { shouldValidate: true, shouldDirty: true })
+        }
+      />
 
       <div className="flex flex-wrap items-center gap-2">
         <Button type="submit" disabled={isPending}>
@@ -854,29 +1016,159 @@ export function EventoForm({
  *
  * Diseño según prototipo Stitch: borde inferior, número circular y icono a la izquierda.
  */
+function FormSectionNav({
+  secciones,
+  activa,
+  onSelect,
+}: {
+  secciones: Array<{ id: string; label: string; ok: boolean }>
+  activa: string
+  onSelect: (id: string) => void
+}) {
+  return (
+    <nav
+      className="flex flex-wrap gap-2"
+      aria-label="Secciones del formulario"
+    >
+      {secciones.map((seccion, index) => (
+        <button
+          key={seccion.id}
+          type="button"
+          onClick={() => onSelect(seccion.id)}
+          aria-current={activa === seccion.id ? 'step' : undefined}
+          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+            seccion.ok
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+          } ${activa === seccion.id ? 'ring-2 ring-sky-300' : ''}`}
+        >
+          {index + 1}. {seccion.label}
+        </button>
+      ))}
+    </nav>
+  )
+}
+
+function FormProgress({
+  secciones,
+  completadas,
+}: {
+  secciones: Array<{ label: string; ok: boolean }>
+  completadas: number
+}) {
+  return (
+    <div
+      className="rounded-xl border border-[#e0e3e5] bg-white p-3 shadow-sm"
+      aria-label="Progreso del formulario"
+    >
+      <div className="mb-2 flex items-center justify-between text-xs font-semibold text-slate-600">
+        <span>Progreso de la propuesta</span>
+        <span className="text-[#00658d]">
+          {completadas}/{secciones.length} secciones completas
+        </span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+        <div
+          className="h-full rounded-full bg-[#00658d] transition-all"
+          style={{ width: `${(completadas / secciones.length) * 100}%` }}
+        />
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {secciones.map((seccion) => (
+          <span
+            key={seccion.label}
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+              seccion.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+            }`}
+          >
+            <span className="material-symbols-outlined text-xs">
+              {seccion.ok ? 'check_circle' : 'radio_button_unchecked'}
+            </span>
+            {seccion.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function FormSection({
+  id,
   number,
   title,
   icon,
+  open,
+  completed,
+  onToggle,
+  onContinue,
+  onBack,
   children,
 }: {
+  id?: string
   number: number
   title: string
   icon: React.ReactNode
+  open: boolean
+  completed: boolean
+  onToggle: () => void
+  onContinue?: () => void
+  onBack?: () => void
   children: React.ReactNode
 }) {
   return (
-    <FieldSet className="rounded-xl bg-white p-4 shadow-[0px_4px_20px_rgba(0,0,0,0.04)] sm:p-6">
+    <FieldSet
+      id={id}
+      className="scroll-mt-24 rounded-xl bg-white p-4 shadow-[0px_4px_20px_rgba(0,0,0,0.04)] sm:p-6"
+    >
       <div className="flex items-center gap-2 border-b border-[#e0e3e5] pb-2">
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#00658d] text-sm font-bold text-white">
-          {number}
+        <span
+          className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold text-white ${
+            completed ? 'bg-emerald-600' : 'bg-[#00658d]'
+          }`}
+        >
+          {completed ? '✓' : number}
         </span>
         <span className="text-[#00658d]">{icon}</span>
-        <FieldLegend className="font-heading text-lg font-bold text-[#191c1e]">
+        <FieldLegend className="font-heading flex-1 text-lg font-bold text-[#191c1e]">
           {title}
         </FieldLegend>
+        <span
+          className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+            completed ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+          }`}
+        >
+          {completed ? 'Completa' : 'Pendiente'}
+        </span>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          aria-label={open ? `Cerrar ${title}` : `Abrir ${title}`}
+          className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100"
+        >
+          <span className="material-symbols-outlined text-xl">
+            {open ? 'expand_less' : 'expand_more'}
+          </span>
+        </button>
       </div>
-      {children}
+      <div className={open ? 'flex flex-col gap-4 pt-4' : 'hidden'}>{children}</div>
+      {open && (onContinue !== undefined || onBack !== undefined) ? (
+        <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
+          {onBack ? (
+            <Button type="button" variant="outline" onClick={onBack}>
+              Volver
+            </Button>
+          ) : (
+            <span />
+          )}
+          {onContinue ? (
+            <Button type="button" onClick={onContinue}>
+              Continuar
+              <span className="material-symbols-outlined text-lg">arrow_forward</span>
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
     </FieldSet>
   )
 }
@@ -892,6 +1184,7 @@ function TextField({
   error,
   description,
   type,
+  required = false,
   inputProps,
 }: {
   id: string
@@ -899,12 +1192,23 @@ function TextField({
   error: RhfFieldError | undefined
   description?: string
   type?: ComponentProps<typeof Input>['type']
+  required?: boolean
   inputProps: ComponentProps<typeof Input>
 }) {
   return (
     <Field data-invalid={error !== undefined}>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <Input id={id} type={type} aria-invalid={error !== undefined} {...inputProps} />
+      <FieldLabel htmlFor={id}>
+        {label}
+        {required ? <span className="text-destructive"> *</span> : null}
+      </FieldLabel>
+      <Input
+        id={id}
+        type={type}
+        aria-label={label}
+        aria-required={required}
+        aria-invalid={error !== undefined}
+        {...inputProps}
+      />
       {description === undefined ? null : <FieldDescription>{description}</FieldDescription>}
       <FieldError>{error?.message}</FieldError>
     </Field>
@@ -926,6 +1230,14 @@ function imagenError(
   const arrayErrors = errors as Array<Record<string, RhfFieldError> | undefined> | undefined
 
   return arrayErrors?.[index]?.url
+}
+
+/** Error del array completo, por ejemplo cuando no se cargó ninguna imagen. */
+function imagenArrayError(errors: unknown): string | undefined {
+  if (typeof errors !== 'object' || errors === null) return undefined
+  const root = (errors as { root?: { message?: string } }).root
+  if (root?.message) return root.message
+  return (errors as { message?: string }).message
 }
 
 function disponibilidadError(

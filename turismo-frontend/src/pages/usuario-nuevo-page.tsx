@@ -5,18 +5,20 @@ import { toast } from 'sonner'
 import { useCrearUsuario } from '@/api/usuarios'
 import { UsuarioForm } from '@/components/usuario-form'
 import { toUserMessage } from '@/lib/http'
-import { toUsuarioRequest, type UsuarioFormValues } from '@/lib/schemas'
+import { toUsuarioRequest, type RegistroFormValues } from '@/lib/schemas'
 
 export function UsuarioNuevoPage() {
   const navigate = useNavigate()
   const crear = useCrearUsuario()
   const [serverError, setServerError] = useState<string | null>(null)
 
-  const defaultValues: UsuarioFormValues = {
+  const defaultValues: RegistroFormValues = {
     nombre: '',
-    apellido: '',
     email: '',
+    telefono: '',
     rol: 'TURISTA',
+    contrasena: '',
+    confirmarContrasena: '',
   }
 
   return (
@@ -25,7 +27,7 @@ export function UsuarioNuevoPage() {
         <div className="flex items-center gap-2">
           <span className="cursor-pointer hover:text-sky-700">Usuarios</span>
           <span className="material-symbols-outlined text-sm">chevron_right</span>
-          <span className="font-medium text-sky-700">Nuevo Registro</span>
+          <span className="font-medium text-sky-700">Nuevo registro</span>
         </div>
       </div>
 
@@ -33,13 +35,14 @@ export function UsuarioNuevoPage() {
         <div className="relative bg-gradient-to-r from-[#5ab2e6] to-[#3a97cf] p-6 text-white sm:p-8">
           <div className="max-w-md">
             <span className="mb-2 inline-block rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider backdrop-blur-sm">
-              Alta de Usuario
+              Alta de usuario
             </span>
-            <h2 className="font-heading text-xl font-extrabold tracking-tight sm:text-2xl">Crear credencial en el sistema</h2>
-            <p className="mt-1 text-xs text-sky-50 sm:text-sm">Completa los datos personales y asigna los permisos operativos correspondientes.</p>
-          </div>
-          <div className="pointer-events-none absolute right-6 top-6 hidden opacity-15 sm:block">
-            <span className="material-symbols-outlined text-7xl">person_add</span>
+            <h2 className="font-heading text-xl font-extrabold tracking-tight sm:text-2xl">
+              Registrar usuario
+            </h2>
+            <p className="mt-1 text-xs text-sky-50 sm:text-sm">
+              Crea una cuenta turista con contraseña. Los roles Publicador/Admin se asignan aparte.
+            </p>
           </div>
         </div>
 
@@ -48,12 +51,13 @@ export function UsuarioNuevoPage() {
             defaultValues={defaultValues}
             isPending={crear.isPending}
             serverError={serverError}
+            submitLabel="Guardar usuario"
             onCancel={() => navigate('/usuarios')}
             onSubmit={(values) => {
               setServerError(null)
               crear.mutate(toUsuarioRequest(values), {
                 onSuccess: () => {
-                  toast.success('¡Usuario registrado con éxito en el sistema!')
+                  toast.success('¡Usuario registrado con éxito!')
                   navigate('/usuarios')
                 },
                 onError: (error) => setServerError(toUserMessage(error)),
@@ -61,11 +65,6 @@ export function UsuarioNuevoPage() {
             }}
           />
         </div>
-      </div>
-
-      <div className="w-full max-w-2xl text-center text-xs text-muted-foreground">
-        <span className="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-700 ring-1 ring-amber-200">Plantilla frontend</span>{' '}
-        Los datos se guardan en mock local hasta conectar el backend (<code>/api/usuarios</code>).
       </div>
     </div>
   )

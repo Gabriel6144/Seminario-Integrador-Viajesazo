@@ -11,29 +11,24 @@ import type { ViajeBorradorRequest, ViajeRequest, ViajeResponse } from '@/types/
 
 export const PAGE_SIZE = 20
 
-export function useBorradores(usuario: string, page: number) {
+/** Listado del turista autenticado: el JWT identifica al usuario (sin `?usuario=`). */
+export function useBorradores(page: number, enabled = true) {
   return useQuery({
     queryKey: queryKeys.borradores(page, PAGE_SIZE),
     queryFn: ({ signal }) =>
-      getPage<ViajeResponse>(
-        `/api/viajes/borradores${pageParams(page, PAGE_SIZE)}&usuario=${encodeURIComponent(usuario)}`,
-        signal,
-      ),
+      getPage<ViajeResponse>(`/api/viajes/borradores${pageParams(page, PAGE_SIZE)}`, signal),
     placeholderData: keepPreviousData,
-    enabled: usuario.trim().length > 0,
+    enabled,
   })
 }
 
-export function useViajes(usuario: string, page: number) {
+export function useViajes(page: number, enabled = true) {
   return useQuery({
     queryKey: queryKeys.viajes(page, PAGE_SIZE),
     queryFn: ({ signal }) =>
-      getPage<ViajeResponse>(
-        `/api/viajes${pageParams(page, PAGE_SIZE)}&usuario=${encodeURIComponent(usuario)}`,
-        signal,
-      ),
+      getPage<ViajeResponse>(`/api/viajes${pageParams(page, PAGE_SIZE)}`, signal),
     placeholderData: keepPreviousData,
-    enabled: usuario.trim().length > 0,
+    enabled,
   })
 }
 

@@ -53,6 +53,9 @@ class AgendaSemanalTest {
 	@Mock
 	private GeocodingService geocodingService;
 
+	@Mock
+	private NotificacionService notificacionService;
+
 	@Test
 	@DisplayName("un miércoles consulta desde hoy hasta el domingo de esa semana")
 	void weekFromWednesday() {
@@ -155,7 +158,7 @@ class AgendaSemanalTest {
 	private PropuestaService serviceAt(String today) {
 		Clock fixed = Clock.fixed(LocalDate.parse(today).atStartOfDay(ZONE).toInstant(), ZONE);
 		return new PropuestaService(eventoRepository, publicadorRepository, estadoPropuestaRepository, ubicacionRepository, fixed, new EventoMapperImpl(),
-				geocodingService);
+				geocodingService, notificacionService);
 	}
 
 	private Evento testEvent() {

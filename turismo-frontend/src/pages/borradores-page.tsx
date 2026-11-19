@@ -15,7 +15,6 @@ import { Button } from '@/components/ui/button'
 import { usePageParam } from '@/lib/use-page-param'
 import type { ViajeResponse } from '@/types/api'
 
-const USUARIO_DEMO = 'turista_demo'
 const VIAJES_VACIOS: ViajeResponse[] = []
 
 type FiltroViaje = 'TODOS' | 'BORRADORES' | 'CONFIRMADOS'
@@ -35,7 +34,7 @@ function normalizarTexto(texto: string): string {
 
 export function BorradoresPage() {
   const [page, setPage] = usePageParam()
-  const query = useViajes(USUARIO_DEMO, page)
+  const query = useViajes(page)
   const descartar = useDescartarBorrador()
   const [borradorADescartarId, setBorradorADescartarId] = useState<number | null>(null)
   const [filtroEstado, setFiltroEstado] = useState<FiltroViaje>('TODOS')

@@ -8,39 +8,54 @@ import { server } from '@/test/server'
 import { user } from '@/test/utils'
 
 /**
- * El mapa usa Leaflet directo (imperativo), que en jsdom revienta. Se mockea igual que en
- * `evento-mapa.test.tsx`: las fábricas devuelven objetos encadenables y el callback de `dragend`
- * se guarda para poder simular el arrastre del pin.
+ * El mapa usa MapLibre directo (imperativo), que en jsdom no tiene WebGL. Se mockea con fábricas
+ * encadenables y se guarda el callback de `dragend` para simular el arrastre del pin.
  */
-const leaflet = vi.hoisted(() => {
+const maplibre = vi.hoisted(() => {
   const handlers: Record<string, () => void> = {}
+  const mapCalls: unknown[] = []
 
   const marker = {
+    setLngLat: vi.fn(),
     addTo: vi.fn(),
     on: vi.fn(),
-    getLatLng: vi.fn(() => ({ lat: -31.42, lng: -64.19 })),
-    setLatLng: vi.fn(),
+    getLngLat: vi.fn(() => ({ lat: -31.42, lng: -64.19 })),
+    remove: vi.fn(),
   }
+  marker.setLngLat.mockReturnValue(marker)
   marker.addTo.mockReturnValue(marker)
   marker.on.mockImplementation((event: string, callback: () => void) => {
     handlers[event] = callback
     return marker
   })
 
-  const map = { setView: vi.fn(), remove: vi.fn() }
-  map.setView.mockReturnValue(map)
+  const map = {
+    jumpTo: vi.fn(),
+    remove: vi.fn(),
+    on: vi.fn((event: string, callback: () => void) => {
+      handlers[event] = callback
+      return map
+    }),
+    setStyle: vi.fn(),
+    easeTo: vi.fn(),
+  }
 
-  const tileLayer = { addTo: vi.fn() }
-
-  return { handlers, marker, map, tileLayer }
+  return { handlers, marker, map, mapCalls }
 })
 
-vi.mock('leaflet', () => ({
-  default: {
-    map: vi.fn(() => leaflet.map),
-    tileLayer: vi.fn(() => leaflet.tileLayer),
-    marker: vi.fn(() => leaflet.marker),
+vi.mock('maplibre-gl', () => ({
+  Map: class {
+    constructor(...args: unknown[]) {
+      maplibre.mapCalls.push(args[0])
+      return maplibre.map
+    }
   },
+  Marker: class {
+    constructor() {
+      return maplibre.marker
+    }
+  },
+  setWorkerUrl: vi.fn(),
 }))
 
 /**
@@ -99,7 +114,9 @@ describe('UbicacionSelector', () => {
     expect(
       await screen.findByRole('img', { name: 'Mapa de la ubicación elegida' }),
     ).toBeInTheDocument()
-    expect(leaflet.map.setView).toHaveBeenCalledWith([-30.9816, -64.0959], 15)
+    expect(maplibre.mapCalls[0]).toEqual(
+      expect.objectContaining({ center: [-64.0959, -30.9816], zoom: 15 }),
+    )
   })
 
   it('busca en Nominatim y lista los resultados', async () => {
@@ -155,6 +172,24 @@ describe('UbicacionSelector', () => {
     ).toBeInTheDocument()
   })
 
+  it('permite cambiar el estilo y alternar entre 2D y 3D', async () => {
+    render(<Harness />)
+    await buscar('anfiteatro')
+    await user().click(await screen.findByText('Anfiteatro José Hernández'))
+    await screen.findByRole('img', { name: 'Mapa de la ubicación elegida' })
+
+    await user().click(screen.getByRole('combobox', { name: 'Estilo del mapa' }))
+    await user().click(await screen.findByRole('option', { name: 'Dark' }))
+    expect(maplibre.map.setStyle).toHaveBeenCalledWith(
+      'https://tiles.openfreemap.org/styles/dark',
+    )
+
+    await user().click(screen.getByRole('button', { name: /Ver en 2D/i }))
+    expect(maplibre.map.easeTo).toHaveBeenCalledWith(
+      expect.objectContaining({ pitch: 0, bearing: 0 }),
+    )
+  })
+
   it('al mover el pin hace geocoding inverso y actualiza la dirección', async () => {
     render(<Harness />)
     await buscar('anfiteatro')
@@ -162,7 +197,7 @@ describe('UbicacionSelector', () => {
     await screen.findByRole('img', { name: 'Mapa de la ubicación elegida' })
 
     // El callback de `dragend` lo registra el componente al montar el mapa; se dispara a mano.
-    leaflet.handlers.dragend()
+    maplibre.handlers.dragend()
 
     await waitFor(() =>
       expect(screen.getByTestId('direccion')).toHaveTextContent('Cleto Peña'),

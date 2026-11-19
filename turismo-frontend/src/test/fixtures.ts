@@ -1,9 +1,11 @@
 import type {
+  AdminDashboardResponse,
   AlternativasReemplazoResponse,
   CircuitoSeleccionadoResponse,
   EventoResponse,
   GeneracionCircuitoResponse,
   Page,
+  PropuestaInscriptosResponse,
   PublicadorResponse,
   ViajeResponse,
 } from '@/types/api'
@@ -106,7 +108,7 @@ export const GASTRONOMIA_ESTANCIA: EventoResponse = {
   descripcion:
     'Recorrido patrimonial guiado por templos, claustros y museos fundacionales de la Manzana Jesuítica.',
   categoria: 'CULTURA',
-  tipoPropuesta: 'VISITA_GUIADA',
+  tipoPropuesta: 'JORNADA',
   modalidad: 'PEDESTRE',
   // Arancelado a propósito: es el único fixture que ejercita el bloque de arancel del detalle.
   tipoAcceso: 'DE_PAGO',
@@ -122,8 +124,7 @@ export const GASTRONOMIA_ESTANCIA: EventoResponse = {
   fechaInicio: '2026-10-05',
   fechaFin: '2026-10-05',
   horarioInicio: '12:30:00',
-  // Solo hora de inicio: el backend no obliga a informar la de fin.
-  horarioFin: null,
+  horarioFin: '15:00:00',
   imagenes: ['https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Manzana_Jesuitica_Cordoba.jpg/1200px-Manzana_Jesuitica_Cordoba.jpg'],
   publicadorId: 1,
   publicadorNombre: 'Turismo Córdoba',
@@ -241,9 +242,11 @@ export const BORRADORES: ViajeResponse[] = [
     fechaFin: '2026-11-03',
     ritmo: 'EQUILIBRADO',
     interesesCategoria: ['NATURALEZA'],
+    diasPlan: [],
     estado: 'BORRADOR',
     pasoActual: 4,
-    usuario: 'turista_demo',
+    usuarioId: 1,
+    usuarioEmail: 'turista@test.com',
   },
   {
     id: 2,
@@ -260,9 +263,11 @@ export const BORRADORES: ViajeResponse[] = [
     fechaFin: '2026-12-07',
     ritmo: 'TRANQUILO',
     interesesCategoria: ['CULTURA', 'GASTRONOMIA'],
+    diasPlan: [],
     estado: 'PLANIFICADO',
     pasoActual: 8,
-    usuario: 'turista_demo',
+    usuarioId: 1,
+    usuarioEmail: 'turista@test.com',
   },
 ]
 
@@ -348,6 +353,7 @@ export const CIRCUITO: GeneracionCircuitoResponse = {
       afinidadIntereses: 0.87,
       categoriasCubiertas: ['CULTURA', 'MUSICA'],
       advertencia: null,
+      // Fechas alineadas al viaje 2 (2026-12-05..07) para que el detalle arme días vacíos.
       propuestas: [
         {
           itemId: 101,
@@ -356,7 +362,7 @@ export const CIRCUITO: GeneracionCircuitoResponse = {
           descripcion: 'La mayor fiesta de la tradición gaucha y música folklórica.',
           categoria: 'MUSICA',
           tipo: 'EVENTO',
-          fecha: '2026-11-01',
+          fecha: '2026-12-05',
           orden: 1,
           horaInicio: '20:00:00',
           horaFin: '23:30:00',
@@ -365,6 +371,34 @@ export const CIRCUITO: GeneracionCircuitoResponse = {
           disponible: true,
           motivoNoDisponible: null,
           imagenes: ['https://example.com/circuito.jpg'],
+          ciudad: 'Córdoba',
+          localidad: 'Centro',
+          direccion: 'Av. Colón 100',
+          lugarRecinto: 'Centro',
+          latitud: -31.42,
+          longitud: -64.18,
+          tipoAcceso: 'GRATUITO',
+          montoEstimado: null,
+          descripcionArancel: null,
+          sitioOficial: null,
+          duracionMinutos: 120,
+        },
+        {
+          itemId: 301,
+          propuestaId: 3,
+          propuestaNombre: 'Circuito Peatonal Histórico Córdoba Jesuítica',
+          descripcion: 'Recorrido patrimonial guiado por templos y museos fundacionales.',
+          categoria: 'HISTORIA',
+          tipo: 'EVENTO',
+          fecha: '2026-12-07',
+          orden: 1,
+          horaInicio: '09:00:00',
+          horaFin: '11:00:00',
+          trasladoKm: 0,
+          trasladoMinutos: 0,
+          disponible: true,
+          motivoNoDisponible: null,
+          imagenes: [],
           ciudad: 'Córdoba',
           localidad: 'Centro',
           direccion: 'Av. Colón 100',
@@ -490,3 +524,46 @@ export const CIRCUITO_SELECCIONADO: CircuitoSeleccionadoResponse = {
     },
   ],
 }
+
+/** Respuesta de ejemplo de `GET /api/admin/dashboard`. */
+export const ADMIN_DASHBOARD: AdminDashboardResponse = {
+  totalUsuarios: 12,
+  usuariosActivos7d: 5,
+  usuariosActivos30d: 9,
+  nuevosRegistros7d: 2,
+  nuevosRegistros30d: 4,
+  totalTuristas: 8,
+  totalPublicadores: 3,
+  viajesCreados7d: 3,
+  viajesCreados30d: 7,
+  propuestasPopulares: [
+    {
+      propuestaId: 1,
+      nombre: 'Festival de Doma y Folklore de Jesús María',
+      tipo: 'EVENTO',
+      inscriptos: 4,
+    },
+    {
+      propuestaId: 2,
+      nombre: 'Semana Gastronómica de las Sierras Chicas',
+      tipo: 'EVENTO',
+      inscriptos: 2,
+    },
+  ],
+}
+
+/** Respuesta de ejemplo de `GET /api/publicador/inscriptos`. */
+export const PUBLICADOR_INSCRIPTOS: PropuestaInscriptosResponse[] = [
+  {
+    propuestaId: 1,
+    nombre: 'Festival de Doma y Folklore de Jesús María',
+    tipo: 'EVENTO',
+    inscriptos: 4,
+  },
+  {
+    propuestaId: 2,
+    nombre: 'Semana Gastronómica de las Sierras Chicas',
+    tipo: 'EVENTO',
+    inscriptos: 2,
+  },
+]

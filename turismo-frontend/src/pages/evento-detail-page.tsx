@@ -301,7 +301,7 @@ export function EventoDetailPage() {
 function Volver() {
   return (
     <Button asChild variant="ghost" size="sm" className="self-start">
-      <Link to="/">
+      <Link to="/propuestas">
         <ArrowLeftIcon className="h-4 w-4" aria-hidden />
         Volver al listado
       </Link>

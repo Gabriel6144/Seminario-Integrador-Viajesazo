@@ -3,7 +3,6 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { useActividad, useActualizarActividad } from '@/api/actividades'
-import { PUBLICADORES_MAX_SIZE, usePublicadores } from '@/api/publicadores'
 import { EventoForm } from '@/components/evento-form'
 import { ErrorState } from '@/components/query-state'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -24,40 +23,16 @@ export function ActividadEditarPage() {
 
   const actividad = useActividad(id)
   const actualizar = useActualizarActividad()
-  const publicadores = usePublicadores(0, PUBLICADORES_MAX_SIZE)
 
   if (id === null) return <IdInvalido />
 
-  if (actividad.isPending || publicadores.isPending) return <FormSkeleton />
+  if (actividad.isPending) return <FormSkeleton />
 
   if (actividad.isError) {
     return (
       <div className="flex flex-col gap-4">
         <Volver />
         <ErrorState error={actividad.error} />
-      </div>
-    )
-  }
-
-  if (publicadores.isError) {
-    return (
-      <div className="flex flex-col gap-4">
-        <Volver />
-        <ErrorState error={publicadores.error} />
-      </div>
-    )
-  }
-
-  if (publicadores.data.content.length === 0) {
-    return (
-      <div className="flex flex-col gap-4">
-        <Volver />
-        <Alert>
-          <AlertTitle>No hay publicadores cargados</AlertTitle>
-          <AlertDescription>
-            Sin publicadores no se puede guardar la actividad, porque el publicador es obligatorio.
-          </AlertDescription>
-        </Alert>
       </div>
     )
   }
@@ -75,7 +50,6 @@ export function ActividadEditarPage() {
 
       <EventoForm
         defaultValues={toActividadFormValues(actual)}
-        publicadores={publicadores.data.content}
         tipoFijo="ACTIVIDAD"
         submitLabel="Guardar cambios"
         cancelTo={`/actividades/${id}`}
@@ -107,7 +81,7 @@ export function ActividadEditarPage() {
 function Volver() {
   return (
     <Button asChild variant="ghost" size="sm" className="self-start">
-      <Link to="/">Volver al listado</Link>
+      <Link to="/propuestas">Volver al listado</Link>
     </Button>
   )
 }

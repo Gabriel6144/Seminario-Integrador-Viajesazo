@@ -13,7 +13,7 @@ Un solo repositorio con dos proyectos independientes:
 
 | Carpeta | Qué es | Stack |
 | --- | --- | --- |
-| [`turismo-backend/`](./turismo-backend) | API REST | Java 21, Spring Boot 4.1.1, Spring Data JPA, H2, MapStruct, Maven |
+| [`turismo-backend/`](./turismo-backend) | API REST | Java 17 (JDK 21 OK), Spring Boot 4.1.1, Spring Security (JWT), Spring Data JPA, H2, MapStruct, Maven |
 | [`turismo-frontend/`](./turismo-frontend) | Cliente web | React 19, TypeScript, Vite, TanStack Query, React Hook Form + Zod, shadcn/ui, Vitest |
 
 Cada proyecto tiene su propio `AGENTS.md` con las decisiones técnicas y las trampas de su
@@ -86,27 +86,32 @@ defaults de Spring Data en vez de la configuración del proyecto.
   única, ventana horaria, snapshot y la trampa de orden de los ítems.
 - [`docs/PRUEBAS-MANUALES-POSTMAN.md`](./docs/PRUEBAS-MANUALES-POSTMAN.md) — flujo completo de
   viajes y circuitos para probar desde Postman.
+- [`docs/seguridad/AUTENTICACION-Y-AUTORIZACION.md`](./docs/seguridad/AUTENTICACION-Y-AUTORIZACION.md)
+  — JWT, roles, ownership y procedimiento de asignación de `PUBLICADOR`/`ADMINISTRADOR`.
 
 ## Estado y limitaciones conocidas
 
-- **No hay autenticación.** Cualquiera que abra la app puede crear, editar y borrar. Es la
-  limitación del alcance del Sprint 1, no una decisión de diseño.
-- **Los publicadores solo se dan de alta**: la API no expone `PUT` ni `DELETE` para ellos.
-- **Los viajes se asocian al turista por `usuario` (String), no por un `turistaId` ni una entidad
-  `Usuario`.** Es la deuda del Sprint 2: "asociar al turista" se resuelve con el identificador en
-  texto hasta que exista autenticación. La baja de viajes es **lógica** (`estado=CANCELADO`), a
-  diferencia de la de eventos, que es física.
+- **Hay autenticación propia** (email + password, JWT access + refresh opaco en cookie HttpOnly,
+  RBAC multi-rol y ABAC por ownership). Detalle en
+  [`docs/seguridad/AUTENTICACION-Y-AUTORIZACION.md`](./docs/seguridad/AUTENTICACION-Y-AUTORIZACION.md).
+  Credenciales del seed **no** van en este README.
+- **Lecturas del catálogo** (agenda, eventos, propuestas, publicadores) siguen públicas; las
+  escrituras y los viajes requieren sesión.
+- **Los viajes pertenecen al usuario autenticado** (`Viaje.usuario` → `@ManyToOne Usuario`). El
+  administrador **no** tiene bypass sobre viajes ajenos.
+- **Los publicadores solo se dan de alta** (solo `ADMINISTRADOR`): la API no expone `PUT` ni
+  `DELETE` para ellos.
 - El selector de publicadores del formulario pide `?size=100`, que es el tope configurado en el
   backend. Con más de 100 publicadores hay que agregarle búsqueda o paginación.
-- El mensaje de email duplicado confirma si un email está registrado, lo que habilita enumerar
-  publicadores. Con autenticación conviene responder un 409 genérico.
+- El mensaje de email duplicado confirma si un email está registrado (enumeración). Mejorable a
+  un 409 genérico.
 - Los datos de H2 son efímeros. Para una demo con datos cargados hay que sembrar por script o
   cambiar a `jdbc:h2:file:./data/turismo` con `ddl-auto=update`.
 
 ## Sprints siguientes
 
-`Usuario`, `Preferencia` y la edición manual de circuitos (VZ-27). La generación y selección de
-circuitos ya existe (VZ-25), con distancias estimadas por Haversine; regenerar, reordenar paradas
-o editar el itinerario todavía no. La baja de eventos es física, así que cuando exista un
-itinerario editable hay que decidir si el `DELETE` valida los circuitos asociados: hoy no lo hace
-y dejaría referencias colgantes.
+`Preferencia` y la edición manual de circuitos (VZ-27). La generación y selección de circuitos ya
+existe (VZ-25), con distancias estimadas por Haversine; regenerar, reordenar paradas o editar el
+itinerario todavía no. La baja de eventos es física, así que cuando exista un itinerario editable
+hay que decidir si el `DELETE` valida los circuitos asociados: hoy no lo hace y dejaría
+referencias colgantes.

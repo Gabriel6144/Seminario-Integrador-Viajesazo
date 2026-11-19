@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   EVENTO_FORM_DEFAULT,
+  actividadSchema,
   eventoSchema,
   publicadorSchema,
   toEventoFormValues,
@@ -24,15 +25,19 @@ function formValido(overrides: Partial<EventoFormValues> = {}): EventoFormValues
   return {
     ...EVENTO_FORM_DEFAULT,
     nombre: 'Festival de Folklore',
+    descripcion: 'Encuentro de Syrigamis',
     categoria: 'CULTURA',
     tipoPropuesta: 'FESTIVAL',
     modalidad: 'PEDESTRE',
+    tipoAcceso: 'GRATUITO',
     lugarRecinto: 'Anfiteatro José Hernández',
     localidad: 'Jesús María',
     direccion: 'Av. San Martín 100',
     fechaInicio: '2026-10-01',
     fechaFin: '2026-10-04',
-    publicadorId: '1',
+    horarioInicio: '20:00',
+    horarioFin: '23:00',
+    imagenes: [{ url: 'https://cdn.test/evento.jpg' }],
     ...overrides,
   }
 }
@@ -44,7 +49,7 @@ describe('eventoSchema', () => {
     expect(resultado.success).toBe(true)
   })
 
-  it('exige nombre, categoría, tipo de propuesta, modalidad, fechas y publicador', () => {
+  it('exige nombre, descripción, categoría, tipo de propuesta, fechas, horarios, imagen y publicador', () => {
     const resultado = eventoSchema.safeParse(EVENTO_FORM_DEFAULT)
 
     expect(resultado.success).toBe(false)
@@ -54,12 +59,15 @@ describe('eventoSchema', () => {
     expect(campos).toEqual(
       expect.arrayContaining([
         'nombre',
+        'descripcion',
         'categoria',
         'tipoPropuesta',
-        'modalidad',
+        'tipoAcceso',
         'fechaInicio',
         'fechaFin',
-        'publicadorId',
+        'horarioInicio',
+        'horarioFin',
+        'imagenes',
       ]),
     )
   })
@@ -94,16 +102,13 @@ describe('eventoSchema', () => {
     )
   })
 
-  it('no compara horarios si falta alguno de los dos', () => {
-    // El backend solo compara cuando ambos vienen informados (`validateRange` tiene un
-    // `&&`). Reclamar más que la API haría que un formulario rechace algo que el servidor
-    // acepta, que es peor que dejar pasar algo.
+  it('exige ambos horarios', () => {
     expect(
       eventoSchema.safeParse(formValido({ horarioInicio: '', horarioFin: '19:00' })).success,
-    ).toBe(true)
+    ).toBe(false)
     expect(
       eventoSchema.safeParse(formValido({ horarioInicio: '20:00', horarioFin: '' })).success,
-    ).toBe(true)
+    ).toBe(false)
   })
 
   it('rechaza una fila de imagen agregada y dejada en blanco', () => {
@@ -114,14 +119,34 @@ describe('eventoSchema', () => {
     expect(resultado.error.issues[0]?.message).toBe('Ingresá la URL o quitá la fila.')
   })
 
-  it('acepta una lista de imágenes vacía', () => {
-    // Vacía no es lo mismo que inválida: `[]` es lo que borra las imágenes del evento.
-    expect(eventoSchema.safeParse(formValido({ imagenes: [] })).success).toBe(true)
+  it('exige al menos una imagen', () => {
+    const resultado = eventoSchema.safeParse(formValido({ imagenes: [] }))
+
+    expect(resultado.success).toBe(false)
+    if (resultado.success) return
+    expect(resultado.error.issues[0]?.message).toBe(
+      'Cargá al menos una imagen para el evento.',
+    )
   })
 
-  it('rechaza un publicador que no es un entero positivo', () => {
-    expect(eventoSchema.safeParse(formValido({ publicadorId: '0' })).success).toBe(false)
-    expect(eventoSchema.safeParse(formValido({ publicadorId: 'abc' })).success).toBe(false)
+  it('rechaza VISITA_GUIADA en un evento', () => {
+    const resultado = eventoSchema.safeParse(formValido({ tipoPropuesta: 'VISITA_GUIADA' }))
+
+    expect(resultado.success).toBe(false)
+    if (resultado.success) return
+    expect(resultado.error.issues[0]?.message).toBe(
+      'El tipo de propuesta no es compatible con este subtipo.',
+    )
+  })
+
+  it('la actividad solo acepta VISITA_GUIADA y DEPORTIVO', () => {
+    const base: EventoFormValues = {
+      ...formValido({ tipoPropuesta: 'VISITA_GUIADA' }),
+      duracionMinutos: '90',
+    }
+    expect(actividadSchema.safeParse(base).success).toBe(true)
+    expect(actividadSchema.safeParse({ ...base, tipoPropuesta: 'DEPORTIVO' }).success).toBe(true)
+    expect(actividadSchema.safeParse({ ...base, tipoPropuesta: 'FESTIVAL' }).success).toBe(false)
   })
 
   it('exige el lugar, la ciudad y la dirección, que son la base del geocoding', () => {
@@ -158,6 +183,16 @@ describe('eventoSchema', () => {
     expect(campos).toEqual(expect.arrayContaining(['montoEstimado', 'sitioOficial']))
   })
 
+  it('exige elegir el tipo de acceso', () => {
+    const resultado = eventoSchema.safeParse(formValido({ tipoAcceso: '' }))
+
+    expect(resultado.success).toBe(false)
+    if (resultado.success) return
+    expect(resultado.error.issues.some((issue) => issue.message === 'Elegí el tipo de acceso.')).toBe(
+      true,
+    )
+  })
+
   it('no exige el arancel si el evento es gratuito', () => {
     expect(eventoSchema.safeParse(formValido({ tipoAcceso: 'GRATUITO' })).success).toBe(true)
   })
@@ -190,21 +225,22 @@ describe('eventoSchema', () => {
 })
 
 describe('toEventoRequest', () => {
-  it('convierte los opcionales vacíos en null y no en cadena vacía', () => {
-    // La trampa principal del CRUD: un input sin llenar es `""`, y `""` no es "sin valor" —
-    // se guardaría como cadena vacía en la base. (Medido contra la API real: Jackson coerciona
-    // `""` a `null` en `LocalDate` y `LocalTime`, así que mandarlo no rompe igual, pero el
-    // `LocalTime` sin `@NotNull` se guarda vacío con 201 y eso tampoco es lo que el usuario
-    // quiso al dejar el campo en blanco.)
+  it('recorta descripción y horarios y convierte la modalidad vacía en null', () => {
     const request = toEventoRequest(
-      formValido({ descripcion: '   ', horarioInicio: '', imagenes: [] }),
+      formValido({
+        descripcion: '  Texto con espacios  ',
+        horarioInicio: ' 20:00 ',
+        horarioFin: ' 23:00 ',
+        modalidad: '',
+      }),
     )
 
-    expect(request.descripcion).toBeNull()
-    expect(request.horarioInicio).toBeNull()
+    expect(request.descripcion).toBe('Texto con espacios')
+    expect(request.horarioInicio).toBe('20:00')
+    expect(request.horarioFin).toBe('23:00')
+    expect(request.modalidad).toBeNull()
     expect(request.categoria).toBe('CULTURA')
     expect(request.tipoPropuesta).toBe('FESTIVAL')
-    expect(request.modalidad).toBe('PEDESTRE')
   })
 
   it('manda el tipo de acceso elegido y limpia el arancel de un evento gratuito', () => {
@@ -258,17 +294,15 @@ describe('toEventoRequest', () => {
     expect(request.imagenes).toEqual([])
   })
 
-  it('convierte el publicador a número y los selectores de categoría, propuesta y modalidad a sus enums', () => {
+  it('convierte los selectores de categoría, propuesta y modalidad a sus enums', () => {
     const request = toEventoRequest(
       formValido({
-        publicadorId: '3',
         categoria: 'CULTURA',
         tipoPropuesta: 'FESTIVAL',
         modalidad: 'PEDESTRE',
       }),
     )
 
-    expect(request.publicadorId).toBe(3)
     expect(request.categoria).toBe('CULTURA')
     expect(request.tipoPropuesta).toBe('FESTIVAL')
     expect(request.modalidad).toBe('PEDESTRE')
@@ -336,7 +370,6 @@ describe('toEventoFormValues', () => {
       horarioInicio: '20:00',
       horarioFin: '23:30',
       imagenes: FOLKLORE.imagenes,
-      publicadorId: FOLKLORE.publicadorId,
     })
   })
 })

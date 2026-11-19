@@ -72,6 +72,19 @@ export const CATEGORIA_LABELS: Record<Categoria, string> = {
   FAMILIAR_Y_RELAX: 'Familiar y relax',
 }
 
+/** Texto breve para ayudar a elegir la categoría en el formulario. */
+export const CATEGORIA_DESCRIPCIONES: Record<Categoria, string> = {
+  NATURALEZA: 'Aire libre, paisajes y ecoturismo.',
+  GASTRONOMIA: 'Sabores, ferias y experiencias culinarias.',
+  CULTURA: 'Arte, música, teatro y tradiciones.',
+  HISTORIA: 'Patrimonio, museos y sitios históricos.',
+  AVENTURA: 'Trekking, escalada y deportes de riesgo.',
+  VIDA_NOCTURNA: 'Bares, peñas y propuestas nocturnas.',
+  MUSICA: 'Recitales, festivales y música en vivo.',
+  COMPRAS: 'Artesanías, ferias y productos locales.',
+  FAMILIAR_Y_RELAX: 'Planes para toda la familia y descanso.',
+}
+
 export const TIPOS_REGISTRO = ['EVENTO', 'ACTIVIDAD'] as const
 export type TipoRegistro = (typeof TIPOS_REGISTRO)[number]
 
@@ -117,6 +130,19 @@ export const TIPO_PROPUESTA_LABELS: Record<TipoPropuesta, string> = {
   EXPOSICION: 'Exposición',
   VISITA_GUIADA: 'Visita guiada',
   FESTIVAL: 'Festival',
+}
+
+/** Texto breve para ayudar a elegir el tipo de propuesta en el formulario. */
+export const TIPO_PROPUESTA_DESCRIPCIONES: Record<TipoPropuesta, string> = {
+  FERIA: 'Stand y venta de productos o servicios.',
+  CONGRESO: 'Encuentro profesional con agenda y ponencias.',
+  ENCUENTRO: 'Reunión abierta de una comunidad o grupo.',
+  DEPORTIVO: 'Competencia, exhibición o actividad física.',
+  ESPECTACULO: 'Show, obra o presentación para público.',
+  JORNADA: 'Actividad de uno o varios días con programa.',
+  EXPOSICION: 'Muestra de arte, ciencia o productos.',
+  VISITA_GUIADA: 'Recorrido acompañado por un guía.',
+  FESTIVAL: 'Celebración con múltiples actividades y público.',
 }
 
 /**
@@ -257,6 +283,8 @@ export interface ActividadResponse {
   latitud: number | null
   longitud: number | null
   duracionMinutos: number
+  fechaInicio: LocalDate
+  fechaFin: LocalDate
   disponibilidades: DisponibilidadItem[]
   imagenes: string[]
   publicadorId: number
@@ -299,9 +327,12 @@ export interface ActividadRequest {
   localidad: string
   direccion: string
   duracionMinutos: number
+  fechaInicio: LocalDate
+  fechaFin: LocalDate
   disponibilidades: DisponibilidadItem[]
   imagenes: string[]
-  publicadorId: number
+  /** Opcional: un PUBLICADOR lo deriva del JWT. Un ADMIN lo indica explícitamente. */
+  publicadorId?: number | null
 }
 
 export interface PublicadorResponse {
@@ -355,7 +386,8 @@ export interface EventoRequest {
    * (`NullValuePropertyMappingStrategy.IGNORE`).
    */
   imagenes: string[] | null
-  publicadorId: number
+  /** Opcional: un PUBLICADOR lo deriva del JWT. Un ADMIN lo indica explícitamente. */
+  publicadorId?: number | null
 }
 
 /**
@@ -371,7 +403,7 @@ export interface PublicadorRequest {
 }
 
 // ---------------------------------------------------------------------------
-// Usuarios (plantilla frontend — contrato pendiente de backend)
+// Auth / Usuarios
 // ---------------------------------------------------------------------------
 
 export const ROLES_USUARIO = ['TURISTA', 'PUBLICADOR', 'ADMINISTRADOR'] as const
@@ -383,38 +415,115 @@ export const ROL_USUARIO_LABELS: Record<RolUsuario, string> = {
   ADMINISTRADOR: 'Administrador',
 }
 
-export const ESTADOS_USUARIO = ['ACTIVO', 'INACTIVO'] as const
-export type EstadoUsuario = (typeof ESTADOS_USUARIO)[number]
+/** Espejo de `dto/request/LoginRequest.java`. */
+export interface LoginRequest {
+  email: string
+  contrasena: string
+}
+
+/** Espejo de `dto/request/ForgotPasswordRequest.java`. */
+export interface ForgotPasswordRequest {
+  email: string
+}
 
 /**
- * Contrato esperado para `GET /api/usuarios` y `GET /api/usuarios/{id}`.
- * Ajustar campos cuando el backend defina el modelo definitivo.
+ * Espejo de `dto/response/UsuarioResponse.java`.
+ * `roles` es multi-valor; `publicadorId` solo viene si el usuario está vinculado a un publicador.
  */
 export interface UsuarioResponse {
   id: number
   nombre: string
-  apellido: string
   email: string
-  rol: RolUsuario
-  estado: EstadoUsuario
-  /** `yyyy-MM-dd` (o ISO) según lo que exponga el backend; opcional en la plantilla. */
-  fechaAlta: LocalDate | null
+  telefono: string | null
+  roles: RolUsuario[]
+  publicadorId: number | null
 }
 
-/** Contrato esperado para `POST /api/usuarios`. */
-export interface UsuarioRequest {
+/** Espejo de `dto/response/AuthTokenResponse.java`. */
+export interface AuthTokenResponse {
+  accessToken: string
+  tokenType: string
+  expiresInSeconds: number
+  usuario: UsuarioResponse
+}
+
+/** Espejo de `dto/response/PropuestaPopularResponse.java` / `PropuestaInscriptosResponse`. */
+export interface PropuestaInscriptosResponse {
+  propuestaId: number
   nombre: string
-  apellido: string
-  email: string
-  rol: RolUsuario
+  tipo: string
+  inscriptos: number
+}
+
+/** Espejo de `dto/response/MeGustaResponse.java`. */
+export interface MeGustaResponse {
+  meGusta: boolean
+  total: number
+}
+
+/** Espejo de `dto/response/AdminDashboardResponse.java`. */
+export interface AdminDashboardResponse {
+  totalUsuarios: number
+  usuariosActivos7d: number
+  usuariosActivos30d: number
+  nuevosRegistros7d: number
+  nuevosRegistros30d: number
+  totalTuristas: number
+  totalPublicadores: number
+  viajesCreados7d: number
+  viajesCreados30d: number
+  propuestasPopulares: PropuestaInscriptosResponse[]
 }
 
 /**
- * Contrato esperado para baja/cambio de estado.
- * Sugerido: `PATCH /api/usuarios/{id}/baja` o `PATCH /api/usuarios/{id}` con `{ estado }`.
+ * Espejo de `dto/request/UsuarioRequest.java` (registro: TURISTA o PUBLICADOR).
  */
+export interface UsuarioRequest {
+  nombre: string
+  email: string
+  telefono: string | null
+  contrasena: string
+  rol: 'TURISTA' | 'PUBLICADOR'
+}
+
+/** Espejo de `dto/response/PublicadorAgendaItemResponse.java`. */
+export interface PublicadorAgendaItemResponse {
+  propuestaId: number
+  nombre: string
+  tipo: string
+  fechaInicio: LocalDate
+  fechaFin: LocalDate
+  modalidad: Modalidad | null
+  imagenUrl: string | null
+  horarioInicio: LocalTime | null
+  horarioFin: LocalTime | null
+  descripcion: string | null
+}
+
+/** Espejo de `dto/request/ReprogramarEventoRequest.java`. */
+export interface ReprogramarEventoRequest {
+  fechaInicio: LocalDate
+}
+
+/** Espejo de `dto/response/PublicadorDashboardResponse.java`. */
+export interface PublicadorDashboardResponse {
+  totalEventos: number
+  totalActividades: number
+  totalPropuestas: number
+  proximas7d: number
+  inscriptosPorPropuesta: PropuestaInscriptosResponse[]
+}
+
+/** Espejo de `dto/request/BajaUsuarioRequest.java`. */
 export interface UsuarioBajaRequest {
-  estado: EstadoUsuario
+  contrasena: string
+}
+
+/** Espejo de `dto/response/BajaUsuarioResponse.java`. */
+export interface BajaUsuarioResponse {
+  id: number
+  mensaje: string
+  viajesCancelados: number
 }
 
 /**
@@ -432,8 +541,14 @@ export interface ApiErrorResponse {
   datosFaltantes?: string[]
 }
 
-export const TIPOS_RITMO = ['TRANQUILO', 'EQUILIBRADO', 'INTENSIVO'] as const
+export const TIPOS_RITMO = ['TRANQUILO', 'EQUILIBRADO', 'INTENSIVO', 'MANUAL'] as const
 export type TipoRitmo = (typeof TIPOS_RITMO)[number]
+
+export interface DiaRitmoPlan {
+  fecha: LocalDate
+  cantidadEventos: number
+  cantidadActividades: number
+}
 
 export const ESTADOS_VIAJE = ['BORRADOR', 'PLANIFICADO', 'EN_CURSO', 'FINALIZADO', 'CANCELADO'] as const
 export type EstadoViaje = (typeof ESTADOS_VIAJE)[number]
@@ -474,6 +589,7 @@ export interface UbicacionResponse {
   longitud: number
 }
 
+/** Identidad del viajero sale del JWT; el body ya no lleva `usuario`. */
 export interface ViajeBorradorRequest {
   nombre: string | null
   ubicacion: UbicacionRequest | null
@@ -483,7 +599,7 @@ export interface ViajeBorradorRequest {
   ritmo: TipoRitmo | null
   interesesCategoria: InteresCategoria[] | null
   pasoActual: number | null
-  usuario: string
+  diasPlan: DiaRitmoPlan[] | null
 }
 
 export interface ViajeResponse {
@@ -496,9 +612,11 @@ export interface ViajeResponse {
   ritmo: TipoRitmo | null
   /** Nunca `null` en las respuestas; el backend usa `@Builder.Default`. */
   interesesCategoria: InteresCategoria[]
+  diasPlan: DiaRitmoPlan[]
   estado: EstadoViaje
   pasoActual: number | null
-  usuario: string
+  usuarioId: number
+  usuarioEmail: string
   /** Solo viene en el detalle; el listado de borradores no lo incluye. */
   circuito?: CircuitoResponse | null
 }
@@ -511,7 +629,7 @@ export interface ViajeRequest {
   fechaFin: LocalDate
   ritmo: TipoRitmo
   intereses: InteresCategoria[]
-  usuario: string
+  diasPlan: DiaRitmoPlan[] | null
 }
 
 /**
@@ -647,4 +765,22 @@ export interface GeneracionCircuitoResponse {
 /** Espejo de `dto/request/SeleccionCircuitoRequest.java`. */
 export interface SeleccionCircuitoRequest {
   estrategia: CircuitStrategy
+}
+
+/** Espejo de `dto/response/ReprogramarPreviewResponse.java`. */
+export interface ReprogramarPreviewResponse {
+  destinatarios: number
+  titulo: string
+  cuerpo: string
+}
+
+/** Espejo de `dto/response/NotificacionResponse.java`. */
+export interface NotificacionResponse {
+  id: number
+  titulo: string
+  cuerpo: string
+  leida: boolean
+  creadaEn: string
+  propuestaId: number | null
+  tipo: string
 }

@@ -3,7 +3,6 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { useActualizarEvento, useEvento } from '@/api/eventos'
-import { PUBLICADORES_MAX_SIZE, usePublicadores } from '@/api/publicadores'
 import { EventoForm } from '@/components/evento-form'
 import { ErrorState } from '@/components/query-state'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -28,41 +27,17 @@ export function EventoEditarPage() {
 
   const evento = useEvento(id)
   const actualizar = useActualizarEvento()
-  const publicadores = usePublicadores(0, PUBLICADORES_MAX_SIZE)
 
   // Un id no numérico no llega al backend: pedírlo devolvería 500 en lugar de 400.
   if (id === null) return <IdInvalido />
 
-  if (evento.isPending || publicadores.isPending) return <FormSkeleton />
+  if (evento.isPending) return <FormSkeleton />
 
   if (evento.isError) {
     return (
       <div className="flex flex-col gap-4">
         <Volver />
         <ErrorState error={evento.error} />
-      </div>
-    )
-  }
-
-  if (publicadores.isError) {
-    return (
-      <div className="flex flex-col gap-4">
-        <Volver />
-        <ErrorState error={publicadores.error} />
-      </div>
-    )
-  }
-
-  if (publicadores.data.content.length === 0) {
-    return (
-      <div className="flex flex-col gap-4">
-        <Volver />
-        <Alert>
-          <AlertTitle>No hay publicadores cargados</AlertTitle>
-          <AlertDescription>
-            Sin publicadores no se puede guardar el evento, porque el publicador es obligatorio.
-          </AlertDescription>
-        </Alert>
       </div>
     )
   }
@@ -80,7 +55,6 @@ export function EventoEditarPage() {
 
       <EventoForm
         defaultValues={toEventoFormValues(actual)}
-        publicadores={publicadores.data.content}
         submitLabel="Guardar cambios"
         cancelTo={`/eventos/${id}`}
         isPending={actualizar.isPending}
@@ -113,7 +87,7 @@ export function EventoEditarPage() {
 function Volver() {
   return (
     <Button asChild variant="ghost" size="sm" className="self-start">
-      <Link to="/">
+      <Link to="/propuestas">
         Volver al listado
       </Link>
     </Button>

@@ -1,3 +1,4 @@
+import { formatWeekdayDay } from '@/lib/dates'
 import {
   CATEGORIA_LABELS,
   CIRCUIT_STRATEGY_LABELS,
@@ -36,6 +37,7 @@ const STRATEGY_META: Record<
   {
     categoryTag: string
     categoryIcon: string
+    image: string
     ventajas: string[]
     consideraciones: string[]
   }
@@ -43,18 +45,21 @@ const STRATEGY_META: Record<
   CERCANIA: {
     categoryTag: 'Ruta compacta',
     categoryIcon: 'near_me',
+    image: 'https://placehold.co/800x500/0ea5e9/ffffff?text=Cerca+de+todo',
     ventajas: ['Minimiza los traslados', 'Ideal si tenés poco tiempo'],
     consideraciones: ['Prioriza la cercanía sobre la afinidad'],
   },
   INTERESES: {
     categoryTag: 'A tu medida',
     categoryIcon: 'tune',
+    image: 'https://placehold.co/800x500/0369a1/ffffff?text=Segun+tus+intereses',
     ventajas: ['Prioriza tus categorías favoritas', 'Mayor afinidad con tu viaje'],
     consideraciones: ['Puede requerir traslados más largos'],
   },
   DESCUBRIMIENTO: {
     categoryTag: 'Nuevas experiencias',
     categoryIcon: 'explore',
+    image: 'https://placehold.co/800x500/075985/ffffff?text=Para+descubrir',
     ventajas: ['Incluye propuestas variadas', 'Evita repetir categorías'],
     consideraciones: ['Algunas paradas pueden estar fuera de tu zona habitual'],
   },
@@ -226,6 +231,7 @@ export function toCircuitoRecomendado(
     return {
       number: dayNumber,
       fecha: date,
+      label: date ? formatWeekdayDay(date) : `Día ${dayNumber}`,
       summary: buildDaySummary(stops, totalKm, totalMinutes),
     }
   })
@@ -255,7 +261,7 @@ export function toCircuitoRecomendado(
     estrategia: alternativa.estrategia,
     title: CIRCUIT_STRATEGY_LABELS[alternativa.estrategia],
     affinity: `${Math.round(alternativa.afinidadIntereses * 100)}% Afinidad`,
-    image: firstStop?.image ?? FALLBACK_IMAGE,
+    image: meta.image ?? firstStop?.image ?? FALLBACK_IMAGE,
     categoryTag: meta.categoryTag,
     categoryIcon: meta.categoryIcon,
     daysLabel: `${days.length} ${days.length === 1 ? 'Día' : 'Días'}`,

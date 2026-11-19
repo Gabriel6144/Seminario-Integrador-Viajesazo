@@ -3,6 +3,7 @@ package com.viajesazo.turismo_backend.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -53,10 +55,13 @@ import com.viajesazo.turismo_backend.model.TipoAcceso;
 import com.viajesazo.turismo_backend.model.TipoRegistro;
 import com.viajesazo.turismo_backend.model.TipoRitmo;
 import com.viajesazo.turismo_backend.model.Ubicacion;
+import com.viajesazo.turismo_backend.model.Usuario;
 import com.viajesazo.turismo_backend.model.Viaje;
 import com.viajesazo.turismo_backend.repository.CircuitoRepository;
+import com.viajesazo.turismo_backend.repository.MeGustaRepository;
 import com.viajesazo.turismo_backend.repository.PropuestaRepository;
 import com.viajesazo.turismo_backend.repository.ViajeRepository;
+import com.viajesazo.turismo_backend.security.TestSecuritySupport;
 
 @ExtendWith(MockitoExtension.class)
 class CircuitoServiceTest {
@@ -71,20 +76,33 @@ class CircuitoServiceTest {
     @Mock
     private PropuestaRepository propuestaRepository;
     @Mock
+    private MeGustaRepository meGustaRepository;
+    @Mock
     private CircuitGenerator generator;
 
     private CircuitoService service;
+    private Usuario owner;
 
     @BeforeEach
     void setUp() {
-        service = new CircuitoService(circuitoRepository, viajeRepository, propuestaRepository, generator,
-                new HaversineDistanceProvider(), CLOCK);
+        owner = TestSecuritySupport.turista(1L, "turista@test.com");
+        TestSecuritySupport.authenticateTurista(owner);
+        lenient().when(meGustaRepository.findPropuestaIdsByUsuarioId(any())).thenReturn(Set.of());
+        lenient().when(meGustaRepository.countByPropuestaIdIn(any())).thenReturn(List.of());
+        service = new CircuitoService(circuitoRepository, viajeRepository, propuestaRepository, meGustaRepository,
+                generator, new HaversineDistanceProvider(), CLOCK);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TestSecuritySupport.clear();
     }
 
     @Test
     void reportsAllMissingTripFieldsTogether() {
         Viaje trip = new Viaje();
         trip.setEstado(EstadoViaje.PLANIFICADO);
+        trip.setUsuario(owner);
         when(viajeRepository.findByIdAndEstadoNotIn(any(), any())).thenReturn(Optional.of(trip));
 
         assertThatThrownBy(() -> service.generate(7L, false))
@@ -102,6 +120,7 @@ class CircuitoServiceTest {
     void doesNotRegenerateAnExistingCircuit() {
         Viaje trip = new Viaje();
         trip.setEstado(EstadoViaje.PLANIFICADO);
+        trip.setUsuario(owner);
         trip.setFechaInicio(java.time.LocalDate.of(2026, 10, 20));
         trip.setFechaFin(java.time.LocalDate.of(2026, 10, 21));
         trip.setRangoInteresKm(20.0);
@@ -205,6 +224,8 @@ class CircuitoServiceTest {
         activity.setNombre("Actividad");
         activity.setEstadoPropuesta(estado(NombreEstado.INICIADO));
         activity.setDuracionMinutos(180);
+        activity.setFechaInicio(LocalDate.parse("2026-10-01"));
+        activity.setFechaFin(LocalDate.parse("2026-12-31"));
         activity.setDisponibilidades(List.of(Disponibilidad.builder()
                 .diaSemana(DayOfWeek.TUESDAY)
                 .horaInicio(LocalTime.of(10, 0))
@@ -674,13 +695,14 @@ class CircuitoServiceTest {
     }
 
     private CircuitoService realService() {
-        return new CircuitoService(circuitoRepository, viajeRepository, propuestaRepository,
+        return new CircuitoService(circuitoRepository, viajeRepository, propuestaRepository, meGustaRepository,
                 new CircuitGenerator(new HaversineDistanceProvider()), new HaversineDistanceProvider(), CLOCK);
     }
 
     private Viaje validTrip() {
         Viaje trip = new Viaje();
         trip.setEstado(EstadoViaje.PLANIFICADO);
+        trip.setUsuario(owner);
         trip.setFechaInicio(ITEM_DATE);
         trip.setFechaFin(ITEM_DATE);
         trip.setRangoInteresKm(50.0);
@@ -744,6 +766,8 @@ class CircuitoServiceTest {
         activity.setEstadoPropuesta(estado(NombreEstado.INICIADO));
         activity.setUbicacion(location(latitude, longitude));
         activity.setDuracionMinutos(durationMinutes);
+        activity.setFechaInicio(LocalDate.parse("2026-10-01"));
+        activity.setFechaFin(LocalDate.parse("2026-12-31"));
         activity.setDisponibilidades(List.of(Disponibilidad.builder()
                 .diaSemana(ITEM_DATE.getDayOfWeek())
                 .horaInicio(start)

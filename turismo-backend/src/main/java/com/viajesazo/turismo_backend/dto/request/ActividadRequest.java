@@ -1,5 +1,6 @@
 package com.viajesazo.turismo_backend.dto.request;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import com.viajesazo.turismo_backend.model.InteresCategoria;
@@ -35,11 +36,17 @@ public record ActividadRequest(
 		@Positive(message = "la duración debe ser mayor a cero")
 		int duracionMinutos,
 
+		@NotNull(message = "la fecha de inicio es obligatoria")
+		LocalDate fechaInicio,
+
+		@NotNull(message = "la fecha de finalización es obligatoria")
+		LocalDate fechaFin,
+
 		List<@Valid DisponibilidadRequest> disponibilidades,
 
 		List<@NotBlank(message = "las URLs de imagen no pueden estar vacías")
 		String> imagenes,
 
-		@NotNull(message = "el publicador es obligatorio")
+		// Opcional: un PUBLICADOR lo deriva del JWT. Un ADMIN lo indica explícitamente.
 		Long publicadorId
 ) {}

@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router-dom'
 
 import './index.css'
+import { AuthProvider } from '@/components/auth-provider'
 import { Toaster } from '@/components/ui/sonner'
 import { ApiError } from '@/lib/http'
 import { router } from '@/router'
@@ -36,7 +37,9 @@ if (root === null) throw new Error('Falta el nodo #root en index.html')
 createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
       {/*
         Va acá y no dentro de `Layout` para que los toasts sobrevivan a la navegación: si estuviera
         en el layout se desmontarían con la ruta. El `Toaster` de shadcn lee el tema de

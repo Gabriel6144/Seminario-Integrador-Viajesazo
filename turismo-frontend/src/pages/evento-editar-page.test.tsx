@@ -1,10 +1,18 @@
 import { screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { EventoEditarPage } from './evento-editar-page'
-import { COSQUIN, FOLKLORE, GASTRONOMIA_ESTANCIA, TURISMO } from '@/test/fixtures'
+import { FOLKLORE, GASTRONOMIA_ESTANCIA } from '@/test/fixtures'
 import { findEvento, resetStore } from '@/test/store'
 import { user, renderRoute } from '@/test/utils'
+
+// MapLibre no tiene WebGL en jsdom. La edición no necesita el mapa real: se reemplaza por un
+// placeholder para que el formulario monte sin lanzar el error del painter.
+vi.mock('@/components/evento-form/evento-mapa-selector', () => ({
+  EventoMapaSelector: () => (
+    <div role="img" aria-label="Mapa de la ubicación elegida" />
+  ),
+}))
 
 /**
  * Tests de la edición de eventos.
@@ -30,9 +38,12 @@ async function esperarFormulario() {
   return screen.findByLabelText('Nombre del evento')
 }
 
-async function elegirPublicador(nombre: string) {
-  await user().click(await screen.findByRole('combobox', { name: 'Publicador' }))
-  await user().click(await screen.findByRole('option', { name: nombre }))
+async function abrirSeccion(nombre: string | RegExp) {
+  const patron = typeof nombre === 'string' ? new RegExp(`(Abrir|Cerrar) ${nombre}`) : nombre
+  const boton = screen.getByRole('button', { name: patron })
+  if (boton.getAttribute('aria-expanded') === 'false') {
+    await user().click(boton)
+  }
 }
 
 beforeEach(() => {
@@ -45,9 +56,11 @@ describe('EventoEditarPage', () => {
 
     const nombre = await esperarFormulario()
     expect(nombre).toHaveValue(FOLKLORE.nombre)
+    await abrirSeccion(/Horarios del evento/)
     // "20:00:00" en la respuesta, "20:00" en el input: sin el recorte el input quedaría vacío.
     expect(screen.getByLabelText('Horario de inicio')).toHaveValue('20:00')
     expect(screen.getByLabelText('Horario de finalización')).toHaveValue('23:30')
+    await abrirSeccion(/Imágenes del Evento/)
     expect(screen.getByLabelText('URL de la imagen 1')).toHaveValue(
       FOLKLORE.imagenes[0],
     )
@@ -78,52 +91,56 @@ describe('EventoEditarPage', () => {
     expect(findEvento(1)?.imagenes).toEqual(FOLKLORE.imagenes)
   })
 
-  it('borra las imágenes cuando el usuario quita la última fila', async () => {
+  it('exige al menos una imagen también al editar', async () => {
     renderEdicion('1')
     await esperarFormulario()
+    await abrirSeccion(/Imágenes del Evento/)
 
     await user().click(screen.getByRole('button', { name: 'Quitar la imagen 1' }))
     await user().click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
-    await waitFor(() => expect(findEvento(1)?.imagenes).toEqual([]))
+    expect(
+      await screen.findByText('Cargá al menos una imagen para el evento.'),
+    ).toBeInTheDocument()
+    expect(findEvento(1)?.imagenes).toEqual(FOLKLORE.imagenes)
   })
 
-  it('reemplaza el publicador y actualiza el nombre aplanado del evento', async () => {
+  it('no muestra el selector de publicador', async () => {
     renderEdicion('1')
     await esperarFormulario()
 
-    await elegirPublicador(COSQUIN.nombre)
-    await user().click(screen.getByRole('button', { name: 'Guardar cambios' }))
-
-    await waitFor(() => expect(findEvento(1)?.publicadorId).toBe(COSQUIN.id))
-    // El backend no lo manda: lo arma con un JOIN. Si el PUT no lo actualizara, el detalle
-    // mostraría el publicador viejo.
-    expect(findEvento(1)?.publicadorNombre).toBe(COSQUIN.nombre)
+    expect(screen.queryByLabelText('Publicador')).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Publicador' })).not.toBeInTheDocument()
   })
 
-  it('deja convertir los opcionales en null al vaciarlos', async () => {
+  it('exige descripción y horario al editar', async () => {
     renderEdicion('1')
     await esperarFormulario()
 
     await user().clear(screen.getByLabelText('Descripción completa'))
+    await abrirSeccion(/Horarios del evento/)
     await user().clear(screen.getByLabelText('Horario de inicio'))
     await user().click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
-    await waitFor(() => expect(findEvento(1)?.descripcion).toBeNull())
-    expect(findEvento(1)?.horarioInicio).toBeNull()
+    expect(await screen.findByText('La descripción es obligatoria.')).toBeInTheDocument()
+    expect(screen.getByText('El horario de inicio es obligatorio.')).toBeInTheDocument()
+    expect(findEvento(1)?.descripcion).toBe(FOLKLORE.descripcion)
+    expect(findEvento(1)?.horarioInicio).toBe(FOLKLORE.horarioInicio)
   })
 
   it('no manda nada si la fecha de finalización queda antes de la de inicio', async () => {
     renderEdicion('1')
     await esperarFormulario()
+    await abrirSeccion(/Agenda de la propuesta/)
 
     await user().clear(screen.getByLabelText('Fecha de finalización'))
     await user().type(screen.getByLabelText('Fecha de finalización'), '2026-09-01')
     await user().click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
+    // El mensaje puede aparecer más de una vez (FieldError + descripción del schema).
     expect(
-      await screen.findByText('La fecha de finalización no puede ser anterior a la de inicio.'),
-    ).toBeInTheDocument()
+      await screen.findAllByText('La fecha de finalización no puede ser anterior a la de inicio.'),
+    ).not.toHaveLength(0)
     expect(findEvento(1)?.fechaFin).toBe(FOLKLORE.fechaFin)
   })
 
@@ -133,20 +150,10 @@ describe('EventoEditarPage', () => {
     expect(await screen.findByText('No existe el evento con id 999')).toBeInTheDocument()
   })
 
-  it('mantiene el publicador seleccionado en el trigger tras cargar', async () => {
-    // El `Select` controlado arranca con `value` vacío y muestra el placeholder: si los
-    // `defaultValues` no tuvieran el id, la edición perdería el publicador al guardar.
-    renderEdicion('1')
-    await esperarFormulario()
-
-    expect(await screen.findByRole('combobox', { name: 'Publicador' })).toHaveTextContent(
-      TURISMO.nombre,
-    )
-  })
-
   it('precarga el arancel de un evento arancelado y lo limpia al pasar a gratuito', async () => {
     renderEdicion('3')
     await esperarFormulario()
+    await abrirSeccion(/Tipo de Acceso y Arancel/)
 
     expect(screen.getByLabelText('Monto estimado')).toHaveValue(GASTRONOMIA_ESTANCIA.montoEstimado)
     expect(screen.getByLabelText('Sitio oficial de la boletería o entradas')).toHaveValue(

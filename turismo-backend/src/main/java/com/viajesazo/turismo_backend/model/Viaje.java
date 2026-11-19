@@ -1,6 +1,7 @@
 package com.viajesazo.turismo_backend.model;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.ArrayList;
@@ -63,6 +64,15 @@ public class Viaje {
     @Builder.Default
     private List<InteresCategoria> interesesCategoria = new ArrayList<>();
 
+    /** Cupos diarios de eventos/actividades cuando {@code ritmo == MANUAL}. */
+    @ElementCollection
+    @CollectionTable(
+        name = "viaje_dia_plan",
+        joinColumns = @JoinColumn(name = "viaje_id")
+    )
+    @Builder.Default
+    private List<ViajeDiaPlan> diasPlan = new ArrayList<>();
+
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Enumerated(EnumType.STRING)
     @Column(length = 50)
@@ -71,10 +81,14 @@ public class Viaje {
     @Column
     private Integer pasoActual;
 
-    // Usuario entiendo lo vemos en el utlimo Sprint, por ahora diría dejarlo como String
-    @Column(nullable = false, length = 120)
-    private String usuario;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "usuario_id", nullable = false)
+    private Usuario usuario;
 
+    /** Momento de creación del viaje/borrador (métricas admin). */
+    @Builder.Default
+    @Column(nullable = false)
+    private Instant creadoEn = Instant.now();
 
     private void transicionarA(EstadoViaje destino) {
         if (estado == null || !estado.puedeTransicionarA(destino)) {
@@ -101,6 +115,9 @@ public class Viaje {
         if (ritmo == null) {
             errores.add("El ritmo del viaje no puede estar vacío");
         }
+        if (ritmo == TipoRitmo.MANUAL && (diasPlan == null || diasPlan.isEmpty())) {
+            errores.add("El ritmo manual requiere definir eventos y actividades por día");
+        }
         if (interesesCategoria == null || interesesCategoria.isEmpty()) {
             errores.add("Debe seleccionar al menos un interés");
         }
@@ -118,7 +135,7 @@ public class Viaje {
                 errores.add("La fecha de inicio no puede ser anterior a hoy");
             }
         }
-        if (usuario == null || usuario.isBlank()) {
+        if (usuario == null) {
             errores.add("El turista no puede estar vacío");
         }
         if (!errores.isEmpty()) {

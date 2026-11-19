@@ -92,14 +92,12 @@ ubicaciones se siembran antes porque `Viaje.zonaInteres` es una FK a `ubicacion`
 
 | id | Viaje | zonaInteres | rango | ritmo | Fechas | usuario |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Escapada serrana por Villa General Belgrano | 1 | 35 | EQUILIBRADO | hoy+7 → hoy+9 | turista.demo@viajesazo.com |
-| 2 | Cultura y naturaleza en Córdoba | 2 | 50 | TRANQUILO | hoy+14 → hoy+17 | turista.demo@viajesazo.com |
-| 3 | Aventura en el Valle de Punilla | 3 | 45 | INTENSIVO | hoy+21 → hoy+24 | turista.aventura@viajesazo.com |
-| 4 | Sabores y tradiciones de Córdoba | 4 | 30 | TRANQUILO | hoy+28 → hoy+30 | turista.gastronomico@viajesazo.com |
-| 5 | Recorrido familiar por las sierras | 5 | 40 | EQUILIBRADO | hoy+35 → hoy+38 | familia.demo@viajesazo.com |
+| 1 | Aventura en el Valle de Punilla | 3 | 45 | INTENSIVO | hoy+21 → hoy+24 | turista.aventura@viajesazo.com |
+| 2 | Sabores y tradiciones de Córdoba | 4 | 30 | TRANQUILO | hoy+28 → hoy+30 | turista.gastronomico@viajesazo.com |
+| 3 | Recorrido familiar por las sierras | 5 | 40 | EQUILIBRADO | hoy+35 → hoy+38 | familia.demo@viajesazo.com |
 
-Todos nacen con `estado='PLANIFICADO'`. `turista.demo@viajesazo.com` es el único con dos viajes
-(ids 1 y 2), cómodo para probar VZ-22. Los ids, igual que los eventos, son fijos.
+Todos nacen con `estado='PLANIFICADO'`. `turista.demo@viajesazo.com` no tiene viajes precargados
+(Mis Viajes arranca vacío). Los ids, igual que los eventos, son fijos.
 
 ## 4. El detalle de los acentos (leer antes que nada)
 
@@ -719,15 +717,28 @@ curl.exe -s -X POST http://localhost:8080/api/eventos -H "Content-Type: applicat
 curl.exe -s -X PUT  http://localhost:8080/api/eventos/1 -H "Content-Type: application/json" -d '...'
 curl.exe -s -i -X DELETE http://localhost:8080/api/eventos/7   # 204 sin cuerpo (baja FISICA)
 
-# viajes: alta, edicion y baja (seccion 8 bis para los bodies completos)
-curl.exe -s "http://localhost:8080/api/viajes?usuario=turista.demo@viajesazo.com"
-curl.exe -s -X POST http://localhost:8080/api/viajes -H "Content-Type: application/json" -d '...'
-curl.exe -s -X PUT  http://localhost:8080/api/viajes/1 -H "Content-Type: application/json" -d '...'
-curl.exe -s -i -X DELETE http://localhost:8080/api/viajes/1   # 204 sin cuerpo (baja LOGICA -> CANCELADO)
+# auth (ver tambien docs/seguridad/AUTENTICACION-Y-AUTORIZACION.md)
+# login -> access JWT en body + Set-Cookie refresh_token
+curl.exe -s -i -c cookies.txt -X POST http://localhost:8080/api/auth/login `
+  -H "Content-Type: application/json" `
+  -d "{\"email\":\"turista.demo@viajesazo.com\",\"contrasena\":\"Turista123!\"}"
+# refresh con cookie
+curl.exe -s -i -b cookies.txt -c cookies.txt -X POST http://localhost:8080/api/auth/refresh
+# mis viajes (sin ?usuario=): requiere Authorization Bearer
+curl.exe -s -H "Authorization: Bearer <ACCESS>" "http://localhost:8080/api/viajes"
+# alta publicador solo ADMIN; asignar roles:
+curl.exe -s -X PUT http://localhost:8080/api/usuarios/2/roles `
+  -H "Authorization: Bearer <ACCESS_ADMIN>" -H "Content-Type: application/json" `
+  -d "{\"roles\":[\"TURISTA\",\"PUBLICADOR\"]}"
+curl.exe -s -X PUT http://localhost:8080/api/usuarios/2/publicador `
+  -H "Authorization: Bearer <ACCESS_ADMIN>" -H "Content-Type: application/json" `
+  -d "{\"publicadorId\":1}"
 
-# tests automatizados (258; 256 en verde y 2 fallos preexistentes por fechas fijas)
+# tests automatizados
 .\mvnw.cmd clean test
 ```
+
+Credenciales del seed (solo demo): ver `docs/seguridad/AUTENTICACION-Y-AUTORIZACION.md`.
 
 Vale aclarar una diferencia entre esto y los tests: `.\mvnw.cmd clean test` **saltea el seed**
 (el `maven-surefire-plugin` pone `spring.sql.init.mode=never`), y la app corriendo **no**. Por eso al

@@ -36,12 +36,21 @@ class CircuitoRepositoryTest {
 	@Autowired
 	private ViajeRepository viajeRepository;
 
+	@Autowired
+	private UsuarioRepository usuarioRepository;
+
 	@PersistenceContext
 	private EntityManager entityManager;
 
 	@Test
 	@DisplayName("VZ-25: al recargar el circuito los ítems mantienen el orden y no aparecen nulos")
 	void reloadsItemsInOrderWithoutNulls() {
+		var usuario = usuarioRepository.save(com.viajesazo.turismo_backend.model.Usuario.builder()
+				.nombre("Turista")
+				.email("turista@test.com")
+				.contrasena("hash")
+				.roles(new java.util.HashSet<>(java.util.Set.of(com.viajesazo.turismo_backend.model.Rol.TURISTA)))
+				.build());
 		Viaje viaje = viajeRepository.save(Viaje.builder()
 				.nombre("Viaje de prueba")
 				.zonaInteres(Ubicacion.builder().ciudad("Córdoba").localidad("Córdoba").build())
@@ -50,7 +59,7 @@ class CircuitoRepositoryTest {
 				.fechaFin(LocalDate.parse("2026-11-03"))
 				.ritmo(TipoRitmo.EQUILIBRADO)
 				.estado(EstadoViaje.PLANIFICADO)
-				.usuario("turista@test.com")
+				.usuario(usuario)
 				.build());
 
 		Circuito circuito = new Circuito();
