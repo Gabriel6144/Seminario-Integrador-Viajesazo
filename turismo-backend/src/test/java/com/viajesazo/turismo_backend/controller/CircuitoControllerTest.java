@@ -30,13 +30,15 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.viajesazo.turismo_backend.config.AppConfig;
 import com.viajesazo.turismo_backend.dto.response.AlternativaItemResponse;
-import com.viajesazo.turismo_backend.dto.response.AlternativaReemplazoResponse;
-import com.viajesazo.turismo_backend.dto.response.AlternativasReemplazoResponse;
 import com.viajesazo.turismo_backend.dto.response.CircuitoAlternativaResponse;
 import com.viajesazo.turismo_backend.dto.response.CircuitoItemResponse;
 import com.viajesazo.turismo_backend.dto.response.CircuitoSeleccionadoResponse;
 import com.viajesazo.turismo_backend.dto.response.DiaCircuitoResponse;
 import com.viajesazo.turismo_backend.dto.response.GeneracionCircuitoResponse;
+import com.viajesazo.turismo_backend.dto.response.OpcionSustitucionResponse;
+import com.viajesazo.turismo_backend.dto.response.OpcionesSustitucionResponse;
+import com.viajesazo.turismo_backend.dto.response.ParadaVecinaResponse;
+import com.viajesazo.turismo_backend.dto.response.PropuestaFueraDeHuecoResponse;
 import com.viajesazo.turismo_backend.exception.CircuitoDataMissingException;
 import com.viajesazo.turismo_backend.exception.ConfirmationRequiredException;
 import com.viajesazo.turismo_backend.exception.ResourceNotFoundException;
@@ -202,19 +204,24 @@ class CircuitoControllerTest {
     }
 
     @Test
-    @DisplayName("VZ-28: lista alternativas válidas para reemplazar una parada")
+    @DisplayName("VZ-28: lista lo que entra en el hueco del día, con motivos y lo que no entra")
     void listsReplacementAlternatives() throws Exception {
-        AlternativaReemplazoResponse alternativa = new AlternativaReemplazoResponse(3L, "Museo Histórico",
-                TipoRegistro.EVENTO, InteresCategoria.HISTORIA, "Córdoba", "Córdoba",
-                "Av. Vélez Sarsfield 264", LocalTime.of(10, 30), LocalTime.of(11, 30), 60);
-        when(circuitoService.replacementAlternatives(7L, 15L)).thenReturn(
-                new AlternativasReemplazoResponse(List.of(alternativa), null));
+        when(circuitoService.replacementAlternatives(7L, 15L)).thenReturn(substitutionResponse());
 
         mockMvc.perform(get("/api/viajes/7/circuito/seleccionado/items/15/alternativas"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.alternativas[0].propuestaId").value(3))
-                .andExpect(jsonPath("$.alternativas[0].propuestaNombre").value("Museo Histórico"))
-                .andExpect(jsonPath("$.alternativas[0].horaInicio").value("10:30:00"))
+                .andExpect(jsonPath("$.fecha").value("2026-10-20"))
+                .andExpect(jsonPath("$.huecoInicio").value("10:00:00"))
+                .andExpect(jsonPath("$.huecoFin").value("13:30:00"))
+                .andExpect(jsonPath("$.paradaAnterior.propuestaNombre").value("Catedral"))
+                .andExpect(jsonPath("$.opciones[0].propuestaId").value(3))
+                .andExpect(jsonPath("$.opciones[0].propuestaNombre").value("Museo Histórico"))
+                .andExpect(jsonPath("$.opciones[0].horaInicio").value("10:30:00"))
+                .andExpect(jsonPath("$.opciones[0].meGusta").value(true))
+                .andExpect(jsonPath("$.opciones[0].enIntereses").value(true))
+                .andExpect(jsonPath("$.opciones[0].totalMeGusta").value(12))
+                .andExpect(jsonPath("$.noEntran[0].motivo")
+                        .value(org.hamcrest.Matchers.containsString("no entra")))
                 .andExpect(jsonPath("$.mensaje").value(org.hamcrest.Matchers.nullValue()));
     }
 
@@ -294,14 +301,121 @@ class CircuitoControllerTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    @DisplayName("antes de confirmar: lista reemplazos para una parada de una alternativa")
+    void listsReplacementOptionsForAnAlternative() throws Exception {
+        when(circuitoService.alternativeReplacementOptions(7L, CircuitStrategy.CERCANIA, 10L))
+                .thenReturn(substitutionResponse());
+
+        mockMvc.perform(get("/api/viajes/7/circuito/alternativas/CERCANIA/items/10/alternativas"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.opciones[0].propuestaId").value(3));
+    }
+
+    @Test
+    @DisplayName("antes de confirmar: sustituye una parada y devuelve las alternativas")
+    void replacesAnItemOfAnAlternative() throws Exception {
+        when(circuitoService.replaceAlternativeItem(eq(7L), eq(CircuitStrategy.CERCANIA), eq(10L), any()))
+                .thenReturn(circuitResponse());
+
+        mockMvc.perform(put("/api/viajes/7/circuito/alternativas/CERCANIA/items/10")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"propuestaId\":3}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.alternativas[0].propuestas[0].itemId").value(10));
+
+        verify(circuitoService).replaceAlternativeItem(eq(7L), eq(CircuitStrategy.CERCANIA), eq(10L), any());
+    }
+
+    @Test
+    @DisplayName("antes de confirmar: elimina una parada confirmada")
+    void deletesAnItemOfAnAlternative() throws Exception {
+        when(circuitoService.deleteAlternativeItem(7L, CircuitStrategy.CERCANIA, 10L, true))
+                .thenReturn(circuitResponse());
+
+        mockMvc.perform(delete("/api/viajes/7/circuito/alternativas/CERCANIA/items/10")
+                .param("confirmar", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.alternativas").isArray());
+
+        verify(circuitoService).deleteAlternativeItem(7L, CircuitStrategy.CERCANIA, 10L, true);
+    }
+
+    @Test
+    @DisplayName("antes de confirmar: una estrategia inexistente en la ruta responde 400")
+    void rejectsUnknownStrategyInThePath() throws Exception {
+        mockMvc.perform(delete("/api/viajes/7/circuito/alternativas/NO_EXISTE/items/10")
+                .param("confirmar", "true"))
+                .andExpect(status().isBadRequest());
+
+        verify(circuitoService, never()).deleteAlternativeItem(any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean());
+    }
+
+    @Test
+    @DisplayName("antes de confirmar: devuelve el estado de cada día de una alternativa")
+    void listsDaySummariesOfAnAlternative() throws Exception {
+        var resumen = new com.viajesazo.turismo_backend.dto.response.ResumenDiaCircuito(0, 4, 0, false,
+                "Se asignaron 0 de 4 paradas pedidas para este día.", true, true);
+        when(circuitoService.alternativeDaySummaries(7L, CircuitStrategy.CERCANIA)).thenReturn(List.of(
+                new com.viajesazo.turismo_backend.dto.response.ResumenDiaAlternativaResponse(
+                        LocalDate.of(2026, 10, 20), resumen)));
+
+        mockMvc.perform(get("/api/viajes/7/circuito/alternativas/CERCANIA/dias"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].fecha").value("2026-10-20"))
+                .andExpect(jsonPath("$[0].resumen.minimo").value(4))
+                .andExpect(jsonPath("$[0].resumen.puedeCompletar").value(true));
+    }
+
+    @Test
+    @DisplayName("antes de confirmar: lista sugerencias y agrega una al día de la alternativa")
+    void completesADayOfAnAlternative() throws Exception {
+        when(circuitoService.alternativeDaySuggestions(7L, CircuitStrategy.CERCANIA, LocalDate.of(2026, 10, 20)))
+                .thenReturn(new com.viajesazo.turismo_backend.dto.response.SugerenciasDiaResponse(List.of(),
+                        "No encontramos propuestas para completar este día"));
+        when(circuitoService.addAlternativeSuggestedItem(eq(7L), eq(CircuitStrategy.CERCANIA),
+                eq(LocalDate.of(2026, 10, 20)), any()))
+                .thenReturn(circuitResponse());
+
+        mockMvc.perform(get("/api/viajes/7/circuito/alternativas/CERCANIA/dias/2026-10-20/sugerencias"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sugerencias").isEmpty())
+                .andExpect(jsonPath("$.mensaje").value("No encontramos propuestas para completar este día"));
+
+        mockMvc.perform(post("/api/viajes/7/circuito/alternativas/CERCANIA/dias/2026-10-20/items")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"propuestaId\":3}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.alternativas[0].propuestas[0].itemId").value(10));
+    }
+
+    private OpcionesSustitucionResponse substitutionResponse() {
+        OpcionSustitucionResponse opcion = new OpcionSustitucionResponse(3L, "Museo Histórico", "Descripción",
+                TipoRegistro.EVENTO, InteresCategoria.HISTORIA, "https://imagen.test/museo.jpg", "Córdoba",
+                "Córdoba", "Av. Vélez Sarsfield 264", new BigDecimal("-31.42"), new BigDecimal("-64.18"),
+                LocalTime.of(10, 30), LocalTime.of(11, 30), 60, true, 12L, true, 0.8, 2);
+        ParadaVecinaResponse anterior = new ParadaVecinaResponse("Catedral", LocalTime.of(9, 0),
+                LocalTime.of(10, 0), new BigDecimal("-31.41"), new BigDecimal("-64.19"));
+        PropuestaFueraDeHuecoResponse noEntra = new PropuestaFueraDeHuecoResponse(9L, "Cena show",
+                TipoRegistro.EVENTO, true,
+                "Su horario (21:00 – 23:00) no entra entre 10:00 y 13:30 contando los traslados");
+        return new OpcionesSustitucionResponse(LocalDate.parse("2026-10-20"), LocalTime.of(10, 0),
+                LocalTime.of(13, 30), anterior, null, List.of(opcion), List.of(noEntra), null);
+    }
+
     private CircuitoSeleccionadoResponse selectedCircuitResponse() {
         AlternativaItemResponse item = new AlternativaItemResponse(15L, 3L, "Museo Histórico",
                 TipoRegistro.EVENTO, InteresCategoria.HISTORIA, "Córdoba", "Córdoba",
-                "Av. Vélez Sarsfield 264", LocalTime.of(10, 0), LocalTime.of(12, 0), 120);
+                "Av. Vélez Sarsfield 264", LocalTime.of(10, 0), LocalTime.of(12, 0), 120,
+                com.viajesazo.turismo_backend.model.OrigenCircuitoItem.GENERADO);
+        var resumen = new com.viajesazo.turismo_backend.dto.response.ResumenDiaCircuito(
+                1, 4, 0, false, null, true, true);
         return new CircuitoSeleccionadoResponse(1L, 7L, null, CircuitStrategy.INTERESES, true,
                 List.of("FECHAS"), true, null, List.of(
-                        new DiaCircuitoResponse(LocalDate.parse("2026-11-01"), List.of(item)),
-                        new DiaCircuitoResponse(LocalDate.parse("2026-11-02"), List.of())));
+                        new DiaCircuitoResponse(LocalDate.parse("2026-11-01"), List.of(item), resumen),
+                        new DiaCircuitoResponse(LocalDate.parse("2026-11-02"), List.of(),
+                                new com.viajesazo.turismo_backend.dto.response.ResumenDiaCircuito(
+                                        0, 4, 0, false, "incompleto", true, true))));
     }
 
     private GeneracionCircuitoResponse circuitResponse() {

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { CIRCUITO } from '@/test/fixtures'
+import { CIRCUITO, CIRCUITO_SELECCIONADO } from '@/test/fixtures'
 import {
   buildMapStops,
+  enrichCircuitoConSeleccionado,
   firstDayWithStops,
   toCircuitoRecomendado,
 } from './circuito-view-model'
@@ -26,6 +27,13 @@ describe('toCircuitoRecomendado', () => {
     expect(primera.duration).toBe('2 h')
     expect(primera.price).toBe('Entrada gratuita')
     expect(primera.image).toBe('https://example.com/circuito.jpg')
+    expect(primera.images).toEqual(['https://example.com/circuito.jpg'])
+    expect(primera.tipo).toBe('EVENTO')
+    expect(primera.fecha).toBeTruthy()
+    expect(primera.horaInicio).toBe('09:00')
+    expect(primera.horaFin).toBe('11:00')
+    expect(typeof primera.trasladoKm).toBe('number')
+    expect(typeof primera.trasladoMinutos).toBe('number')
     expect(primera.walkNext).toBe('3.2 km · 18 min de traslado')
     expect(primera.latitud).toBe(-31.42)
   })
@@ -47,5 +55,28 @@ describe('buildMapStops', () => {
     expect(stops).toHaveLength(2)
     expect(stops[0].time).toBe('09:00 - 11:00')
     expect(stops[1].lat).toBe(-31.42)
+  })
+})
+
+describe('enrichCircuitoConSeleccionado', () => {
+  it('copia resumen y origen desde el circuito seleccionado', () => {
+    const alternativa = {
+      ...cercania,
+      propuestas: cercania.propuestas.map((item, index) =>
+        index === 0 ? { ...item, itemId: 101, fecha: '2026-12-05' } : item,
+      ),
+    }
+    const base = toCircuitoRecomendado(
+      alternativa,
+      'Tranquilo',
+      '2026-12-05',
+      '2026-12-07',
+    )
+    const enriched = enrichCircuitoConSeleccionado(base, CIRCUITO_SELECCIONADO)
+
+    expect(enriched.days[0].resumen?.pendiente).toBe(true)
+    expect(enriched.days[0].resumen?.puedeCompletar).toBe(true)
+    const stop = enriched.stopsByDay[1]?.find((s) => s.id === '101')
+    expect(stop?.origen).toBe('GENERADO')
   })
 })

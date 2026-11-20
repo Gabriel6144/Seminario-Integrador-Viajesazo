@@ -9,17 +9,16 @@ servidor ni lógica de negocio: la UI **consume** la API.
 Los dos proyectos viven en el **mismo repositorio git**, como subcarpetas. Eso no los hace
 acoplados de build: cada uno tiene su `package.json` / `pom.xml` y sus propios comandos.
 
-- Estado actual: Sprints 1–3 completos y **consulta (VZ-26), eliminación (VZ-29) y reemplazo
-  (VZ-28) de paradas**. Listados paginados de eventos y publicadores, detalle de ambos, agenda
-  (VZ-18), **CRUD de eventos y alta de publicadores**, **planificador de viajes con generación y
-  selección de circuitos (VZ-25)**, **página día por día del circuito seleccionado con
-  eliminación confirmada y reemplazo de paradas por alternativas compatibles (VZ-26/VZ-28/VZ-29)**
-  y ruta 404. La agenda filtra y pagina en el servidor. El alta/edición de eventos
+- Estado actual: Sprints 1–3 completos y **consulta (VZ-26), eliminación (VZ-29), reemplazo
+  (VZ-28) y completar día incompleto con sugerencias**. Listados paginados de eventos y
+  publicadores, detalle de ambos, agenda (VZ-18), **CRUD de eventos y alta de publicadores**,
+  **planificador de viajes con generación y selección de circuitos (VZ-25)**, **página día por
+  día del circuito seleccionado con eliminación, reemplazo y sugerencias para días incompletos
+  (VZ-26/VZ-28/VZ-29)** y ruta 404. La agenda filtra y pagina en el servidor. El alta/edición de eventos
   soporta **tipo de acceso y arancel** (`GRATUITO` / `DE_PAGO` con monto y link al sitio oficial)
   y **ubicación con mapa** (Leaflet + OpenStreetMap), incluido un **selector de ubicación** con
-  buscador y pin arrastrable. **191 tests en 22 archivos (182 en verde).** Los 9 que fallan son
-  preexistentes y ajenos: 8 de `eventos-page.test.tsx` (mockea `/api/eventos` y la página usa
-  `/api/propuestas`) y 1 de `evento-editar-page.test.tsx` (validación de fecha).
+  buscador y pin arrastrable. **285 tests en 34 archivos (282 en verde, 20/11/2026).** Los 3 que fallan son
+  preexistentes y ajenos al circuito: los de `evento-detail-page.test.tsx`.
 - **Autenticación activa:** access JWT en memoria (`src/lib/auth-session.ts`), refresh en cookie
   HttpOnly vía `credentials: 'include'` en `src/lib/http.ts` (single-flight refresh en 401).
   Una cuenta = un rol. Registro elige TURISTA o PUBLICADOR. Guards:
@@ -153,10 +152,15 @@ animación de generación y el 10 muestra las tres alternativas reales.
 - **“Mis viajes” usa `GET /api/viajes?usuario=`**, no `/borradores`: el listado trae borradores y
   viajes confirmados. `estado !== 'BORRADOR'` decide si la tarjeta muestra “Circuito confirmado” y
   oculta descartar/continuar. `useViajes` invalida `viajesAll` al crear, completar y descartar.
-- **El detalle del planificador (paso 10) sigue mostrando “Sustituir” y “Eliminar” como
-  “Próximamente”**: esas acciones operan sobre el circuito ya seleccionado y viven en
-  `/viajes/:id/circuito` (VZ-28/VZ-29), no sobre las alternativas recién generadas. Así la UI no
-  ofrece una acción que todavía no tiene un `itemId` seleccionado.
+- **Una sola vista de detalle del circuito** (`CircuitoDiaSplitView`) con `modo`:
+  - **`recomendado`**: detalle al abrir “Ver detalle” en Paso10 (planificador o viaje sin
+    selección). Misma portada/mapa/scroll-snap, sin sugerencias; **con Sustituir/Eliminar solo
+    mientras no hay alternativa elegida** (`selectedStrategy === null`, usa los endpoints
+    `/alternativas/{estrategia}/items/...`); barra
+    sticky con “Confirmar y guardar circuito” y modal de éxito (`circuito-guardado-modal.tsx`).
+  - **`confirmado`** (default): `/viajes/:id/circuito` con Sustituir/Eliminar y completar día.
+  - `Paso10Circuito` solo cambia el detalle; el listado de tarjetas de alternativas no se toca.
+    Requiere `viajeId` para OSRM. `CircuitoDetalleView` quedó sin usos (no borrado aún).
 - **El detalle del viaje NO devuelve `GeneracionCircuitoResponse`**: `GET /api/viajes/{id}` trae
   `circuito: { estrategia, alternativa, ... }` (singular), mientras que
   `GET /api/viajes/{id}/circuito` trae `estrategiaSeleccionada` y `alternativas` (plural). En
@@ -184,26 +188,89 @@ animación de generación y el 10 muestra las tres alternativas reales.
   expone este endpoint. “Regenerar” reutiliza `planificador-regenerate-modal` y
   `useGenerarCircuito` con `?reemplazar=true`; al terminar invalida el prefijo `['circuito']`, así
   que la página vuelve a pedir el seleccionado.
-- **Eliminar una parada pasa por un `AlertDialog`** que repite el nombre. `useEliminarParadaCircuito`
+- **Eliminar una parada pasa por `EliminarParadaDialog`** (`parada-dialogs.tsx`), que repite el
+  nombre, dice cómo queda el día (“Vas a ir de X directo a Y”) y, si `confirmado`, avisa que deja
+  de figurar como inscripto. `useEliminarParadaCircuito`
   manda `?confirmar=true`, escribe el `CircuitoSeleccionadoResponse` actualizado en la caché de
   `circuitoSeleccionado` e invalida `['circuito', viajeId]` y `viajesAll`; la fila desaparece sin
   recargar. El `apiDelete` genérico existe porque esta baja devuelve cuerpo, a diferencia del
   `DELETE` de eventos (204).
-- **Sustituir una parada (VZ-28) usa un `AlertDialog` como selector.** `useAlternativasReemplazo`
-  pide las opciones del ítem solo cuando el diálogo está abierto (`enabled` con `viajeId` e
-  `itemId`); `useReemplazarParadaCircuito` hace el `PUT`, escribe el `CircuitoSeleccionadoResponse`
-  en caché e invalida `['circuito', viajeId]`, las alternativas del ítem y `viajesAll`. El botón
-  “Reemplazar” queda deshabilitado hasta elegir una propuesta y mientras la mutación está en
-  vuelo; si `alternativas` viene vacío se muestra el `mensaje` del backend. No se agregó un
-  componente `dialog` de shadcn: `AlertDialog` ya estaba y el footer usa un `Button` normal para
-  no cerrarse antes de que termine el `PUT`.
+- **Sustituir una parada (VZ-28) usa `SustituirParadaPanel`** (`sustituir-parada-panel.tsx`,
+  `Dialog` de radix) + `SustitucionMapa` (Leaflet). La respuesta es `OpcionesSustitucionResponse`
+  (`huecoInicio/huecoFin`, `paradaAnterior/Siguiente`, `opciones[]`, `noEntran[]`, `mensaje`).
+  El panel muestra la línea de tiempo del hueco, filtros (todas / me gusta / intereses / otras;
+  tipo), orden (recomendadas / cerca / populares), tarjetas con letra A, B, C… y sus motivos,
+  “No entran ese día” plegable y pie Antes → Después; el botón es “Sustituir por {letra}”.
+  `useAlternativasReemplazo` (confirmado) y `useReemplazosAlternativa` (antes de elegir) piden las
+  opciones solo con el panel abierto. **La respuesta se valida**: si `opciones` no es una lista
+  (backend sin reiniciar con el formato viejo) no se rompe y muestra un aviso de reiniciar el
+  backend. Los tooltips del mapa van con `textContent`, nunca HTML.
+- **Días incompletos antes de confirmar.** En el paso 10, con el detalle abierto y sin alternativa
+  elegida, `useDiasAlternativa` trae el estado de cada día (`GET .../alternativas/{estrategia}/dias`)
+  y `conResumenDeDias` lo pone en el view-model. El aviso ofrece completar con
+  `useSugerenciasDiaAlternativa` / `useAgregarParadaSugeridaAlternativa` (mismo
+  `CompletarDiaDialog` que el circuito confirmado); "Dejarlo así" solo oculta el aviso en pantalla.
+  Sustituir, eliminar y agregar invalidan `queryKeys.alternativa(viajeId, estrategia)`.
+- **Días incompletos (fase 4B): la generación no rellena; el usuario decide.** Cada día del
+  seleccionado trae `resumen` (`pendiente`, `puedeCompletar`, `agregadasPorUsuario`,
+  `avisoDescartado`, `mensaje`). `AvisoDiaIncompleto` en la consulta muestra CTAs solo si
+  `puedeCompletar`; en el planificador solo informa. “Ver sugerencias…” abre un `AlertDialog`
+  con `useSugerenciasDia` (query solo con el diálogo abierto), agrupadas en
+  `OTRO_TIPO` / `OTRA_CATEGORIA`. `useAgregarParadaSugerida` y `useDescartarAvisoDia` escriben el
+  `CircuitoSeleccionadoResponse` en caché e invalidan `['circuito', viajeId]` y `viajesAll`. Las
+  paradas con `origen === 'SUGERENCIA_ACEPTADA'` muestran el badge “Agregada por vos”.
+  `enrichCircuitoConSeleccionado` une `resumen`/`origen` del seleccionado al view-model que sale
+  de la generación (imágenes/coords).
 - **MSW** agrega los handlers `GET /api/viajes/:id/circuito/seleccionado`, `DELETE
-  .../items/:itemId`, `GET .../items/:itemId/alternativas` y `PUT .../items/:itemId`, además de
+  .../items/:itemId`, `GET .../items/:itemId/alternativas`, `PUT .../items/:itemId`,
+  `GET/POST .../dias/:fecha/sugerencias|items` y `PUT .../dias/:fecha/aviso`, además de
   los fixtures `CIRCUITO_SELECCIONADO` (viaje `2`, estrategia `INTERESES`,
-  `desactualizado: true`, con un día vacío) y `ALTERNATIVAS_REEMPLAZO` (una opción válida para la
-  parada `101`). `resetStore()` siembra la selección del viaje `2`; los tests de la página cubren
-  agrupado por día, regeneración, eliminación confirmada/cancelada, alternativas, reemplazo,
-  ausencia de opciones y `404`.
+  `desactualizado: true`, con un día vacío y `resumen` pendiente), `OPCIONES_SUSTITUCION` y
+  `SUGERENCIAS_DIA`. `resetStore()` siembra la selección del viaje `2`; los tests cubren
+  agrupado por día, regeneración, eliminación, reemplazo, sugerencias (agregar / vacío /
+  Dejarlo así / 422) y `404`.
+
+## Vista de detalle del circuito (mapa + scroll-snap)
+
+`CircuitoDiaSplitView` cubre recomendado (Paso10) y confirmado (`/viajes/:id/circuito`). Lista
+con **scroll-snap** vertical (una parada por pantalla, `IntersectionObserver` para la activa) y
+mapa a la derecha (arriba en mobile).
+
+- **Geometría OSRM a pie** (`src/lib/rutas.ts`): solo `routed-foot` en
+  `routing.openstreetmap.de`. Una request por día con todos los waypoints; cola ≥1,1 s;
+  timeout 8 s. Hook `useRutaDia` en `src/api/rutas.ts` con `staleTime: Infinity`. La query key
+  incluye `estrategia ?? 'seleccionado'` para no mezclar caché entre alternativas del mismo
+  viaje. Si falla, línea recta (`geometriaLineaRecta`). No se muestran distancias/tiempos OSRM
+  ni `trasladoKm`/`trasladoMinutos` en esta vista (siguen en tipos).
+- **“Recorrer el día”** anima el muñequito (`/viajezaso/assets/turista.png`) con
+  `routeMetrics`/`sampleRoute` sobre la geometría a pie y sincroniza la lista con las
+  distancias acumuladas a lo largo de la ruta.
+
+### Links a Google Maps
+
+`src/lib/google-maps.ts` arma URLs de Directions sin API key y **sin `travelmode`** (el
+turista elige el modo en Google). Base `https://www.google.com/maps/dir/?api=1` con
+`origin` / `destination` / `waypoints` vía `URLSearchParams` (`%2C`, `%7C`). Coordenadas
+`lat,lng` o, si faltan, el texto de dirección (`location`); sin datos no hay link.
+
+- Por tarjeta: “Cómo llegar desde mi ubicación” (primera) o “desde la parada anterior”.
+- En el mapa: “Ver el día en Google Maps”; si hace falta, partes. Google Maps en celular
+  acepta pocas intermedias: `linksDiaCompleto` parte en tramos de hasta **5 paradas**
+  (origen + 3 waypoints + destino), encadenados.
+
+### Mapa 2D/3D de la consulta del circuito
+
+`CircuitoRutaMapa` orquesta una interfaz común `MapaCircuito`
+(`mapa-circuito.ts` + `mapa-circuito-leaflet.ts` + `mapa-circuito-maplibre.ts`):
+`setRuta`, `setParadas`, `setActiva`, `encuadrarRuta`, `setProgreso`, `destruir`. La
+animación y “Recorrer el día” solo hablan con esa interfaz.
+
+- **2D**: Leaflet + OSM, `scrollWheelZoom: false`.
+- **3D**: MapLibre on-demand (`import()`), estilo
+  `/viajezaso/assets/maps/cordoba-style.json`, pitch 55, `scrollZoom: false`, capa
+  `building-3d`. Sin WebGL2 / timeout 14 s / 3 errores / `webglcontextlost` → vuelve a 2D
+  con mensaje. La demo de landing (`circuit-map.tsx`) no se modifica.
+- Selector **2D | 3D** (`aria-pressed`); preferencia en `localStorage` clave `vz-mapa-modo`.
 
 ## Escritura: cómo está armado
 
@@ -311,6 +378,10 @@ Las reglas que sostienen esto:
 
 ## Estado de la página: vive en la URL
 
+El circuito también guarda su estado en la URL para que F5 no saque al usuario de donde estaba:
+`?viaje=` en el planificador y `?alternativa=` + `?dia=` en el paso 10 y en
+`/viajes/:id/circuito`.
+
 `usePageParam` lee y escribe `?page=`, **base 0 como el backend**. No es `useState` a propósito:
 la URL queda compartible, el botón "atrás" funciona y recargar no pierde la posición. La primera
 página borra el query param para que `/eventos` se vea más limpio que `/eventos?page=0`.
@@ -344,8 +415,9 @@ Cuidado con los bordes de la paginación: `pointer-events-none` depende del CSS 
 
 ## Tests
 
-Vitest + Testing Library + MSW. 191 tests en 22 archivos (9 en rojo, preexistentes y ajenos a la
-agenda y al planificador: 8 de `eventos-page` y 1 de `evento-editar-page`). `circuito-view-model`
+Vitest + Testing Library + MSW. 285 tests en 34 archivos (3 en rojo, preexistentes y ajenos al
+circuito: los de `evento-detail-page`). Los mapas (`circuito-ruta-mapa`, `sustitucion-mapa`) se
+mockean en los tests de páginas. `circuito-view-model`
 cubre el adaptador real, `borradores-page` el listado mixto borrador/confirmado y
 `circuito-page` la vista día por día del seleccionado (días vacíos, regeneración, eliminación
 confirmada/cancelada, reemplazo, ausencia de alternativas y cancelación).

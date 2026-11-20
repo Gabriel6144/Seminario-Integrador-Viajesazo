@@ -699,6 +699,12 @@ export interface CircuitoResponse {
   motivosDesactualizacion: string[]
 }
 
+/** Espejo de `model/OrigenCircuitoItem.java`. */
+export type OrigenCircuitoItem = 'GENERADO' | 'SUGERENCIA_ACEPTADA' | 'REEMPLAZO'
+
+/** Espejo de `model/MotivoSugerencia.java`. */
+export type MotivoSugerencia = 'OTRA_CATEGORIA' | 'OTRO_TIPO'
+
 /** Espejo de `dto/response/AlternativaItemResponse.java` (VZ-26). */
 export interface AlternativaItemResponse {
   itemId: number
@@ -712,6 +718,60 @@ export interface AlternativaItemResponse {
   horaInicio: LocalTime | null
   horaFin: LocalTime | null
   duracionMinutos: number | null
+  origen?: OrigenCircuitoItem
+}
+
+/** Espejo de `dto/response/ResumenDiaCircuito.java`. */
+export interface ResumenDiaCircuito {
+  asignadas: number
+  minimo: number
+  agregadasPorUsuario: number
+  avisoDescartado: boolean
+  mensaje: string | null
+  pendiente: boolean
+  puedeCompletar: boolean
+}
+
+/**
+ * Espejo de `dto/response/ResumenDiaAlternativaResponse.java`: estado de un día de una alternativa
+ * todavía sin confirmar (`GET .../alternativas/{estrategia}/dias`).
+ */
+export interface ResumenDiaAlternativaResponse {
+  fecha: string
+  resumen: ResumenDiaCircuito
+}
+
+/** Espejo de `dto/response/SugerenciaDiaResponse.java`. */
+export interface SugerenciaDiaResponse {
+  propuestaId: number
+  nombre: string
+  tipo: TipoRegistro
+  categoria: InteresCategoria | null
+  motivoSugerencia: MotivoSugerencia
+  textoMotivo: string
+  horaInicio: LocalTime | null
+  horaFin: LocalTime | null
+  trasladoKm: number
+  trasladoMinutos: number
+  duracionMinutos: number | null
+  imagenes: string[]
+  ciudad: string | null
+  localidad: string | null
+  direccion: string | null
+  lugarRecinto: string | null
+  latitud: number | null
+  longitud: number | null
+  tipoAcceso: TipoAcceso | null
+  montoEstimado: number | null
+  descripcionArancel: string | null
+  sitioOficial: string | null
+  descripcion: string | null
+}
+
+/** Espejo de `dto/response/SugerenciasDiaResponse.java`. */
+export interface SugerenciasDiaResponse {
+  sugerencias: SugerenciaDiaResponse[]
+  mensaje: string | null
 }
 
 /** Espejo de `dto/response/AlternativaReemplazoResponse.java` (VZ-28). */
@@ -734,10 +794,72 @@ export interface AlternativasReemplazoResponse {
   mensaje: string | null
 }
 
+/** Espejo de `dto/response/ParadaVecinaResponse.java`: parada que limita el hueco de una sustitución. */
+export interface ParadaVecinaResponse {
+  propuestaNombre: string | null
+  horaInicio: LocalTime | null
+  horaFin: LocalTime | null
+  latitud: number | null
+  longitud: number | null
+}
+
+/**
+ * Espejo de `dto/response/OpcionSustitucionResponse.java`: una propuesta que entra en el hueco de
+ * la parada a sustituir. `meGusta`, `enIntereses`, `distanciaKm` y `totalMeGusta` explican el orden.
+ */
+export interface OpcionSustitucionResponse {
+  propuestaId: number
+  propuestaNombre: string
+  descripcion: string | null
+  tipo: TipoRegistro
+  categoria: InteresCategoria | null
+  imagen: string | null
+  ciudad: string | null
+  localidad: string | null
+  direccion: string | null
+  latitud: number | null
+  longitud: number | null
+  horaInicio: LocalTime | null
+  horaFin: LocalTime | null
+  duracionMinutos: number | null
+  /** El turista le dio Me gusta en Propuestas. */
+  meGusta: boolean
+  /** Me gusta de todos los turistas. */
+  totalMeGusta: number
+  /** La categoría es una de las preferencias del viaje (paso 6). */
+  enIntereses: boolean
+  /** Desde la parada anterior; si es la primera del día, desde la siguiente. */
+  distanciaKm: number
+  minutosTraslado: number
+}
+
+/** Espejo de `dto/response/PropuestaFueraDeHuecoResponse.java`. */
+export interface PropuestaFueraDeHuecoResponse {
+  propuestaId: number
+  propuestaNombre: string
+  tipo: TipoRegistro
+  meGusta: boolean
+  motivo: string
+}
+
+/** Espejo de `dto/response/OpcionesSustitucionResponse.java`: respuesta de "Sustituir parada". */
+export interface OpcionesSustitucionResponse {
+  fecha: LocalDate | null
+  huecoInicio: LocalTime
+  huecoFin: LocalTime
+  paradaAnterior: ParadaVecinaResponse | null
+  paradaSiguiente: ParadaVecinaResponse | null
+  /** Ya ordenadas: Me gusta, intereses, cercanía y popularidad. */
+  opciones: OpcionSustitucionResponse[]
+  noEntran: PropuestaFueraDeHuecoResponse[]
+  mensaje: string | null
+}
+
 /** Espejo de `dto/response/DiaCircuitoResponse.java` (VZ-26). */
 export interface DiaCircuitoResponse {
   fecha: LocalDate
   items: AlternativaItemResponse[]
+  resumen?: ResumenDiaCircuito | null
 }
 
 /** Espejo de `dto/response/CircuitoSeleccionadoResponse.java` (VZ-26). */

@@ -58,6 +58,18 @@ export const queryKeys = {
   circuitoSeleccionado: (viajeId: number) => ['circuito', viajeId, 'seleccionado'] as const,
   alternativasReemplazo: (viajeId: number, itemId: number) =>
     ['circuito', viajeId, 'seleccionado', 'items', itemId, 'alternativas'] as const,
+  sugerenciasDia: (viajeId: number, fecha: string) =>
+    ['circuito', viajeId, 'seleccionado', 'dias', fecha, 'sugerencias'] as const,
+  /** Reemplazos para una parada de una alternativa todavía sin elegir (detalle recomendado). */
+  reemplazosAlternativa: (viajeId: number, estrategia: string, itemId: number) =>
+    ['circuito', viajeId, 'alternativas', estrategia, 'items', itemId, 'reemplazos'] as const,
+  /** Todo lo de una alternativa sin elegir: reemplazos, estado de los días y sugerencias. */
+  alternativa: (viajeId: number, estrategia: string) =>
+    ['circuito', viajeId, 'alternativas', estrategia] as const,
+  diasAlternativa: (viajeId: number, estrategia: string) =>
+    ['circuito', viajeId, 'alternativas', estrategia, 'dias'] as const,
+  sugerenciasDiaAlternativa: (viajeId: number, estrategia: string, fecha: string) =>
+    ['circuito', viajeId, 'alternativas', estrategia, 'dias', fecha, 'sugerencias'] as const,
   circuitosAll: () => ['circuito'] as const,
   /**
    * Prefijo de los eventos de un publicador. No es `['publicador', id]` a propósito: eso

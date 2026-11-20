@@ -103,6 +103,39 @@ class CircuitGeneratorTest {
     }
 
     @Test
+    void prefersWhatTheTouristLikedWhenInterestsTie() {
+        CircuitGenerator generator = new CircuitGenerator(new FixedDistanceProvider(1, 5));
+        CircuitCandidate museum = candidate(1L, "A Museo", InteresCategoria.CULTURA,
+                slot(DAY, "10:00", "11:00"));
+        CircuitCandidate theatre = candidate(2L, "B Teatro", InteresCategoria.CULTURA,
+                slot(DAY, "10:00", "11:00"));
+
+        GeneratedAlternative alternative = generator.generate(DAY, DAY, TipoRitmo.TRANQUILO,
+                Set.of(InteresCategoria.CULTURA), List.of(museum, theatre), Map.of(), Set.of(2L), Map.of())
+                .get(1);
+
+        // Antes ganaba "A Museo" por orden alfabético aunque el turista le había dado Me gusta al teatro.
+        assertThat(alternative.proposals()).extracting(ScheduledProposal::proposalId)
+                .containsExactly(2L);
+    }
+
+    @Test
+    void prefersTheMostPopularWhenTheTouristLikedNeither() {
+        CircuitGenerator generator = new CircuitGenerator(new FixedDistanceProvider(1, 5));
+        CircuitCandidate museum = candidate(1L, "A Museo", InteresCategoria.CULTURA,
+                slot(DAY, "10:00", "11:00"));
+        CircuitCandidate theatre = candidate(2L, "B Teatro", InteresCategoria.CULTURA,
+                slot(DAY, "10:00", "11:00"));
+
+        GeneratedAlternative alternative = generator.generate(DAY, DAY, TipoRitmo.TRANQUILO,
+                Set.of(InteresCategoria.CULTURA), List.of(museum, theatre), Map.of(), Set.of(),
+                Map.of(1L, 2L, 2L, 9L)).get(1);
+
+        assertThat(alternative.proposals()).extracting(ScheduledProposal::proposalId)
+                .containsExactly(2L);
+    }
+
+    @Test
     void respectsTheDailyLimitOfTheRhythm() {
         CircuitGenerator generator = new CircuitGenerator(new FixedDistanceProvider(0, 0));
         List<CircuitCandidate> candidates = List.of(

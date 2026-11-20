@@ -109,6 +109,10 @@ public class CircuitoItem {
 
     private Integer duracionMinutos;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 32)
+    private OrigenCircuitoItem origen = OrigenCircuitoItem.GENERADO;
+
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "circuito_item_imagen", joinColumns = @JoinColumn(name = "item_id"))
     @OrderColumn(name = "orden")

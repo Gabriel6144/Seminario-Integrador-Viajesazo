@@ -19,6 +19,28 @@ Element.prototype.releasePointerCapture ??= () => {}
 Element.prototype.scrollIntoView ??= () => {}
 window.scrollTo = () => {}
 
+class ResizeObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+window.ResizeObserver ??= ResizeObserverStub as unknown as typeof ResizeObserver
+
+class IntersectionObserverStub {
+  readonly root = null
+  readonly rootMargin = ''
+  readonly thresholds: readonly number[] = []
+  constructor(_callback: IntersectionObserverCallback) {}
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords(): IntersectionObserverEntry[] {
+    return []
+  }
+}
+window.IntersectionObserver ??=
+  IntersectionObserverStub as unknown as typeof IntersectionObserver
+
 /**
  * Ciclo de vida de MSW.
  *

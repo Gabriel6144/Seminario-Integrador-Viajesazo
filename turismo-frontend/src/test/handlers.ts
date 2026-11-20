@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw'
 
 import {
   ADMIN_DASHBOARD,
-  ALTERNATIVAS_REEMPLAZO,
+  OPCIONES_SUSTITUCION,
   errorBody,
   NOMINATIM_REVERSE,
   NOMINATIM_SEARCH,
@@ -10,6 +10,7 @@ import {
   PUBLICADOR_INSCRIPTOS,
 } from './fixtures'
 import {
+  addSuggestedCircuitoItem,
   allBorradores,
   allEventos,
   allPublicadores,
@@ -21,6 +22,7 @@ import {
   createViaje,
   deleteBorrador,
   deleteEvento,
+  discardDiaAviso,
   findBorrador,
   findCircuito,
   findCircuitoItem,
@@ -28,7 +30,14 @@ import {
   findEvento,
   findPublicador,
   findPublicadorByEmail,
+  findSugerenciasDia,
+  hasAlternativaGeneradaItem,
+  removeAlternativaGeneradaItem,
   removeCircuitoItem,
+  replaceAlternativaGeneradaItem,
+  diasAlternativaGenerada,
+  sugerenciasDiaAlternativa,
+  addSuggestedAlternativaItem,
   replaceCircuitoItem,
   allNotificaciones,
   allAgendaActividades,
@@ -633,9 +642,11 @@ export const handlers = [
         { status: 404 },
       )
     }
-    if (itemId === 101) return HttpResponse.json(ALTERNATIVAS_REEMPLAZO)
+    if (itemId === 101) return HttpResponse.json(OPCIONES_SUSTITUCION)
     return HttpResponse.json({
-      alternativas: [],
+      ...OPCIONES_SUSTITUCION,
+      opciones: [],
+      noEntran: [],
       mensaje: 'No hay propuestas disponibles para reemplazar esta parada.',
     })
   }),
@@ -670,7 +681,7 @@ export const handlers = [
         status: 400,
       })
     }
-    const alternativa = ALTERNATIVAS_REEMPLAZO.alternativas.find(
+    const alternativa = OPCIONES_SUSTITUCION.opciones.find(
       (candidate) => candidate.propuestaId === body.propuestaId,
     )
     if (alternativa === undefined) {
@@ -681,6 +692,95 @@ export const handlers = [
     }
     replaceCircuitoItem(viaje.id, item.itemId, alternativa)
     return HttpResponse.json(circuito)
+  }),
+
+  http.get('/api/viajes/:id/circuito/seleccionado/dias/:fecha/sugerencias', ({ params }) => {
+    const viaje = findBorrador(Number(params.id))
+    if (viaje === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el viaje con id ${String(params.id)}`), {
+        status: 404,
+      })
+    }
+    const circuito = findCircuitoSeleccionado(viaje.id)
+    if (circuito === undefined) {
+      return HttpResponse.json(
+        errorBody(404, 'El circuito del viaje todavía no tiene una alternativa seleccionada'),
+        { status: 404 },
+      )
+    }
+    const response = findSugerenciasDia(viaje.id, String(params.fecha))
+    if (response === undefined) {
+      return HttpResponse.json(
+        errorBody(404, `No existe el día ${String(params.fecha)} en el circuito seleccionado`),
+        { status: 404 },
+      )
+    }
+    return HttpResponse.json(response)
+  }),
+
+  http.post(
+    '/api/viajes/:id/circuito/seleccionado/dias/:fecha/items',
+    async ({ params, request }) => {
+      const viaje = findBorrador(Number(params.id))
+      if (viaje === undefined) {
+        return HttpResponse.json(errorBody(404, `No existe el viaje con id ${String(params.id)}`), {
+          status: 404,
+        })
+      }
+      if (findCircuitoSeleccionado(viaje.id) === undefined) {
+        return HttpResponse.json(
+          errorBody(404, 'El circuito del viaje todavía no tiene una alternativa seleccionada'),
+          { status: 404 },
+        )
+      }
+      const body = await readJson<Partial<{ propuestaId: number }>>(request)
+      if (typeof body.propuestaId !== 'number') {
+        return HttpResponse.json(errorBody(400, 'La propuesta sugerida es obligatoria'), {
+          status: 400,
+        })
+      }
+      const result = addSuggestedCircuitoItem(viaje.id, String(params.fecha), body.propuestaId)
+      if (result === 'not-found') {
+        return HttpResponse.json(
+          errorBody(404, `No existe el día ${String(params.fecha)} en el circuito seleccionado`),
+          { status: 404 },
+        )
+      }
+      if (result === 'invalid') {
+        return HttpResponse.json(
+          errorBody(422, 'la propuesta elegida ya no es una sugerencia válida para este día'),
+          { status: 422 },
+        )
+      }
+      return HttpResponse.json(result)
+    },
+  ),
+
+  http.put('/api/viajes/:id/circuito/seleccionado/dias/:fecha/aviso', async ({ params, request }) => {
+    const viaje = findBorrador(Number(params.id))
+    if (viaje === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el viaje con id ${String(params.id)}`), {
+        status: 404,
+      })
+    }
+    if (findCircuitoSeleccionado(viaje.id) === undefined) {
+      return HttpResponse.json(
+        errorBody(404, 'El circuito del viaje todavía no tiene una alternativa seleccionada'),
+        { status: 404 },
+      )
+    }
+    const body = await readJson<Partial<{ descartado: boolean }>>(request)
+    if (body.descartado !== true) {
+      return HttpResponse.json(errorBody(400, 'descartado debe ser true'), { status: 400 })
+    }
+    const updated = discardDiaAviso(viaje.id, String(params.fecha))
+    if (updated === undefined) {
+      return HttpResponse.json(
+        errorBody(404, `No existe el día ${String(params.fecha)} en el circuito seleccionado`),
+        { status: 404 },
+      )
+    }
+    return HttpResponse.json(updated)
   }),
 
   http.get('/api/viajes/:id/circuito', ({ params }) => {
@@ -769,6 +869,145 @@ export const handlers = [
       status: existente === undefined ? 201 : 200,
     })
   }),
+
+  // Antes de confirmar: sustituir / eliminar paradas de una alternativa sin elegir.
+  http.get(
+    '/api/viajes/:id/circuito/alternativas/:estrategia/items/:itemId/alternativas',
+    ({ params }) => {
+      const circuito = findCircuito(Number(params.id))
+      if (circuito === undefined) {
+        return HttpResponse.json(errorBody(404, 'El viaje todavía no tiene un circuito generado'), {
+          status: 404,
+        })
+      }
+      if (circuito.estrategiaSeleccionada !== null) {
+        return HttpResponse.json(
+          errorBody(400, 'el circuito ya tiene una alternativa elegida'),
+          { status: 400 },
+        )
+      }
+      if (!hasAlternativaGeneradaItem(Number(params.id), String(params.estrategia), Number(params.itemId))) {
+        return HttpResponse.json(errorBody(404, 'No existe la parada en la alternativa'), {
+          status: 404,
+        })
+      }
+      return HttpResponse.json(OPCIONES_SUSTITUCION)
+    },
+  ),
+
+  http.put(
+    '/api/viajes/:id/circuito/alternativas/:estrategia/items/:itemId',
+    async ({ params, request }) => {
+      const body = await readJson<Partial<{ propuestaId: number }>>(request)
+      const reemplazo = OPCIONES_SUSTITUCION.opciones.find(
+        (candidate) => candidate.propuestaId === body.propuestaId,
+      )
+      if (reemplazo === undefined) {
+        return HttpResponse.json(
+          errorBody(422, 'la propuesta elegida no es un reemplazo válido para esta parada'),
+          { status: 422 },
+        )
+      }
+      const circuito = replaceAlternativaGeneradaItem(
+        Number(params.id),
+        String(params.estrategia),
+        Number(params.itemId),
+        reemplazo,
+      )
+      if (circuito === undefined) {
+        return HttpResponse.json(errorBody(404, 'No existe la parada en la alternativa'), {
+          status: 404,
+        })
+      }
+      return HttpResponse.json(circuito)
+    },
+  ),
+
+  http.delete('/api/viajes/:id/circuito/alternativas/:estrategia/items/:itemId', ({ params, request }) => {
+    if (new URL(request.url).searchParams.get('confirmar') !== 'true') {
+      return HttpResponse.json(
+        errorBody(409, 'la eliminación de la parada requiere confirmación; confirmá con confirmar=true'),
+        { status: 409 },
+      )
+    }
+    const circuito = removeAlternativaGeneradaItem(
+      Number(params.id),
+      String(params.estrategia),
+      Number(params.itemId),
+    )
+    if (circuito === undefined) {
+      return HttpResponse.json(errorBody(404, 'No existe la parada en la alternativa'), {
+        status: 404,
+      })
+    }
+    return HttpResponse.json(circuito)
+  }),
+
+  // Antes de confirmar: completar días incompletos de una alternativa sin elegir.
+  http.get('/api/viajes/:id/circuito/alternativas/:estrategia/dias', ({ params }) => {
+    const circuito = findCircuito(Number(params.id))
+    if (circuito?.estrategiaSeleccionada != null) {
+      return HttpResponse.json(errorBody(400, 'el circuito ya tiene una alternativa elegida'), {
+        status: 400,
+      })
+    }
+    const dias = diasAlternativaGenerada(Number(params.id), String(params.estrategia))
+    if (dias === undefined) {
+      return HttpResponse.json(errorBody(404, 'No existe la alternativa en el circuito generado'), {
+        status: 404,
+      })
+    }
+    return HttpResponse.json(dias)
+  }),
+
+  http.get(
+    '/api/viajes/:id/circuito/alternativas/:estrategia/dias/:fecha/sugerencias',
+    ({ params }) => {
+      const response = sugerenciasDiaAlternativa(
+        Number(params.id),
+        String(params.estrategia),
+        String(params.fecha),
+      )
+      if (response === undefined) {
+        return HttpResponse.json(
+          errorBody(404, `No existe el día ${String(params.fecha)} en el circuito seleccionado`),
+          { status: 404 },
+        )
+      }
+      return HttpResponse.json(response)
+    },
+  ),
+
+  http.post(
+    '/api/viajes/:id/circuito/alternativas/:estrategia/dias/:fecha/items',
+    async ({ params, request }) => {
+      const body = await readJson<Partial<{ propuestaId: number }>>(request)
+      if (typeof body.propuestaId !== 'number') {
+        return HttpResponse.json(errorBody(400, 'La propuesta sugerida es obligatoria'), {
+          status: 400,
+        })
+      }
+      const result = addSuggestedAlternativaItem(
+        Number(params.id),
+        String(params.estrategia),
+        String(params.fecha),
+        body.propuestaId,
+      )
+      if (result === 'not-found') {
+        return HttpResponse.json(
+          errorBody(404, `No existe el día ${String(params.fecha)} en el circuito seleccionado`),
+          { status: 404 },
+        )
+      }
+      if (result === 'invalid') {
+        return HttpResponse.json(
+          errorBody(422, 'la propuesta elegida ya no es una sugerencia válida para este día'),
+          { status: 422 },
+        )
+      }
+      return HttpResponse.json(result)
+    },
+  ),
 
   http.post('/api/viajes/:id/circuito/seleccion', async ({ params, request }) => {
     const viaje = findBorrador(Number(params.id))
@@ -879,6 +1118,24 @@ export const handlers = [
   http.get('/nominatim/search', () => HttpResponse.json(NOMINATIM_SEARCH)),
 
   http.get('/nominatim/reverse', () => HttpResponse.json(NOMINATIM_REVERSE)),
+
+  // OSRM FOSSGIS (geometría a pie del mapa de consulta).
+  http.get('https://routing.openstreetmap.de/routed-foot/route/v1/driving/:coords', () =>
+    HttpResponse.json({
+      code: 'Ok',
+      routes: [
+        {
+          geometry: {
+            type: 'LineString',
+            coordinates: [
+              [-64.18, -31.42],
+              [-64.183, -31.413],
+            ],
+          },
+        },
+      ],
+    }),
+  ),
 ]
 
 /**

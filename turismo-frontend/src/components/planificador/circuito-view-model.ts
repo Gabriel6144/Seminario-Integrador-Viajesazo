@@ -5,6 +5,7 @@ import {
   type CircuitStrategy,
   type CircuitoAlternativaResponse,
   type CircuitoItemResponse,
+  type CircuitoSeleccionadoResponse,
   type InteresCategoria,
 } from '@/types/api'
 import type {
@@ -73,6 +74,12 @@ const PACE_LABELS: Record<string, string> = {
 
 function formatTime(value: string | null): string {
   if (!value) return '--:--'
+  return value.slice(0, 5)
+}
+
+/** Recorta `LocalTime` a HH:mm; null si no hay valor. */
+function toHoraDisplay(value: string | null): string | null {
+  if (!value) return null
   return value.slice(0, 5)
 }
 
@@ -148,6 +155,9 @@ function toStop(
       ? `${formatDistance(next.trasladoKm)} · ${next.trasladoMinutos} min de traslado`
       : undefined
 
+  const images =
+    item.imagenes.length > 0 ? [...item.imagenes] : [FALLBACK_IMAGE]
+
   return {
     id: String(item.itemId),
     number,
@@ -165,7 +175,14 @@ function toStop(
         ? `${start} - ${end}`
         : 'Horario a confirmar',
     price: formatPrice(item),
-    image: item.imagenes[0] ?? FALLBACK_IMAGE,
+    image: images[0],
+    images,
+    tipo: item.tipo,
+    fecha: item.fecha,
+    horaInicio: toHoraDisplay(item.horaInicio),
+    horaFin: toHoraDisplay(item.horaFin),
+    trasladoKm: item.trasladoKm,
+    trasladoMinutos: item.trasladoMinutos,
     duration: formatDuration(duration),
     walkNext: transfer,
     latitud: item.latitud ?? undefined,
@@ -315,4 +332,40 @@ export function buildMapStops(
 
 export function firstDayWithStops(circuito: CircuitoRecomendado): number {
   return circuito.days.find((day) => (circuito.stopsByDay[day.number] ?? []).length > 0)?.number ?? 1
+}
+
+/**
+ * Une el view-model (imágenes, coords) con `resumen`/`origen` del circuito seleccionado.
+ * La generación no trae esos campos; la consulta día por día sí.
+ */
+export function enrichCircuitoConSeleccionado(
+  circuito: CircuitoRecomendado,
+  seleccionado: CircuitoSeleccionadoResponse | null | undefined,
+): CircuitoRecomendado {
+  if (!seleccionado) return circuito
+
+  const resumenByFecha = new Map(
+    seleccionado.dias.map((dia) => [dia.fecha, dia.resumen ?? null] as const),
+  )
+  const origenByItemId = new Map(
+    seleccionado.dias.flatMap((dia) =>
+      dia.items.map((item) => [item.itemId, item.origen] as const),
+    ),
+  )
+
+  const days = circuito.days.map((day) => ({
+    ...day,
+    resumen: day.fecha ? (resumenByFecha.get(day.fecha) ?? day.resumen ?? null) : day.resumen,
+  }))
+
+  const stopsByDay: Record<number, ParadaCircuitoDetalle[]> = {}
+  for (const [dayKey, stops] of Object.entries(circuito.stopsByDay)) {
+    const dayNumber = Number(dayKey)
+    stopsByDay[dayNumber] = stops.map((stop) => {
+      const origen = origenByItemId.get(Number(stop.id))
+      return origen !== undefined ? { ...stop, origen } : stop
+    })
+  }
+
+  return { ...circuito, days, stopsByDay }
 }

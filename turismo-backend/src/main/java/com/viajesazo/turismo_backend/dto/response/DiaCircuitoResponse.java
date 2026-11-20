@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 public record DiaCircuitoResponse(
-        LocalDate fecha,
-        List<AlternativaItemResponse> items) {
+		LocalDate fecha,
+		List<AlternativaItemResponse> items,
+		ResumenDiaCircuito resumen) {
 }

@@ -1,10 +1,12 @@
 import { useEffect, useState, useId, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   fetchCircuito,
   useGenerarCircuito,
   useSeleccionarCircuito,
 } from '@/api/circuitos'
+import { queryKeys } from '@/api/queries'
 import {
   useBorrador,
   useActualizarBorrador,
@@ -27,21 +29,50 @@ import { Paso6Intereses } from '@/components/planificador/paso-6-intereses'
 import { Paso7Ritmo } from '@/components/planificador/paso-7-ritmo'
 import { Paso8Resumen } from '@/components/planificador/paso-8-resumen'
 import { Paso9Generando } from '@/components/planificador/paso-9-generando'
-import { Paso10Circuito } from '@/components/planificador/paso-10-circuito'
+import {
+  PARAM_ALTERNATIVA,
+  PARAM_DIA,
+  Paso10Circuito,
+} from '@/components/planificador/paso-10-circuito'
 import { PlanificadorExitModal } from '@/components/planificador/planificador-exit-modal'
 import { PlanificadorHeader } from '@/components/planificador/planificador-header'
 import { PlanificadorRegenerateModal } from '@/components/planificador/planificador-regenerate-modal'
 import type { DestinoSeleccionado, LoadingStep } from '@/components/planificador/types'
-import { toUserMessage } from '@/lib/http'
+import { apiGet, toUserMessage } from '@/lib/http'
 import type {
   CircuitStrategy,
   DiaRitmoPlan,
   GeneracionCircuitoResponse,
   InteresCategoria,
   TipoRitmo,
+  UbicacionResponse,
   ViajeBorradorRequest,
   ViajeRequest,
+  ViajeResponse,
 } from '@/types/api'
+
+/**
+ * Con el circuito ya generado, la URL lleva `?viaje=<id>`: si se recarga la página (F5) el
+ * planificador vuelve a pedir el viaje y su circuito y abre otra vez el paso 10.
+ */
+const PARAM_VIAJE = 'viaje'
+
+function destinoDesdeUbicacion(ubicacion: UbicacionResponse): DestinoSeleccionado {
+  return {
+    nombre:
+      [ubicacion.ciudad, ubicacion.localidad].filter(Boolean).join(' · ') || ubicacion.nombre,
+    ciudad: ubicacion.ciudad,
+    localidad: ubicacion.localidad,
+    latitud: ubicacion.latitud,
+    longitud: ubicacion.longitud,
+  }
+}
+
+function idDesdeParam(valor: string | null): number | null {
+  if (valor === null) return null
+  const id = Number(valor)
+  return Number.isInteger(id) && id > 0 ? id : null
+}
 
 const RHYTHM_REVERSE: Record<TipoRitmo, string> = {
   TRANQUILO: 'Tranquilo',
@@ -60,7 +91,8 @@ function isAlreadyGenerated(error: unknown): boolean {
 
 export function PlanificadorPage() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const queryClient = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
   const borradorIdInicial = searchParams.get('borrador')
   const [borradorId, setBorradorId] = useState<number | null>(
     borradorIdInicial ? Number(borradorIdInicial) : null,
@@ -200,20 +232,91 @@ export function PlanificadorPage() {
     if (d.ritmo) setRhythm(RHYTHM_REVERSE[d.ritmo] ?? rhythm)
     if (d.diasPlan?.length) setDiasPlan(d.diasPlan)
     if (d.ubicacion) {
-      const ubicacion = d.ubicacion
-      setDestino({
-        nombre:
-          [ubicacion.ciudad, ubicacion.localidad].filter(Boolean).join(' · ') ||
-          ubicacion.nombre,
-        ciudad: ubicacion.ciudad,
-        localidad: ubicacion.localidad,
-        latitud: ubicacion.latitud,
-        longitud: ubicacion.longitud,
-      })
+      setDestino(destinoDesdeUbicacion(d.ubicacion))
     }
     if (d.pasoActual) setStep(d.pasoActual)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [borradorQuery.data, borradorId])
+
+  // F5 en el paso 10: la URL trae `?viaje=<id>`. Se piden el viaje y su circuito y se vuelve a
+  // armar la pantalla tal cual estaba (el detalle abierto y el día salen de la misma URL).
+  const viajeARestaurar = idDesdeParam(searchParams.get(PARAM_VIAJE))
+  const [restaurando, setRestaurando] = useState<boolean>(() => viajeARestaurar !== null)
+  const restauracionIniciada = useRef(false)
+
+  useEffect(() => {
+    if (restauracionIniciada.current) return
+    restauracionIniciada.current = true
+    if (viajeARestaurar === null) return
+
+    Promise.all([
+      queryClient.fetchQuery({
+        queryKey: queryKeys.viaje(viajeARestaurar),
+        queryFn: ({ signal }) =>
+          apiGet<ViajeResponse>(`/api/viajes/${viajeARestaurar}`, signal),
+      }),
+      queryClient.fetchQuery({
+        queryKey: queryKeys.circuito(viajeARestaurar),
+        queryFn: ({ signal }) => fetchCircuito(viajeARestaurar, signal),
+      }),
+    ]).then(
+      ([viaje, generado]) => {
+        setTripName(viaje.nombre ?? 'Escapada a Córdoba')
+        if (viaje.fechaInicio) setDateFrom(viaje.fechaInicio)
+        if (viaje.fechaFin) setDateTo(viaje.fechaFin)
+        if (viaje.rangoInteresKm != null) {
+          setRadiusKm(Math.min(Math.max(viaje.rangoInteresKm, 1), RADIO_MAX_KM))
+        }
+        if (viaje.interesesCategoria.length > 0) {
+          setInterests(
+            viaje.interesesCategoria.map((item) => INTEREST_REVERSE[item] ?? item),
+          )
+        }
+        if (viaje.ritmo) setRhythm(RHYTHM_REVERSE[viaje.ritmo])
+        if (viaje.diasPlan?.length) setDiasPlan(viaje.diasPlan)
+        if (viaje.ubicacion) setDestino(destinoDesdeUbicacion(viaje.ubicacion))
+        setTripId(viaje.id)
+        setCircuito(generado)
+        setSelectedStrategy(generado.estrategiaSeleccionada)
+        setStep(10)
+        setRestaurando(false)
+      },
+      () => {
+        // El viaje ya no existe o no tiene circuito: se arranca el planificador de cero.
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev)
+            next.delete(PARAM_VIAJE)
+            next.delete(PARAM_ALTERNATIVA)
+            next.delete(PARAM_DIA)
+            return next
+          },
+          { replace: true },
+        )
+        setRestaurando(false)
+      },
+    )
+  }, [viajeARestaurar, queryClient, setSearchParams])
+
+  /** Pone o saca el viaje de la URL; sin viaje también se cierra el detalle abierto. */
+  const syncViajeEnUrl = (viajeId: number | null) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete(PARAM_ALTERNATIVA)
+        next.delete(PARAM_DIA)
+        if (viajeId === null) {
+          next.delete(PARAM_VIAJE)
+        } else {
+          next.set(PARAM_VIAJE, String(viajeId))
+          // El borrador ya se convirtió en viaje: si quedara en la URL, al recargar pisaría el paso.
+          next.delete('borrador')
+        }
+        return next
+      },
+      { replace: true },
+    )
+  }
 
   const isSavingTrip =
     crearViaje.isPending ||
@@ -328,10 +431,14 @@ export function PlanificadorPage() {
       setCircuito(generado)
       setSelectedStrategy(generado.estrategiaSeleccionada)
       setActiveDay(1)
+      return viajeId
     })()
 
     void Promise.all([request, animation])
-      .then(() => setStep(10))
+      .then(([viajeId]) => {
+        setStep(10)
+        syncViajeEnUrl(viajeId)
+      })
       .catch((error: unknown) => {
         if (intervalRef.current) clearInterval(intervalRef.current)
         if (timeoutRef.current) clearTimeout(timeoutRef.current)
@@ -427,6 +534,7 @@ export function PlanificadorPage() {
 
   const handleRestart = () => {
     setShowSuccessModal(false)
+    syncViajeEnUrl(null)
     setStep(1)
     setTripId(null)
     setCircuito(null)
@@ -464,6 +572,20 @@ export function PlanificadorPage() {
   const handleDiscardExit = () => {
     setIsExitModalOpen(false)
     navigate('/propuestas')
+  }
+
+  if (restaurando) {
+    return (
+      <div
+        role="status"
+        className="mx-auto flex w-full max-w-4xl flex-col items-center justify-center gap-3 py-24 text-slate-500"
+      >
+        <span className="material-symbols-outlined animate-spin text-[32px] text-sky-600">
+          progress_activity
+        </span>
+        <p className="text-sm font-medium">Recuperando tu circuito…</p>
+      </div>
+    )
   }
 
   return (
@@ -571,9 +693,10 @@ export function PlanificadorPage() {
             />
           )}
 
-          {step === 10 && circuito !== null && (
+          {step === 10 && circuito !== null && tripId !== null && (
             <Paso10Circuito
               circuito={circuito}
+              viajeId={tripId}
               rhythm={rhythm}
               dateFrom={dateFrom}
               dateTo={dateTo}
@@ -586,8 +709,12 @@ export function PlanificadorPage() {
               onCloseSuccess={() => setShowSuccessModal(false)}
               onGoToTrips={handleGoToTrips}
               onRestart={handleRestart}
-              onBackToResumen={() => setStep(8)}
+              onBackToResumen={() => {
+                syncViajeEnUrl(null)
+                setStep(8)
+              }}
               onRegenerate={() => setIsRegenerateModalOpen(true)}
+              onCircuitoChange={setCircuito}
             />
           )}
         </main>

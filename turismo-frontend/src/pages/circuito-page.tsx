@@ -1,45 +1,43 @@
-import { ArrowLeftIcon, ClockIcon, MapPinIcon } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ArrowLeftIcon } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import {
+  useAgregarParadaSugerida,
   useAlternativasReemplazo,
   useCircuito,
   useCircuitoSeleccionado,
+  useDescartarAvisoDia,
   useEliminarParadaCircuito,
   useGenerarCircuito,
   useReemplazarParadaCircuito,
   useSeleccionarCircuito,
+  useSugerenciasDia,
 } from '@/api/circuitos'
 import { useViaje } from '@/api/viajes'
-import { CategoriaBadge } from '@/components/categoria-badge'
-import { CircuitoDetalleView } from '@/components/planificador/circuito-detalle-view'
+import { CircuitoDiaSplitView } from '@/components/planificador/circuito-dia-split-view'
 import { CircuitoMapaGeneralView } from '@/components/planificador/circuito-mapa-general-view'
+import { CompletarDiaDialog } from '@/components/planificador/completar-dia-dialog'
 import {
+  enrichCircuitoConSeleccionado,
   firstDayWithStops,
   toCircuitoRecomendado,
 } from '@/components/planificador/circuito-view-model'
-import { Paso10Circuito } from '@/components/planificador/paso-10-circuito'
+import { EliminarParadaDialog } from '@/components/planificador/parada-dialogs'
+import { SustituirParadaPanel } from '@/components/planificador/sustituir-parada-panel'
+import { PARAM_DIA, Paso10Circuito } from '@/components/planificador/paso-10-circuito'
 import type { ParadaCircuitoDetalle } from '@/components/planificador/types'
 import { PlanificadorRegenerateModal } from '@/components/planificador/planificador-regenerate-modal'
 import { ErrorState } from '@/components/query-state'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatTimeRange } from '@/lib/dates'
 import { toUserMessage } from '@/lib/http'
 import { parseId } from '@/lib/parse-id'
-import type { AlternativaItemResponse, CircuitStrategy, TipoRitmo } from '@/types/api'
+import type {
+  CircuitStrategy,
+  TipoRitmo,
+} from '@/types/api'
 
 const MOTIVO_LABELS: Record<string, string> = {
   FECHAS: 'fechas del viaje',
@@ -53,15 +51,6 @@ const RHYTHM_LABELS: Record<TipoRitmo, string> = {
   EQUILIBRADO: 'Equilibrado',
   INTENSIVO: 'Intensivo',
   MANUAL: 'Manual',
-}
-
-function locationLabel(
-  item: Pick<AlternativaItemResponse, 'direccion' | 'localidad' | 'ciudad'>,
-): string {
-  const parts = [item.direccion, item.localidad, item.ciudad]
-    .filter((part): part is string => Boolean(part && part.trim()))
-    .filter((part, index, all) => all.indexOf(part) === index)
-  return parts.length > 0 ? parts.join(', ') : 'Ubicación a confirmar'
 }
 
 function CircuitoSkeleton() {
@@ -100,15 +89,22 @@ export function CircuitoPage() {
   const eliminar = useEliminarParadaCircuito()
   const reemplazar = useReemplazarParadaCircuito()
   const seleccionar = useSeleccionarCircuito()
+  const agregarSugerida = useAgregarParadaSugerida()
+  const descartarAviso = useDescartarAvisoDia()
   const [isRegenerateModalOpen, setIsRegenerateModalOpen] = useState(false)
-  const [itemToDelete, setItemToDelete] = useState<AlternativaItemResponse | null>(null)
-  const [itemToReplace, setItemToReplace] = useState<AlternativaItemResponse | null>(null)
-  const [selectedPropuestaId, setSelectedPropuestaId] = useState<number | null>(null)
-  const [activeDay, setActiveDay] = useState(1)
+  const [stopToDelete, setStopToDelete] = useState<ParadaCircuitoDetalle | null>(null)
+  const [stopToReplace, setStopToReplace] = useState<ParadaCircuitoDetalle | null>(null)
+  const [sugerenciasFecha, setSugerenciasFecha] = useState<string | null>(null)
+  const [addingPropuestaId, setAddingPropuestaId] = useState<number | null>(null)
+  const [sugerenciaError, setSugerenciaError] = useState<string | null>(null)
   const [showMap, setShowMap] = useState(false)
   const [selectionActiveDay, setSelectionActiveDay] = useState(1)
   const [selectionSuccess, setSelectionSuccess] = useState(false)
-  const alternativas = useAlternativasReemplazo(viajeId, itemToReplace?.itemId ?? null)
+  const alternativas = useAlternativasReemplazo(
+    viajeId,
+    stopToReplace === null ? null : Number(stopToReplace.id),
+  )
+  const sugerencias = useSugerenciasDia(viajeId, sugerenciasFecha)
 
   const handleRegenerate = () => {
     if (viajeId === null) return
@@ -137,19 +133,44 @@ export function CircuitoPage() {
 
   const richCircuito = useMemo(() => {
     if (!alternativaSeleccionada) return null
-    return toCircuitoRecomendado(
+    const rhythmLabel = viajeQuery.data?.ritmo
+      ? RHYTHM_LABELS[viajeQuery.data.ritmo]
+      : 'Equilibrado'
+    const base = toCircuitoRecomendado(
       alternativaSeleccionada,
-      'Equilibrado',
+      rhythmLabel,
       viajeQuery.data?.fechaInicio ?? undefined,
       viajeQuery.data?.fechaFin ?? undefined,
     )
-  }, [alternativaSeleccionada, viajeQuery.data?.fechaInicio, viajeQuery.data?.fechaFin])
+    return enrichCircuitoConSeleccionado(base, circuito)
+  }, [
+    alternativaSeleccionada,
+    circuito,
+    viajeQuery.data?.ritmo,
+    viajeQuery.data?.fechaInicio,
+    viajeQuery.data?.fechaFin,
+  ])
 
-  useEffect(() => {
-    if (richCircuito) {
-      setActiveDay(firstDayWithStops(richCircuito))
-    }
-  }, [richCircuito])
+  // El día que se está viendo vive en la URL (`?dia=2`): un F5 vuelve al mismo día y, después de
+  // sustituir o eliminar una parada, la vista se queda donde estaba en lugar de saltar al primero.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const diaEnUrl = Number(searchParams.get(PARAM_DIA))
+  const activeDay =
+    richCircuito === null
+      ? 1
+      : richCircuito.days.some((day) => day.number === diaEnUrl)
+        ? diaEnUrl
+        : firstDayWithStops(richCircuito)
+  const setActiveDay = (day: number) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.set(PARAM_DIA, String(day))
+        return next
+      },
+      { replace: true },
+    )
+  }
 
   if (viajeId === null) return <IdInvalido />
 
@@ -230,6 +251,7 @@ export function CircuitoPage() {
           </div>
           <Paso10Circuito
             circuito={circuitoGenerado.data}
+            viajeId={viajeId}
             rhythm={rhythmLabel}
             dateFrom={dateFrom}
             dateTo={dateTo}
@@ -292,20 +314,12 @@ export function CircuitoPage() {
     )
   }
 
-  const findSelectedItem = (itemId: number): AlternativaItemResponse | null => {
-    for (const dia of circuito.dias) {
-      const item = dia.items.find((candidate) => candidate.itemId === itemId)
-      if (item) return item
-    }
-    return null
-  }
-
   const handleDelete = () => {
-    const target = itemToDelete
+    const target = stopToDelete
     if (target === null) return
-    eliminar.mutateAsync({ viajeId, itemId: target.itemId }).then(
+    eliminar.mutateAsync({ viajeId, itemId: Number(target.id) }).then(
       () => {
-        setItemToDelete(null)
+        setStopToDelete(null)
         toast.success('Parada eliminada correctamente')
       },
       (error: unknown) => {
@@ -314,36 +328,61 @@ export function CircuitoPage() {
     )
   }
 
-  const closeReplace = () => {
-    setItemToReplace(null)
-    setSelectedPropuestaId(null)
-  }
+  const closeReplace = () => setStopToReplace(null)
+  const openReplaceByStop = (stop: ParadaCircuitoDetalle) => setStopToReplace(stop)
+  const openDeleteByStop = (stop: ParadaCircuitoDetalle) => setStopToDelete(stop)
 
-  const openReplace = (item: AlternativaItemResponse) => {
-    setSelectedPropuestaId(null)
-    setItemToReplace(item)
-  }
-
-  const openReplaceByStop = (stop: ParadaCircuitoDetalle) => {
-    const item = findSelectedItem(Number(stop.id))
-    if (item) openReplace(item)
-  }
-
-  const openDeleteByStop = (stop: ParadaCircuitoDetalle) => {
-    const item = findSelectedItem(Number(stop.id))
-    if (item) setItemToDelete(item)
-  }
-
-  const handleReplace = () => {
-    const target = itemToReplace
-    if (target === null || selectedPropuestaId === null) return
-    reemplazar.mutateAsync({ viajeId, itemId: target.itemId, propuestaId: selectedPropuestaId }).then(
+  const handleReplace = (propuestaId: number) => {
+    const target = stopToReplace
+    if (target === null) return
+    reemplazar.mutateAsync({ viajeId, itemId: Number(target.id), propuestaId }).then(
       () => {
         closeReplace()
         toast.success('Parada reemplazada correctamente')
       },
       (error: unknown) => {
         toast.error(toUserMessage(error) || 'No pudimos reemplazar la parada')
+      },
+    )
+  }
+
+  const closeSugerencias = () => {
+    setSugerenciasFecha(null)
+    setAddingPropuestaId(null)
+    setSugerenciaError(null)
+  }
+
+  const handleDejarloAsi = (fecha: string) => {
+    descartarAviso.mutate(
+      { viajeId, fecha },
+      {
+        onSuccess: () => {
+          toast.success('Dejamos el día como está')
+        },
+        onError: (error) => {
+          toast.error(toUserMessage(error) || 'No pudimos guardar la decisión')
+        },
+      },
+    )
+  }
+
+  const handleAgregarSugerencia = (propuestaId: number) => {
+    if (sugerenciasFecha === null) return
+    setAddingPropuestaId(propuestaId)
+    setSugerenciaError(null)
+    agregarSugerida.mutate(
+      { viajeId, fecha: sugerenciasFecha, propuestaId },
+      {
+        onSuccess: () => {
+          toast.success('Parada agregada al día')
+          setAddingPropuestaId(null)
+        },
+        onError: (error) => {
+          const message = toUserMessage(error) || 'No pudimos agregar la sugerencia'
+          setSugerenciaError(message)
+          toast.error(message)
+          setAddingPropuestaId(null)
+        },
       },
     )
   }
@@ -399,20 +438,20 @@ export function CircuitoPage() {
       )}
 
       {richCircuito ? (
-        <CircuitoDetalleView
+        <CircuitoDiaSplitView
           circuito={richCircuito}
           activeDay={activeDay}
-          selectedStrategy={circuito.estrategia}
           onChangeActiveDay={setActiveDay}
           onBackToList={() => window.history.back()}
           onExploreMap={() => setShowMap(true)}
-          editable
           onReplaceStop={openReplaceByStop}
           onDeleteStop={openDeleteByStop}
+          viajeId={viajeId}
           headerTitle="Circuito confirmado"
           backAriaLabel="Volver a Mis viajes"
-          showHeroBadge={false}
-          ritmo={viajeQuery.data?.ritmo ?? null}
+          onVerSugerencias={setSugerenciasFecha}
+          onDejarloAsi={handleDejarloAsi}
+          descartandoAviso={descartarAviso.isPending}
         />
       ) : circuitoGenerado.isPending ? (
         <CircuitoSkeleton />
@@ -422,117 +461,33 @@ export function CircuitoPage() {
         </p>
       )}
 
-      <AlertDialog
-        open={itemToDelete !== null}
-        onOpenChange={(open) => {
-          if (!open) setItemToDelete(null)
-        }}
-      >
-        <AlertDialogContent className="max-w-lg rounded-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="font-heading text-lg font-bold">
-              Eliminar parada
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              ¿Querés eliminar “{itemToDelete?.propuestaNombre}” del circuito? Se
-              recalcularán los traslados y las métricas del recorrido.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={eliminar.isPending}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={eliminar.isPending}
-              className="bg-red-600 text-white hover:bg-red-700"
-            >
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <EliminarParadaDialog
+        parada={stopToDelete}
+        paradasDelDia={richCircuito?.stopsByDay[activeDay] ?? []}
+        confirmado
+        isPending={eliminar.isPending}
+        onCancel={() => setStopToDelete(null)}
+        onConfirm={handleDelete}
+      />
 
-      <AlertDialog
-        open={itemToReplace !== null}
-        onOpenChange={(open) => {
-          if (!open) closeReplace()
-        }}
-      >
-        <AlertDialogContent className="max-w-lg rounded-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="font-heading text-lg font-bold">
-              Sustituir parada
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Elegí una propuesta para reemplazar “{itemToReplace?.propuestaNombre}”. Solo se
-              muestran opciones que entran en el mismo bloque horario y respetan los traslados.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
+      <SustituirParadaPanel
+        parada={stopToReplace}
+        diaLabel={richCircuito?.days.find((day) => day.number === activeDay)?.label ?? ''}
+        opciones={alternativas}
+        isPending={reemplazar.isPending}
+        onCancel={closeReplace}
+        onConfirm={handleReplace}
+      />
 
-          <div className="flex max-h-72 flex-col gap-2 overflow-y-auto py-2">
-            {alternativas.isPending && (
-              <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">
-                Buscando alternativas...
-              </p>
-            )}
-            {alternativas.isError && (
-              <p className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                {toUserMessage(alternativas.error)}
-              </p>
-            )}
-            {alternativas.isSuccess && alternativas.data.alternativas.length === 0 && (
-              <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">
-                {alternativas.data.mensaje ??
-                  'No hay propuestas disponibles para reemplazar esta parada.'}
-              </p>
-            )}
-            {alternativas.isSuccess &&
-              alternativas.data.alternativas.map((alternativa) => (
-                <button
-                  key={alternativa.propuestaId}
-                  type="button"
-                  onClick={() => setSelectedPropuestaId(alternativa.propuestaId)}
-                  aria-pressed={selectedPropuestaId === alternativa.propuestaId}
-                  className={`flex w-full flex-col gap-1 rounded-xl border p-3 text-left transition-colors ${
-                    selectedPropuestaId === alternativa.propuestaId
-                      ? 'border-sky-600 bg-sky-50'
-                      : 'border-slate-200 hover:border-sky-300 hover:bg-slate-50'
-                  }`}
-                >
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="font-heading text-sm font-bold text-slate-900">
-                      {alternativa.propuestaNombre}
-                    </span>
-                    <CategoriaBadge categoria={alternativa.categoria} />
-                  </span>
-                  <span className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
-                    <span className="flex items-center gap-1">
-                      <ClockIcon className="size-3.5" aria-hidden />
-                      {formatTimeRange(alternativa.horaInicio, alternativa.horaFin) ??
-                        'A confirmar'}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <MapPinIcon className="size-3.5" aria-hidden />
-                      {locationLabel(alternativa)}
-                    </span>
-                  </span>
-                </button>
-              ))}
-          </div>
-
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={reemplazar.isPending} onClick={closeReplace}>
-              Cancelar
-            </AlertDialogCancel>
-            <Button
-              type="button"
-              onClick={handleReplace}
-              disabled={selectedPropuestaId === null || reemplazar.isPending}
-            >
-              {reemplazar.isPending ? 'Reemplazando...' : 'Reemplazar'}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <CompletarDiaDialog
+        abierto={sugerenciasFecha !== null}
+        sugerencias={sugerencias}
+        agregandoId={addingPropuestaId}
+        isPending={agregarSugerida.isPending}
+        error={sugerenciaError}
+        onClose={closeSugerencias}
+        onAgregar={handleAgregarSugerencia}
+      />
 
       <PlanificadorRegenerateModal
         isOpen={isRegenerateModalOpen}
@@ -543,8 +498,6 @@ export function CircuitoPage() {
     </div>
   )
 }
-
-// Header visual se renderiza con el mismo formato de alternativas (CircuitoDetalleView).
 
 function describeReasons(motivos: string[]): string {
   const labels = motivos.map((motivo) => MOTIVO_LABELS[motivo] ?? motivo.toLowerCase())

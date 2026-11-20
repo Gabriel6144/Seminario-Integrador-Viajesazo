@@ -94,6 +94,10 @@ public class Circuito {
     @Column(name = "categoria", nullable = false, length = 50)
     private List<InteresCategoria> interesesCategoriaSnapshot = new ArrayList<>();
 
+    @ElementCollection
+    @CollectionTable(name = "circuito_dia_estado", joinColumns = @JoinColumn(name = "circuito_id"))
+    private List<CircuitoDiaEstado> diasEstado = new ArrayList<>();
+
     @OneToMany(mappedBy = "circuito", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CircuitoAlternativa> alternativas = new ArrayList<>();
 

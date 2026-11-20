@@ -363,8 +363,17 @@ Decisiones que no son obvias:
 | POST | `/api/viajes/{id}/circuito/seleccion` | Selecciona una alternativa (**200**) e **inscribe** al turista en las propuestas de esa alternativa (ver abajo) |
 | GET | `/api/viajes/{id}/circuito/seleccionado` | Devuelve el circuito seleccionado agrupado por día (**200**); **404** si no hay viaje, circuito o selección |
 | DELETE | `/api/viajes/{id}/circuito/seleccionado/items/{itemId}?confirmar=true` | Elimina la parada y devuelve el circuito actualizado (**200**); **409** sin confirmar; **404** si el ítem no pertenece a la alternativa seleccionada |
-| GET | `/api/viajes/{id}/circuito/seleccionado/items/{itemId}/alternativas` | Lista reemplazos compatibles (**200**); si no hay, devuelve `alternativas: []` y un `mensaje`; **404** si la parada no pertenece a la alternativa seleccionada |
+| GET | `/api/viajes/{id}/circuito/seleccionado/items/{itemId}/alternativas` | Opciones para sustituir la parada en su hueco del día: `OpcionesSustitucionResponse` (**200**); sin opciones devuelve `opciones: []` y un `mensaje`; **404** si la parada no pertenece a la alternativa seleccionada |
 | PUT | `/api/viajes/{id}/circuito/seleccionado/items/{itemId}` | Reemplaza la parada por `{ "propuestaId": 123 }` y devuelve el circuito actualizado (**200**); **400** sin `propuestaId`; **404** de ítem; **422** si la propuesta no encaja |
+| GET | `/api/viajes/{id}/circuito/alternativas/{estrategia}/items/{itemId}/alternativas` | Igual que el anterior pero **antes de confirmar**, sobre cualquiera de las 3 alternativas |
+| PUT | `/api/viajes/{id}/circuito/alternativas/{estrategia}/items/{itemId}` | Sustituye la parada antes de confirmar; devuelve `GeneracionCircuitoResponse` (**200**); **400** si ya hay alternativa elegida; **422** si no encaja |
+| DELETE | `/api/viajes/{id}/circuito/alternativas/{estrategia}/items/{itemId}?confirmar=true` | Elimina la parada antes de confirmar (**200**); **409** sin confirmar; **400** si ya hay alternativa elegida |
+| GET | `/api/viajes/{id}/circuito/alternativas/{estrategia}/dias` | Antes de confirmar: `List<ResumenDiaAlternativaResponse>` (`fecha` + `resumen`), contado en vivo sobre las paradas de la alternativa (**200**); **400** si ya hay alternativa elegida |
+| GET | `/api/viajes/{id}/circuito/alternativas/{estrategia}/dias/{fecha}/sugerencias` | Antes de confirmar: sugerencias para completar ese día (**200**; lista vacía + `mensaje` si el día está completo o no hay); **404** fuera de rango |
+| POST | `/api/viajes/{id}/circuito/alternativas/{estrategia}/dias/{fecha}/items` | Antes de confirmar: suma una sugerencia (`{ "propuestaId" }`, `origen=SUGERENCIA_ACEPTADA`) y devuelve `GeneracionCircuitoResponse` (**200**); **422** si ya no es válida |
+| GET | `/api/viajes/{id}/circuito/seleccionado/dias/{fecha}/sugerencias` | Lista sugerencias para completar un día incompleto (**200**); lista vacía + `mensaje` si no hay; **404** si el día no está en el rango |
+| POST | `/api/viajes/{id}/circuito/seleccionado/dias/{fecha}/items` | Agrega una sugerencia aceptada (`{ "propuestaId" }`) con `origen=SUGERENCIA_ACEPTADA` (**200**); **422** si ya no es válida |
+| PUT | `/api/viajes/{id}/circuito/seleccionado/dias/{fecha}/aviso` | Marca “Dejarlo así” (`{ "descartado": true }`) y oculta el aviso (**200**) |
 
 Las alternativas son `CERCANIA`, `INTERESES` y `DESCUBRIMIENTO`. Se guardan como instantánea:
 regenerar sin `?reemplazar=true` devuelve **409** y no modifica nada; con el flag reemplaza las
@@ -375,7 +384,9 @@ persiste nada al refrescar disponibilidad.
 **Inscriptos (sin tabla aparte):** al confirmar el circuito (`POST .../seleccion`), el turista queda
 contado como inscripto en cada `CircuitoItem.propuestaId` de la alternativa elegida. El conteo es
 `COUNT(DISTINCT usuario)` por propuesta (no se duplica el mismo turista), solo si la propuesta tiene
-`publicador`. El publicador lo ve en `GET /api/publicador/dashboard` (`inscriptosPorPropuesta`) y
+`publicador`. **Se cuenta en vivo**: sustituir una parada mueve la inscripción a la propuesta nueva
+y eliminarla la saca, sin código extra. **Los viajes `CANCELADO` no cuentan** (las 3 consultas de
+`CircuitoItemRepository` filtran `v.estado <> CANCELADO`; lo cubre `CircuitoItemRepositoryTest`). El publicador lo ve en `GET /api/publicador/dashboard` (`inscriptosPorPropuesta`) y
 `GET /api/publicador/inscriptos` vía `InscriptosService` + `CircuitoItemRepository`.
 
 Decisiones y trampas:
@@ -428,18 +439,35 @@ Decisiones y trampas:
   deja en 0 si pasa a ser el primero) y vuelve a calcular `distanciaTotalKm` (suma de traslados),
   `afinidadIntereses` (ítems con categoría del snapshot de intereses / total) y
    `categoriasCubiertas`. Un día vacío se devuelve igual y el circuito no se borra.
-- **El reemplazo (VZ-28) reutiliza el motor de candidatos.** `replacementOptions` arma candidatos
-  con `isEligible` (estado activo, coordenadas, interés estricto y radio) y luego filtra por:
-  bloque completo dentro de `horaInicio..horaFin` del ítem original, sin solaparse con otros
-  ítems del día, disponibilidad válida y traslados factibles desde el anterior y hacia el
-  siguiente. Excluye propuestas ya presentes en la alternativa (incluida la reemplazada) y deja
-  una opción por propuesta con el primer bloque compatible, ordenadas por nombre.
-- **`PUT` valida antes de mutar.** La propuesta se busca de nuevo, se vuelve a chequear el bloque
-  y los traslados, y recién entonces `applyCandidate` pisa la parada y
-  `recalculateTransfersAround` recalcula el traslado siguiente y las métricas. Una propuesta
-  inválida lanza `InvariantViolationException` (**422**) y deja la parada intacta; sin
-  `propuestaId` responde **400**. `GET .../alternativas` devuelve **200** con `alternativas: []`
-  y `mensaje` cuando no hay opciones.
+- **La generación no rellena días incompletos.** El motor respeta el tope del ritmo, pero si no
+  hay más candidatos elegibles el día queda corto. El aviso (`ResumenDiaCircuito`) y las
+  sugerencias (`daySuggestions` / `addSuggestedItem` / `discardDayNotice`) dejan la decisión al
+  usuario: se relaja solo categoría o tipo (según ritmo MANUAL), sin tocar `isEligible` del
+  generate/replace. Cada ítem guarda `origen` (`GENERADO` / `SUGERENCIA_ACEPTADA` / `REEMPLAZO`).
+- **Los Me gusta pesan en la generación** (`CircuitGenerator.choose()`): `CERCANIA` (con parada
+  previa) ordena por tramos de 500 m → Me gusta → popularidad → distancia; `DESCUBRIMIENTO` por
+  categoría no cubierta → Me gusta → disponibilidad → popularidad → nombre; el resto por afinidad
+  de intereses → Me gusta → popularidad → nombre. Popularidad = total de Me gusta de la propuesta.
+- **Sustituir (VZ-28) trabaja con el "hueco del día"** (`analyzeSubstitution`). Hueco = desde el
+  fin de la parada anterior (o 06:00) hasta el inicio de la siguiente (o 23:59). Un horario entra
+  si se llega desde la anterior con el traslado, se llega a tiempo a la siguiente y no se pisa
+  con otra parada (horarios que cruzan medianoche suman 24 h). Entran propuestas activas dentro
+  del radio **aunque no sean de sus intereses** (`enIntereses=false`). Excluye las que ya están en
+  la alternativa. Orden: Me gusta → intereses → tramos de 500 m → popularidad → distancia →
+  nombre; la distancia se mide desde la anterior (si no, la siguiente; si no, la reemplazada).
+  `noEntran` lista hasta 6 que le gustaron o son de sus intereses y no caben, con su motivo.
+- **Antes de confirmar** se puede sustituir, eliminar y completar días en cualquier alternativa
+  (`editableAlternative`), solo mientras no haya estrategia seleccionada. El estado del día
+  (`liveSummary`) se calcula en vivo: si el turista borra una parada, el día vuelve a quedar
+  incompleto. `suggestionOptions` recibe un `boolean dayIncomplete` en lugar de leer
+  `CircuitoDiaEstado`, porque antes de confirmar ese estado no existe. Al seleccionar,
+  `rebuildDayStates` cuenta lo sumado con sugerencias como `agregadasPorUsuario`, no como
+  `asignadas`.
+- **`PUT` valida antes de mutar.** `chosenSubstitution` vuelve a analizar el hueco; si la
+  propuesta ya no entra lanza `InvariantViolationException` (**422**) y deja la parada intacta.
+  Si entra, `applyCandidate` pisa la parada, se renumera el día y `recalculateTransfersAround`
+  recalcula traslados y métricas. Sin `propuestaId` responde **400**. El `GET` devuelve **200**
+  con `opciones: []` y `mensaje` cuando no hay nada.
 
 ## API de Usuarios — registro y baja
 
