@@ -4,21 +4,13 @@ import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/components/auth-provider'
 import { NotificacionesBell } from '@/components/notificaciones-bell'
 import { Button } from '@/components/ui/button'
-import { resolverIconoClima } from '@/lib/clima'
-
-const CORDOBA_WEATHER_URL =
-  'https://api.open-meteo.com/v1/forecast?latitude=-31.4201&longitude=-64.1888&current=temperature_2m,weather_code,is_day&timezone=America%2FArgentina%2FCordoba'
-
-interface ClimaCordoba {
-  temperatura: number
-  icono: string
-  descripcion: string
-}
+import { UserMenu } from '@/components/user-menu'
+import { fetchClimaActualCordoba, type ClimaActualCordoba } from '@/lib/clima'
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
-  `flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-all ${
+  `flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] transition-colors ${
     isActive
-      ? 'bg-gradient-to-r from-sky-600 to-sky-500 text-white font-bold shadow-sm'
+      ? 'bg-[#00658d] text-white font-bold'
       : 'text-[#3f484e] font-medium hover:bg-slate-100 hover:text-[#00658d]'
   }`
 
@@ -28,7 +20,7 @@ const navClass = ({ isActive }: { isActive: boolean }) =>
 export function TopAppBar() {
   const { isAuthenticated, hasRole, logout, user } = useAuth()
   const navigate = useNavigate()
-  const [clima, setClima] = useState<ClimaCordoba>({
+  const [clima, setClima] = useState<ClimaActualCordoba>({
     temperatura: 18,
     icono: 'partly_cloudy_day',
     descripcion: 'Clima actual en Córdoba',
@@ -39,23 +31,12 @@ export function TopAppBar() {
 
     async function cargarClima() {
       try {
-        const res = await fetch(CORDOBA_WEATHER_URL, { signal: controller.signal })
-        if (!res.ok) return
-        const data = (await res.json()) as {
-          current?: { temperature_2m?: number; weather_code?: number; is_day?: number }
+        const actual = await fetchClimaActualCordoba(controller.signal)
+        if (actual !== null && !controller.signal.aborted) {
+          setClima(actual)
         }
-        const temp = data.current?.temperature_2m
-        if (typeof temp !== 'number') return
-        const code = data.current?.weather_code ?? 1
-        const isDay = data.current?.is_day ?? 1
-        const { icono, descripcion } = resolverIconoClima(code, isDay)
-        setClima({
-          temperatura: Math.round(temp),
-          icono,
-          descripcion,
-        })
       } catch {
-        // Si no hay conexión o se aborta el fetch, se conserva el valor de respaldo (18°C).
+        // Si no hay conexión o se aborta el fetch, se conserva el valor de respaldo.
       }
     }
 
@@ -69,7 +50,7 @@ export function TopAppBar() {
   }, [])
 
   return (
-    <header className="sticky top-0 z-40 bg-[#f7f9fb] shadow-sm">
+    <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-[#f7f9fb]">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-2">
         <div className="flex items-center gap-2">
           <Link
@@ -81,10 +62,10 @@ export function TopAppBar() {
             <img
               src="/LOGO_V.png"
               alt="Logo de Viajesazo"
-              className="h-9 w-9 rounded-full object-cover shadow-sm"
+              className="h-9 w-9 rounded-full object-cover"
             />
-            <span className="font-heading text-lg font-bold tracking-tight text-[#bb0413]">
-              Viajesazo
+            <span className="font-heading text-2xl font-bold tracking-tight text-[#bb0413]">
+              VIAJESAZO
             </span>
           </Link>
         </div>
@@ -213,13 +194,19 @@ export function TopAppBar() {
 
         <div className="flex items-center gap-2">
           <div
-            title={`${clima.descripcion} en Córdoba Capital`}
-            className="flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-[#bb0413] shadow-sm"
+            title={[
+              `${clima.descripcion} en Córdoba Capital`,
+              clima.sensacionTermica !== undefined ? `Sensación ${clima.sensacionTermica}°C` : null,
+              clima.humedad !== undefined ? `Humedad ${clima.humedad}%` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+            className="flex h-8 items-center gap-1.5 px-1 text-[13px] font-medium text-[#3f484e]"
           >
-            <span className="material-symbols-outlined text-sm text-[#df2a29]" aria-hidden>
+            <span className="material-symbols-outlined text-[17px] leading-none text-[#00658d]" aria-hidden>
               {clima.icono}
             </span>
-            <span className="text-sm">{clima.temperatura}°C Córdoba</span>
+            <span>{clima.temperatura}°C Córdoba</span>
           </div>
 
           {isAuthenticated && hasRole('TURISTA') && !hasRole('ADMINISTRADOR') && !hasRole('PUBLICADOR') ? (
@@ -227,24 +214,16 @@ export function TopAppBar() {
           ) : null}
 
           {isAuthenticated ? (
-            <div className="hidden items-center gap-2 sm:flex">
-              <span className="max-w-[10rem] truncate text-xs text-[#3f484e]" title={user?.email}>
-                {user?.nombre}
-              </span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 rounded-full px-3 text-xs"
-                onClick={() => {
-                  void logout().then(() => navigate('/login'))
-                }}
-              >
-                Salir
-              </Button>
-            </div>
+            <UserMenu
+              nombre={user?.nombre ?? 'Usuario'}
+              email={user?.email}
+              roles={user?.roles}
+              onLogout={() => {
+                void logout().then(() => navigate('/login'))
+              }}
+            />
           ) : (
-            <Button asChild size="sm" className="hidden h-8 rounded-full bg-[#00658d] px-3 text-xs text-white hover:bg-[#65b7e8] sm:inline-flex">
+            <Button asChild size="sm" className="hidden h-8 rounded-full bg-[#00658d] px-3.5 text-[13px] font-semibold text-white hover:bg-[#65b7e8] sm:inline-flex">
               <Link to="/login">Ingresar</Link>
             </Button>
           )}

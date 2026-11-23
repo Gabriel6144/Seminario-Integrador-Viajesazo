@@ -1,6 +1,7 @@
 package com.viajesazo.turismo_backend.controller;
 
 import java.time.LocalDate;
+import java.util.List;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -12,7 +13,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.viajesazo.turismo_backend.dto.request.PropuestaFiltro;
+import com.viajesazo.turismo_backend.dto.response.PropuestaResumenContadoresResponse;
 import com.viajesazo.turismo_backend.dto.response.PropuestaResumenResponse;
+import com.viajesazo.turismo_backend.dto.response.ZonaResponse;
 import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.model.Modalidad;
 import com.viajesazo.turismo_backend.model.NombreEstado;
@@ -44,13 +47,49 @@ public class PropuestaController {
 			@RequestParam(required = false) NombreEstado estado,
 			@RequestParam(required = false) Long publicadorId,
 			@RequestParam(required = false) String localidad,
+			@RequestParam(required = false) String ciudad,
 			@RequestParam(required = false) String ubicacion,
 			@RequestParam(required = false) String q,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaDesde,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaHasta,
+			@RequestParam(defaultValue = "false") boolean incluirCanceladas,
 			@PageableDefault(size = 20) Pageable pageable) {
 		PropuestaFiltro filtro = new PropuestaFiltro(tipo, tipoPropuesta, categoria, modalidad, tipoAcceso,
-				estado, publicadorId, localidad, ubicacion, q, fechaDesde, fechaHasta);
+				estado, publicadorId, localidad, ciudad, ubicacion, q, fechaDesde, fechaHasta,
+				incluirCanceladas);
 		return new PagedModel<>(propuestaQueryService.search(filtro, pageable));
+	}
+
+	/**
+	 * Contadores para las píldoras del catálogo. Ignora el filtro de tipo: devuelve cuántas
+	 * propuestas hay en total y cuántas son eventos y actividades con el resto de los filtros.
+	 */
+	@GetMapping("/resumen")
+	public PropuestaResumenContadoresResponse summary(
+			@RequestParam(required = false) TipoPropuesta tipoPropuesta,
+			@RequestParam(required = false) InteresCategoria categoria,
+			@RequestParam(required = false) Modalidad modalidad,
+			@RequestParam(required = false) TipoAcceso tipoAcceso,
+			@RequestParam(required = false) NombreEstado estado,
+			@RequestParam(required = false) Long publicadorId,
+			@RequestParam(required = false) String localidad,
+			@RequestParam(required = false) String ciudad,
+			@RequestParam(required = false) String ubicacion,
+			@RequestParam(required = false) String q,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaDesde,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaHasta,
+			@RequestParam(defaultValue = "false") boolean incluirCanceladas) {
+		PropuestaFiltro filtro = new PropuestaFiltro(null, tipoPropuesta, categoria, modalidad, tipoAcceso,
+				estado, publicadorId, localidad, ciudad, ubicacion, q, fechaDesde, fechaHasta,
+				incluirCanceladas);
+		return propuestaQueryService.summary(filtro);
+	}
+
+	/** Zonas distintas para el selector del catálogo. */
+	@GetMapping("/zonas")
+	public List<ZonaResponse> zones(
+			@RequestParam(required = false) Long publicadorId,
+			@RequestParam(defaultValue = "false") boolean incluirCanceladas) {
+		return propuestaQueryService.zones(publicadorId, incluirCanceladas);
 	}
 }

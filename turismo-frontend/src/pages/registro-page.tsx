@@ -94,7 +94,7 @@ export function RegistroPage() {
         {serverError === null ? null : (
           <div
             role="alert"
-            className="rounded-lg border border-red-400/40 bg-red-500/15 px-4 py-3 text-sm text-red-200"
+            className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
           >
             {serverError}
           </div>
@@ -116,12 +116,12 @@ export function RegistroPage() {
                       className={cn(
                         'rounded-xl border-2 p-3 text-left text-sm transition-all',
                         field.value === 'TURISTA'
-                          ? 'border-[#65b7e8] bg-[#00658d]/30 font-semibold text-white'
-                          : 'border-white/15 text-white/75 hover:border-white/30',
+                          ? 'border-[#00658d] bg-sky-50 font-semibold text-[#00658d]'
+                          : 'border-slate-200 text-[#3f484e] hover:border-slate-300',
                       )}
                     >
                       Turista
-                      <span className="mt-1 block text-xs font-normal text-white/50">
+                      <span className="mt-1 block text-xs font-normal text-slate-500">
                         Planificar viajes y consultar agenda turística.
                       </span>
                     </button>
@@ -131,12 +131,12 @@ export function RegistroPage() {
                       className={cn(
                         'rounded-xl border-2 p-3 text-left text-sm transition-all',
                         field.value === 'PUBLICADOR'
-                          ? 'border-[#65b7e8] bg-[#00658d]/30 font-semibold text-white'
-                          : 'border-white/15 text-white/75 hover:border-white/30',
+                          ? 'border-[#00658d] bg-sky-50 font-semibold text-[#00658d]'
+                          : 'border-slate-200 text-[#3f484e] hover:border-slate-300',
                       )}
                     >
                       Publicador
-                      <span className="mt-1 block text-xs font-normal text-white/50">
+                      <span className="mt-1 block text-xs font-normal text-slate-500">
                         Publicar eventos/actividades y ver tu agenda.
                       </span>
                     </button>

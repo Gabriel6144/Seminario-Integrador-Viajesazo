@@ -11,7 +11,6 @@ import {
   LocalSection,
   PublisherTicket,
   GlossarySection,
-  FollowSection,
 } from "@/components/viajezaso/content";
 import { useViajezaso, AppLink, T } from "@/components/viajezaso/context";
 import { MediaViewer, SocialDialog } from "@/components/viajezaso/dialogs";
@@ -20,6 +19,13 @@ import { usePageEffects } from "@/components/viajezaso/use-page-effects";
 import { ViajezasoLayout } from "@/components/viajezaso/viajezaso-layout";
 
 type Showcase = "agenda" | "circuit";
+
+const COVER_IMAGES = [
+  { file: "cordoba-hd-portada.avif", objectPosition: "center 30%" },
+  { file: "cordoba-hd-2-portada.avif", objectPosition: "center 30%" },
+  { file: "sierras-cordoba-portada.avif", objectPosition: "center 30%" },
+  { file: "los-gigantes-portada.avif", objectPosition: "center 30%" },
+] as const;
 
 export function InicioPage() {
   return (
@@ -47,7 +53,15 @@ function InicioContent() {
   );
   const [media, setMedia] = useState<MediaSelection | null>(null);
   const [social, setSocial] = useState(false);
+  const [coverIndex, setCoverIndex] = useState(0);
   usePageEffects(root, copy.pageTitle);
+  useEffect(() => {
+    if (COVER_IMAGES.length <= 1) return;
+    const timer = window.setInterval(() => {
+      setCoverIndex((prev) => (prev + 1) % COVER_IMAGES.length);
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, []);
   useEffect(() => {
     if (hash === "#propuestas") setShowcase("circuit");
     else if (hash === "#agenda-preview") setShowcase("agenda");
@@ -67,17 +81,39 @@ function InicioContent() {
           aria-labelledby="cover-title"
         >
           <div className="andes-cover">
-            <img
-              className="andes-photo"
-              src={asset("andes-horizonte.png")}
-              width="2172"
-              height="724"
-              alt={copy.andesAlt}
-              fetchPriority="high"
-            />
-            <h1 id="cover-title" className="visually-hidden">
-              {copy.coverAccessibleTitle}
-            </h1>
+            {COVER_IMAGES.map((item, idx) => (
+              <img
+                key={item.file}
+                className={`andes-photo ${idx === coverIndex ? "is-active" : ""}`}
+                style={{ objectPosition: item.objectPosition }}
+                src={asset(item.file)}
+                alt={idx === coverIndex ? copy.andesAlt : ""}
+                aria-hidden={idx !== coverIndex}
+                fetchPriority={idx === 0 ? "high" : "auto"}
+              />
+            ))}
+            <div className="cover-dots" role="tablist" aria-label="Imágenes de portada">
+              {COVER_IMAGES.map((item, idx) => (
+                <button
+                  key={item.file}
+                  type="button"
+                  role="tab"
+                  aria-selected={idx === coverIndex}
+                  aria-label={`Imagen ${idx + 1} de ${COVER_IMAGES.length}`}
+                  className={`cover-dot ${idx === coverIndex ? "is-active" : ""}`}
+                  onClick={() => setCoverIndex(idx)}
+                />
+              ))}
+            </div>
+            <div className="cover-hero-scrim" aria-hidden="true" />
+            <div className="cover-hero-overlay wrap">
+              <h1 id="cover-title" className="cover-hero-title">
+                ¿QUÉ HACEMO&apos;? ¿NOS VAMOS DE VIAJESAZO?
+              </h1>
+              <p className="cover-hero-subtitle">
+                Armá tu recorrido por las sierras sin renegar con nada.
+              </p>
+            </div>
           </div>
           <div className="masthead-caption">
             <span>{copy.coverCaption}</span>
@@ -190,7 +226,6 @@ function InicioContent() {
         <LocalSection />
         <PublisherTicket />
         <GlossarySection />
-        <FollowSection {...sectionProps} />
       </main>
       {media && <MediaViewer media={media} onClose={() => setMedia(null)} />}
       {social && <SocialDialog onClose={() => setSocial(false)} />}

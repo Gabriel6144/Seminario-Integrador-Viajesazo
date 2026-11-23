@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
 
-import { useDescartarBorrador, useViajes } from '@/api/viajes'
+import { useCancelarViaje, useDescartarBorrador, useViajes } from '@/api/viajes'
 import { ViajeBorradorCard } from '@/components/viaje-borrador-card'
 import { PaginationBar } from '@/components/pagination-bar'
 import { EmptyState, ErrorState, GridSkeleton } from '@/components/query-state'
@@ -13,6 +14,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { usePageParam } from '@/lib/use-page-param'
+import { toUserMessage } from '@/lib/http'
 import type { ViajeResponse } from '@/types/api'
 
 const VIAJES_VACIOS: ViajeResponse[] = []
@@ -36,7 +38,9 @@ export function BorradoresPage() {
   const [page, setPage] = usePageParam()
   const query = useViajes(page)
   const descartar = useDescartarBorrador()
+  const cancelar = useCancelarViaje()
   const [borradorADescartarId, setBorradorADescartarId] = useState<number | null>(null)
+  const [viajeACancelarId, setViajeACancelarId] = useState<number | null>(null)
   const [filtroEstado, setFiltroEstado] = useState<FiltroViaje>('TODOS')
   const [busqueda, setBusqueda] = useState<string>('')
   const [orden, setOrden] = useState<OrdenViaje>('recientes')
@@ -98,6 +102,16 @@ export function BorradoresPage() {
     if (borradorADescartarId === null) return
     descartar.mutate(borradorADescartarId, {
       onSettled: () => setBorradorADescartarId(null),
+    })
+  }
+
+  const handleConfirmarCancelacion = () => {
+    if (viajeACancelarId === null) return
+    cancelar.mutate(viajeACancelarId, {
+      onSuccess: () => toast.success('Viaje cancelado correctamente'),
+      onError: (error: unknown) =>
+        toast.error(toUserMessage(error) || 'No pudimos cancelar el viaje'),
+      onSettled: () => setViajeACancelarId(null),
     })
   }
 
@@ -257,6 +271,8 @@ export function BorradoresPage() {
               borrador={borrador}
               onDescartar={(id) => setBorradorADescartarId(id)}
               descartando={borradorADescartarId === borrador.id && descartar.isPending}
+              onCancelar={(id) => setViajeACancelarId(id)}
+              cancelando={viajeACancelarId === borrador.id && cancelar.isPending}
             />
           ))}
         </div>
@@ -317,6 +333,67 @@ export function BorradoresPage() {
                   Sí,
                   <br />
                   descartar
+                </>
+              )}
+            </button>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={viajeACancelarId !== null}
+        onOpenChange={(open) => {
+          if (!open && !cancelar.isPending) {
+            setViajeACancelarId(null)
+          }
+        }}
+      >
+        <AlertDialogContent className="max-w-[380px] gap-5 rounded-3xl bg-white p-6 shadow-2xl">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#ffdad6]">
+              <span className="material-symbols-outlined text-[28px] text-[#bb0413]">
+                warning
+              </span>
+            </div>
+            <div className="flex flex-col text-left">
+              <AlertDialogTitle className="font-heading text-[22px] font-bold leading-tight text-[#191c1e]">
+                ¿Cancelar este viaje?
+              </AlertDialogTitle>
+              <span className="mt-1 text-[11px] font-bold uppercase tracking-wider text-[#bb0413]">
+                ACCIÓN IRREVERSIBLE
+              </span>
+            </div>
+          </div>
+
+          <AlertDialogDescription className="text-left text-[15px] leading-relaxed text-[#3f484e]">
+            Vas a dejar de figurar como inscripto en las propuestas de este circuito. El viaje
+            deja de aparecer en Mis viajes y no se puede recuperar.
+          </AlertDialogDescription>
+
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => setViajeACancelarId(null)}
+              disabled={cancelar.isPending}
+              className="flex h-14 items-center justify-center rounded-2xl border border-[#d8dadc] bg-white px-4 text-center text-sm font-semibold leading-tight text-[#191c1e] transition hover:bg-[#f2f4f6] disabled:opacity-50"
+            >
+              Mantener
+              <br />
+              viaje
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmarCancelacion}
+              disabled={cancelar.isPending}
+              className="flex h-14 items-center justify-center rounded-2xl bg-[#bb0413] px-4 text-center text-sm font-bold leading-tight text-white shadow-sm transition hover:bg-[#93000b] disabled:opacity-50"
+            >
+              {cancelar.isPending ? (
+                'Cancelando...'
+              ) : (
+                <>
+                  Sí,
+                  <br />
+                  cancelar
                 </>
               )}
             </button>

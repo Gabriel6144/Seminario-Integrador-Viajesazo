@@ -1,4 +1,11 @@
-import type { CircuitStrategy, UbicacionRequest } from '@/types/api'
+import type {
+  CircuitStrategy,
+  LocalDate,
+  OrigenCircuitoItem,
+  ResumenDiaCircuito,
+  TipoRegistro,
+  UbicacionRequest,
+} from '@/types/api'
 
 export interface ZoneItem {
   name: string
@@ -65,6 +72,8 @@ export interface CircuitoDia {
   /** Etiqueta visible del tab, p. ej. "Lunes 17". */
   label: string
   summary: string
+  /** Resumen del día desde el circuito seleccionado (fase 4B). */
+  resumen?: ResumenDiaCircuito | null
 }
 
 export interface CircuitoRecomendado {
@@ -94,15 +103,29 @@ export interface ParadaCircuitoDetalle {
   description: string
   detailDescription: string
   location: string
+  /** Ciudad y localidad sueltas, para armar la ruta del día en el resumen del PDF. */
+  ciudad?: string | null
+  localidad?: string | null
   hours: string
   price: string
+  /** Primera imagen (compatibilidad con vistas existentes). */
   image: string
+  /** Todas las imágenes de la parada; nunca vacío (usa placeholder). */
+  images: string[]
+  tipo: TipoRegistro
+  fecha: LocalDate
+  /** HH:mm o null si el backend no mandó horario. */
+  horaInicio: string | null
+  horaFin: string | null
+  trasladoKm: number
+  trasladoMinutos: number
   duration: string
   walkNext?: string
   latitud?: number
   longitud?: number
   disponible: boolean
   motivoNoDisponible?: string | null
+  origen?: OrigenCircuitoItem
 }
 
 export interface AlternativaReemplazo {

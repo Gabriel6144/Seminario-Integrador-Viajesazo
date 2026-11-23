@@ -1,6 +1,8 @@
 import { useState } from 'react'
 
-import type { CircuitStrategy, TipoRitmo } from '@/types/api'
+import type { CircuitStrategy, ResumenDiaCircuito, TipoRitmo } from '@/types/api'
+import { AvisoDiaIncompleto } from './aviso-dia-incompleto'
+import { CircuitoParadaDetalleModal } from './circuito-parada-detalle-modal'
 import { ParadaUbicacionMapaView } from './parada-ubicacion-mapa-view'
 import type { CircuitoRecomendado, ParadaCircuitoDetalle } from './types'
 
@@ -77,11 +79,25 @@ export function CircuitoDetalleView({
   }
 
   const stopsOfDay = circuito.stopsByDay[activeDay] ?? []
+  const activeDayMeta = circuito.days.find((day) => day.number === activeDay)
   const isSelected = selectedStrategy === circuito.estrategia
   const otherSelected = selectedStrategy !== null && !isSelected
   const minExpected = ritmo ? RITMO_MIN_PARADAS[ritmo] : null
   const hasInsufficientStops =
-    minExpected !== null && stopsOfDay.length > 0 && stopsOfDay.length < minExpected
+    minExpected !== null && stopsOfDay.length < minExpected
+  const resumenDia: ResumenDiaCircuito | null | undefined =
+    activeDayMeta?.resumen ??
+    (hasInsufficientStops && ritmo
+      ? {
+          asignadas: stopsOfDay.length,
+          minimo: minExpected ?? 0,
+          agregadasPorUsuario: 0,
+          avisoDescartado: false,
+          mensaje: `No se agregaron más actividades para este día según el ritmo elegido (${RITMO_LABELS[ritmo]}) porque no se encontraron más opciones disponibles.`,
+          pendiente: true,
+          puedeCompletar: false,
+        }
+      : null)
 
   return (
     <div className="w-full pb-8">
@@ -319,17 +335,9 @@ export function CircuitoDetalleView({
                 )}
               </div>
             ))}
-            {hasInsufficientStops && ritmo && (
-              <div className="mt-2 flex items-start gap-3 rounded-2xl border border-sky-200/80 bg-sky-50/70 p-4">
-                <span className="material-symbols-outlined mt-0.5 text-sky-700">info</span>
-                <p className="text-xs leading-relaxed text-sky-900 sm:text-sm">
-                  No se agregaron más actividades para este día según el ritmo elegido (
-                  {RITMO_LABELS[ritmo]}) porque no se encontraron más opciones disponibles.
-                </p>
-              </div>
-            )}
           </>
         )}
+        <AvisoDiaIncompleto resumen={resumenDia} />
       </section>
 
       {!editable ? (
@@ -377,66 +385,14 @@ export function CircuitoDetalleView({
       )}
 
       {detailStop !== null && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 backdrop-blur-sm sm:items-center sm:p-4">
-          <div className="w-full max-w-lg rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <h3 className="font-heading pr-4 text-lg font-bold text-slate-800">
-                {detailStop.title}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setDetailStop(null)}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100"
-              >
-                <span className="material-symbols-outlined text-[20px]">close</span>
-              </button>
-            </div>
-            <div className="space-y-3 py-4 text-xs sm:text-sm">
-              <p className="leading-relaxed text-slate-600">{detailStop.detailDescription}</p>
-              <div className="flex items-center gap-2 text-slate-800">
-                <span className="material-symbols-outlined text-[18px] text-[#00658d]">
-                  location_on
-                </span>
-                <span className="font-medium">{detailStop.location}</span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-800">
-                <span className="material-symbols-outlined text-[18px] text-[#00658d]">
-                  schedule
-                </span>
-                <span className="font-medium">
-                  {detailStop.hours} · {detailStop.duration}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-800">
-                <span className="material-symbols-outlined text-[18px] text-[#00658d]">
-                  payments
-                </span>
-                <span className="font-medium">{detailStop.price}</span>
-              </div>
-            </div>
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  const stopToMap = detailStop
-                  setDetailStop(null)
-                  setMapStop(stopToMap)
-                }}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#00658d] py-3 text-xs font-bold text-white shadow-sm hover:bg-[#004f70]"
-              >
-                <span className="material-symbols-outlined text-[18px]">map</span>
-                <span>Ver en mapa</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setDetailStop(null)}
-                className="rounded-xl bg-slate-100 px-5 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-200"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
+        <CircuitoParadaDetalleModal
+          stop={detailStop}
+          onClose={() => setDetailStop(null)}
+          onOpenMap={(stop) => {
+            setDetailStop(null)
+            setMapStop(stop)
+          }}
+        />
       )}
 
       {!editable && showSuccessModal && (

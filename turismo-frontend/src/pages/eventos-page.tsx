@@ -14,7 +14,12 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
-import { usePropuestas } from '@/api/propuestas'
+import {
+  usePropuestas,
+  useResumenPropuestas,
+  useZonasPropuestas,
+  type PropuestaFiltros,
+} from '@/api/propuestas'
 import { useAuth } from '@/components/auth-provider'
 import { EventoCard } from '@/components/evento-card'
 import { PaginationBar } from '@/components/pagination-bar'
@@ -27,7 +32,6 @@ import {
   TIPO_PROPUESTA_LABELS,
   TIPOS_PROPUESTA,
   type EstadoPropuesta,
-  type EstadoPropuestaObj,
   type PropuestaResumenResponse,
   type TipoPropuesta,
   type TipoRegistro,
@@ -43,21 +47,6 @@ const FECHA_LABELS: Record<FiltroFecha, string> = {
   PROXIMOS: 'Próximos',
   ESTA_SEMANA: 'Esta semana',
   ESTE_MES: 'Este mes',
-}
-
-function normalizeText(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim()
-}
-
-function resolveEstadoKey(
-  estado: EstadoPropuesta | EstadoPropuestaObj | null | undefined,
-): EstadoPropuesta {
-  if (!estado) return 'INICIADO'
-  return typeof estado === 'object' ? estado.nombre : estado
 }
 
 function getTodayIso(): string {
@@ -78,15 +67,25 @@ function addDaysIso(baseIso: string, days: number): string {
   return `${ny}-${nm}-${nd}`
 }
 
+/** Traduce el selector de fecha a un rango ISO que entiende el backend. */
+function rangoFecha(filtro: FiltroFecha): { desde?: string; hasta?: string } {
+  if (filtro === 'TODAS') return {}
+  const hoy = getTodayIso()
+  if (filtro === 'PROXIMOS') return { desde: hoy }
+  if (filtro === 'ESTA_SEMANA') return { desde: hoy, hasta: addDaysIso(hoy, 7) }
+  return { desde: hoy, hasta: addDaysIso(hoy, 30) }
+}
+
 /**
- * Listado polimórfico de propuestas turísticas — `GET /api/propuestas?page=&size=`.
+ * Listado polimórfico de propuestas turísticas — `GET /api/propuestas`.
  *
- * Incluye barra permanente de píldoras de tipo con contadores en vivo, buscador rápido
- * y menú desplegable colapsable de filtros avanzados (Fecha, Zona y Estado).
+ * Todos los filtros viajan al servidor: la grilla nunca vuelve a filtrar la página recibida, así
+ * que el paginado y los contadores describen el conjunto real y no solo las 12 filas visibles.
  */
 export function EventosPage() {
   const { hasRole, user } = useAuth()
   const canCreate = hasRole('PUBLICADOR', 'ADMINISTRADOR')
+  const esPublicador = hasRole('PUBLICADOR')
   const [page, setPage] = usePageParam()
   const [filtroTipo, setFiltroTipo] = useState<FiltroTipo>('TODAS')
   const [busqueda, setBusqueda] = useState('')
@@ -100,101 +99,45 @@ export function EventosPage() {
 
   // Solo el publicador ve sus propuestas; turista/admin siguen con el catálogo global.
   const publicadorIdFiltro =
-    hasRole('PUBLICADOR') && user?.publicadorId != null ? user.publicadorId : undefined
-  const query = usePropuestas(page, { publicadorId: publicadorIdFiltro })
-  const todasLasPropuestas = query.data?.content ?? []
+    esPublicador && user?.publicadorId != null ? user.publicadorId : undefined
+  const incluirCanceladas = esPublicador
+  // Un viajero no debería poder listar propuestas canceladas; el publicador sí, para gestionarlas.
+  const estadosDisponibles: readonly EstadoPropuesta[] = esPublicador
+    ? ESTADOS_PROPUESTA
+    : ESTADOS_PROPUESTA.filter((estado) => estado !== 'CANCELADO')
 
-  // Zonas (localidades) disponibles dinámicamente según las propuestas cargadas
+  const fechas = rangoFecha(filtroFecha)
+  const filtros: PropuestaFiltros = {
+    tipo: filtroTipo === 'TODAS' ? undefined : filtroTipo,
+    publicadorId: publicadorIdFiltro,
+    q: busqueda.trim() === '' ? undefined : busqueda.trim(),
+    ciudad: filtroZona === 'TODAS' ? undefined : filtroZona,
+    estado: filtroEstado === 'TODOS' ? undefined : filtroEstado,
+    tipoPropuesta: filtroTipoPropuesta === 'TODOS' ? undefined : filtroTipoPropuesta,
+    fechaDesde: fechas.desde,
+    fechaHasta: fechas.hasta,
+    incluirCanceladas,
+  }
+
+  const query = usePropuestas(page, filtros)
+  const resumen = useResumenPropuestas(filtros)
+  const zonasQuery = useZonasPropuestas({ publicadorId: publicadorIdFiltro, incluirCanceladas })
+
+  const propuestas = query.data?.content ?? []
+
   const zonasDisponibles = useMemo(() => {
     const unicas = new Set<string>()
-    for (const item of todasLasPropuestas) {
-      if (item.localidad && item.localidad.trim() !== '') {
-        unicas.add(item.localidad.trim())
+    for (const zona of zonasQuery.data ?? []) {
+      if (zona.ciudad && zona.ciudad.trim() !== '') {
+        unicas.add(zona.ciudad.trim())
       }
     }
     return [...unicas].sort((a, b) => a.localeCompare(b, 'es'))
-  }, [todasLasPropuestas])
+  }, [zonasQuery.data])
 
-  // 1) Filtrado por buscador + filtros avanzados (Fecha, Zona, Estado)
-  const propuestasTrasFiltrosAvanzados = useMemo(() => {
-    const q = normalizeText(busqueda)
-    const hoy = getTodayIso()
-    const finSemana = addDaysIso(hoy, 7)
-    const finMes = addDaysIso(hoy, 30)
-
-    return todasLasPropuestas.filter((propuesta) => {
-      // Buscador por nombre, localidad, recinto o descripción
-      if (q !== '') {
-        const texto = [
-          propuesta.nombre,
-          propuesta.localidad ?? '',
-          propuesta.lugarRecinto ?? '',
-          propuesta.descripcion ?? '',
-        ]
-          .map(normalizeText)
-          .join(' ')
-        if (!texto.includes(q)) return false
-      }
-
-      // Filtro por Zona (localidad)
-      if (filtroZona !== 'TODAS') {
-        if ((propuesta.localidad ?? '').trim().toLowerCase() !== filtroZona.toLowerCase()) {
-          return false
-        }
-      }
-
-      // Filtro por Estado
-      if (filtroEstado !== 'TODOS') {
-        if (resolveEstadoKey(propuesta.estadoPropuesta) !== filtroEstado) {
-          return false
-        }
-      }
-
-      // Filtro por Tipo de propuesta
-      if (filtroTipoPropuesta !== 'TODOS') {
-        if (propuesta.tipoPropuesta !== filtroTipoPropuesta) {
-          return false
-        }
-      }
-
-      // Filtro por Fecha (los eventos tienen rango de fechas; las actividades son permanentes)
-      if (filtroFecha !== 'TODAS' && propuesta.tipo !== 'ACTIVIDAD') {
-        const inicio = propuesta.fechaInicio ?? ''
-        const fin = propuesta.fechaFin ?? inicio
-        if (filtroFecha === 'PROXIMOS' && fin !== '' && fin < hoy) {
-          return false
-        }
-        if (filtroFecha === 'ESTA_SEMANA' && fin !== '' && (fin < hoy || inicio > finSemana)) {
-          return false
-        }
-        if (filtroFecha === 'ESTE_MES' && fin !== '' && (fin < hoy || inicio > finMes)) {
-          return false
-        }
-      }
-
-      return true
-    })
-  }, [todasLasPropuestas, busqueda, filtroZona, filtroEstado, filtroTipoPropuesta, filtroFecha])
-
-  // Contadores en vivo por tipo (respetando buscador y filtros avanzados)
-  const totalCount = propuestasTrasFiltrosAvanzados.length
-  const eventosCount = useMemo(
-    () => propuestasTrasFiltrosAvanzados.filter((p) => p.tipo !== 'ACTIVIDAD').length,
-    [propuestasTrasFiltrosAvanzados],
-  )
-  const actividadesCount = useMemo(
-    () => propuestasTrasFiltrosAvanzados.filter((p) => p.tipo === 'ACTIVIDAD').length,
-    [propuestasTrasFiltrosAvanzados],
-  )
-
-  // 2) Filtrado final aplicando la píldora de tipo seleccionada
-  const propuestasVisibles = useMemo(() => {
-    if (filtroTipo === 'TODAS') return propuestasTrasFiltrosAvanzados
-    if (filtroTipo === 'ACTIVIDAD') {
-      return propuestasTrasFiltrosAvanzados.filter((p) => p.tipo === 'ACTIVIDAD')
-    }
-    return propuestasTrasFiltrosAvanzados.filter((p) => p.tipo !== 'ACTIVIDAD')
-  }, [propuestasTrasFiltrosAvanzados, filtroTipo])
+  const totalCount = resumen.data?.total ?? query.data?.page.totalElements ?? 0
+  const eventosCount = resumen.data?.eventos ?? 0
+  const actividadesCount = resumen.data?.actividades ?? 0
 
   // Chips de filtros avanzados activos
   const chipsActivos = useMemo(() => {
@@ -203,39 +146,54 @@ export function EventosPage() {
       chips.push({
         key: 'fecha',
         label: FECHA_LABELS[filtroFecha],
-        onRemove: () => setFiltroFecha('TODAS'),
+        onRemove: () => {
+          setFiltroFecha('TODAS')
+          setPage(0)
+        },
       })
     }
     if (filtroZona !== 'TODAS') {
       chips.push({
         key: 'zona',
         label: filtroZona,
-        onRemove: () => setFiltroZona('TODAS'),
+        onRemove: () => {
+          setFiltroZona('TODAS')
+          setPage(0)
+        },
       })
     }
     if (filtroEstado !== 'TODOS') {
       chips.push({
         key: 'estado',
         label: ESTADO_PROPUESTA_LABELS[filtroEstado],
-        onRemove: () => setFiltroEstado('TODOS'),
+        onRemove: () => {
+          setFiltroEstado('TODOS')
+          setPage(0)
+        },
       })
     }
     if (filtroTipoPropuesta !== 'TODOS') {
       chips.push({
         key: 'tipoPropuesta',
         label: TIPO_PROPUESTA_LABELS[filtroTipoPropuesta],
-        onRemove: () => setFiltroTipoPropuesta('TODOS'),
+        onRemove: () => {
+          setFiltroTipoPropuesta('TODOS')
+          setPage(0)
+        },
       })
     }
     if (busqueda.trim() !== '') {
       chips.push({
         key: 'busqueda',
         label: `“${busqueda.trim()}”`,
-        onRemove: () => setBusqueda(''),
+        onRemove: () => {
+          setBusqueda('')
+          setPage(0)
+        },
       })
     }
     return chips
-  }, [filtroFecha, filtroZona, filtroEstado, filtroTipoPropuesta, busqueda])
+  }, [filtroFecha, filtroZona, filtroEstado, filtroTipoPropuesta, busqueda, setPage])
 
   const cantidadFiltrosAvanzados =
     (filtroFecha !== 'TODAS' ? 1 : 0) +
@@ -243,12 +201,19 @@ export function EventosPage() {
     (filtroEstado !== 'TODOS' ? 1 : 0) +
     (filtroTipoPropuesta !== 'TODOS' ? 1 : 0)
 
+  /** Cambia un filtro y vuelve a la primera página: si no, se puede quedar en una página vacía. */
+  function updateFilter<T>(setter: (value: T) => void, value: T) {
+    setter(value)
+    if (page !== 0) setPage(0)
+  }
+
   const limpiarFiltros = () => {
     setFiltroFecha('TODAS')
     setFiltroZona('TODAS')
     setFiltroEstado('TODOS')
     setFiltroTipoPropuesta('TODOS')
     setBusqueda('')
+    setPage(0)
   }
 
   return (
@@ -293,7 +258,7 @@ export function EventosPage() {
               type="button"
               role="tab"
               aria-selected={filtroTipo === 'TODAS'}
-              onClick={() => setFiltroTipo('TODAS')}
+              onClick={() => updateFilter(setFiltroTipo, 'TODAS')}
               className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm transition-all ${
                 filtroTipo === 'TODAS'
                   ? 'bg-[#00658d] font-bold text-white shadow-sm'
@@ -308,7 +273,7 @@ export function EventosPage() {
               type="button"
               role="tab"
               aria-selected={filtroTipo === 'EVENTO'}
-              onClick={() => setFiltroTipo('EVENTO')}
+              onClick={() => updateFilter(setFiltroTipo, 'EVENTO')}
               className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm transition-all ${
                 filtroTipo === 'EVENTO'
                   ? 'bg-[#00658d] font-bold text-white shadow-sm'
@@ -328,7 +293,7 @@ export function EventosPage() {
               type="button"
               role="tab"
               aria-selected={filtroTipo === 'ACTIVIDAD'}
-              onClick={() => setFiltroTipo('ACTIVIDAD')}
+              onClick={() => updateFilter(setFiltroTipo, 'ACTIVIDAD')}
               className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm transition-all ${
                 filtroTipo === 'ACTIVIDAD'
                   ? 'bg-[#00658d] font-bold text-white shadow-sm'
@@ -354,7 +319,7 @@ export function EventosPage() {
             <input
               type="search"
               value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
+              onChange={(e) => updateFilter(setBusqueda, e.target.value)}
               placeholder="Buscar por nombre, localidad..."
               aria-label="Buscar por nombre o localidad"
               className="h-10 w-full rounded-xl bg-[#f2f4f6] pl-9 pr-3 text-sm text-[#191c1e] placeholder:text-[#70787f] transition-colors focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#00658d]/30"
@@ -396,7 +361,9 @@ export function EventosPage() {
                 <select
                   aria-label="Filtrar por tipo de propuesta"
                   value={filtroTipoPropuesta}
-                  onChange={(e) => setFiltroTipoPropuesta(e.target.value as FiltroTipoPropuesta)}
+                  onChange={(e) =>
+                    updateFilter(setFiltroTipoPropuesta, e.target.value as FiltroTipoPropuesta)
+                  }
                   className="w-full cursor-pointer appearance-none bg-transparent pr-5 font-bold text-[#191c1e] focus:outline-none"
                 >
                   <option value="TODOS">Todos los tipos</option>
@@ -419,7 +386,7 @@ export function EventosPage() {
                 <select
                   aria-label="Filtrar por fecha"
                   value={filtroFecha}
-                  onChange={(e) => setFiltroFecha(e.target.value as FiltroFecha)}
+                  onChange={(e) => updateFilter(setFiltroFecha, e.target.value as FiltroFecha)}
                   className="w-full cursor-pointer appearance-none bg-transparent pr-5 font-bold text-[#191c1e] focus:outline-none"
                 >
                   <option value="TODAS">Todas las fechas</option>
@@ -440,7 +407,7 @@ export function EventosPage() {
                 <select
                   aria-label="Filtrar por zona"
                   value={filtroZona}
-                  onChange={(e) => setFiltroZona(e.target.value)}
+                  onChange={(e) => updateFilter(setFiltroZona, e.target.value)}
                   className="w-full cursor-pointer appearance-none bg-transparent pr-5 font-bold text-[#191c1e] focus:outline-none"
                 >
                   <option value="TODAS">Todas las zonas</option>
@@ -474,11 +441,11 @@ export function EventosPage() {
                 <select
                   aria-label="Filtrar por estado"
                   value={filtroEstado}
-                  onChange={(e) => setFiltroEstado(e.target.value as FiltroEstado)}
+                  onChange={(e) => updateFilter(setFiltroEstado, e.target.value as FiltroEstado)}
                   className="w-full cursor-pointer appearance-none bg-transparent pr-5 font-bold text-[#191c1e] focus:outline-none"
                 >
                   <option value="TODOS">Todos los estados</option>
-                  {ESTADOS_PROPUESTA.map((estado) => (
+                  {estadosDisponibles.map((estado) => (
                     <option key={estado} value={estado}>
                       {ESTADO_PROPUESTA_LABELS[estado]}
                     </option>
@@ -524,7 +491,7 @@ export function EventosPage() {
               <div className="inline-flex items-center gap-1.5 font-semibold text-[#3f484e]">
                 <span className="h-2 w-2 rounded-full bg-[#df2a29]" aria-hidden />
                 <span>
-                  {totalCount} {totalCount === 1 ? 'propuesta activa' : 'propuestas activas'} (
+                  {totalCount} {totalCount === 1 ? 'propuesta encontrada' : 'propuestas encontradas'} (
                   {eventosCount} {eventosCount === 1 ? 'evento' : 'eventos'}, {actividadesCount}{' '}
                   {actividadesCount === 1 ? 'actividad' : 'actividades'})
                 </span>
@@ -536,7 +503,7 @@ export function EventosPage() {
 
       <PropuestasGrid
         query={query}
-        propuestas={propuestasVisibles}
+        propuestas={propuestas}
         filtroTipo={filtroTipo}
         hayFiltrosActivos={chipsActivos.length > 0}
         onLimpiarFiltros={limpiarFiltros}

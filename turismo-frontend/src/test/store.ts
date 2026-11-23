@@ -4,20 +4,25 @@ import {
   CIRCUITO_SELECCIONADO,
   EVENTOS,
   PUBLICADORES,
+  SUGERENCIAS_DIA,
 } from './fixtures'
 import type {
   ActividadResponse,
   AlternativaItemResponse,
-  AlternativaReemplazoResponse,
   CircuitStrategy,
   CircuitoSeleccionadoResponse,
   EventoRequest,
   EventoResponse,
   GeneracionCircuitoResponse,
+  OpcionSustitucionResponse,
   NotificacionResponse,
   PublicadorAgendaItemResponse,
   PublicadorRequest,
   PublicadorResponse,
+  ResumenDiaAlternativaResponse,
+  ResumenDiaCircuito,
+  SugerenciaDiaResponse,
+  SugerenciasDiaResponse,
   ViajeBorradorRequest,
   ViajeRequest,
   ViajeResponse,
@@ -53,6 +58,11 @@ let nextEventoId = 0
 let nextPublicadorId = 0
 let nextBorradorId = 0
 let nextNotificacionId = 1
+let nextCircuitoItemId = 400
+/** Fuerza lista vacía en sugerencias (tests de mensaje vacío / 422). */
+let sugerenciasVacias = false
+/** Paradas que el turista sumó con sugerencias antes de confirmar (por itemId). */
+let agregadasAntesDeConfirmar = new Set<number>()
 
 /** Mock de inscriptos por propuesta para preview / notify en tests. */
 const MOCK_INSCRIPTOS_POR_PROPUESTA = 2
@@ -157,6 +167,128 @@ export function resetStore(): void {
   nextPublicadorId = Math.max(0, ...PUBLICADORES.map((publicador) => publicador.id)) + 1
   nextBorradorId = Math.max(0, ...BORRADORES.map((borrador) => borrador.id)) + 1
   nextNotificacionId = 1
+  nextCircuitoItemId = 400
+  sugerenciasVacias = false
+  agregadasAntesDeConfirmar = new Set()
+}
+
+function refreshDiaResumen(
+  resumen: ResumenDiaCircuito | null | undefined,
+  extras: Partial<ResumenDiaCircuito>,
+): ResumenDiaCircuito {
+  const base: ResumenDiaCircuito = resumen ?? {
+    asignadas: 0,
+    minimo: 2,
+    agregadasPorUsuario: 0,
+    avisoDescartado: false,
+    mensaje: null,
+    pendiente: false,
+    puedeCompletar: false,
+  }
+  const next = { ...base, ...extras }
+  const cubiertas = next.asignadas + next.agregadasPorUsuario
+  const pendiente =
+    next.minimo > 0 && cubiertas < next.minimo && !next.avisoDescartado
+  next.pendiente = pendiente
+  next.puedeCompletar = pendiente
+  if (pendiente && !next.mensaje) {
+    next.mensaje = `Se asignaron ${next.asignadas} de ${next.minimo} paradas pedidas para este día. La generación no rellena sola: podés completar con sugerencias.`
+  }
+  if (!pendiente) {
+    next.mensaje = null
+  }
+  return next
+}
+
+/** Tests: fuerza `sugerencias: []` en el GET de sugerencias. */
+export function setSugerenciasVacias(value: boolean): void {
+  sugerenciasVacias = value
+}
+
+export function findSugerenciasDia(
+  viajeId: number,
+  fecha: string,
+): SugerenciasDiaResponse | undefined {
+  const circuito = circuitosSeleccionados.get(viajeId)
+  if (circuito === undefined) return undefined
+  const dia = circuito.dias.find((candidate) => candidate.fecha === fecha)
+  if (dia === undefined) return undefined
+  if (!dia.resumen?.pendiente || sugerenciasVacias) {
+    return {
+      sugerencias: [],
+      noEntran: [],
+      mensaje: 'No encontramos propuestas para completar este día',
+    }
+  }
+  const usadas = new Set(
+    circuito.dias.flatMap((d) => d.items.map((item) => item.propuestaId)),
+  )
+  const sugerencias = SUGERENCIAS_DIA.sugerencias.filter(
+    (s) => !usadas.has(s.propuestaId),
+  )
+  return {
+    sugerencias,
+    noEntran: SUGERENCIAS_DIA.noEntran ?? [],
+    mensaje:
+      sugerencias.length === 0
+        ? 'No encontramos propuestas para completar este día'
+        : null,
+  }
+}
+
+export function addSuggestedCircuitoItem(
+  viajeId: number,
+  fecha: string,
+  propuestaId: number,
+): CircuitoSeleccionadoResponse | 'not-found' | 'invalid' {
+  const circuito = circuitosSeleccionados.get(viajeId)
+  if (circuito === undefined) return 'not-found'
+  const dia = circuito.dias.find((candidate) => candidate.fecha === fecha)
+  if (dia === undefined) return 'not-found'
+  const available = findSugerenciasDia(viajeId, fecha)
+  const sugerencia = available?.sugerencias.find((s) => s.propuestaId === propuestaId)
+  if (sugerencia === undefined) return 'invalid'
+
+  const item: AlternativaItemResponse = {
+    itemId: nextCircuitoItemId++,
+    propuestaId: sugerencia.propuestaId,
+    propuestaNombre: sugerencia.nombre,
+    tipo: sugerencia.tipo,
+    categoria: sugerencia.categoria,
+    ciudad: sugerencia.ciudad,
+    localidad: sugerencia.localidad,
+    direccion: sugerencia.direccion,
+    horaInicio: sugerencia.horaInicio,
+    horaFin: sugerencia.horaFin,
+    duracionMinutos: sugerencia.duracionMinutos,
+    origen: 'SUGERENCIA_ACEPTADA',
+  }
+  dia.items.push(item)
+  dia.items.sort((a, b) => (a.horaInicio ?? '').localeCompare(b.horaInicio ?? ''))
+  dia.resumen = refreshDiaResumen(dia.resumen, {
+    agregadasPorUsuario: (dia.resumen?.agregadasPorUsuario ?? 0) + 1,
+  })
+  syncGeneradoFromSeleccionado(viajeId)
+  return circuito
+}
+
+export function discardDiaAviso(
+  viajeId: number,
+  fecha: string,
+): CircuitoSeleccionadoResponse | undefined {
+  const circuito = circuitosSeleccionados.get(viajeId)
+  if (circuito === undefined) return undefined
+  const dia = circuito.dias.find((candidate) => candidate.fecha === fecha)
+  if (dia === undefined) return undefined
+  dia.resumen = refreshDiaResumen(dia.resumen, { avisoDescartado: true })
+  return circuito
+}
+
+/** Expone una sugerencia del fixture para armar respuestas de error en handlers. */
+export function findSugerenciaFixture(
+  propuestaId: number,
+): SugerenciaDiaResponse | undefined {
+  return SUGERENCIAS_DIA.sugerencias.find((s) => s.propuestaId === propuestaId)
 }
 
 export function getMeGusta(propuestaId: number): { meGusta: boolean; total: number } {
@@ -246,7 +378,7 @@ export function allPublicadores(): PublicadorResponse[] {
 }
 
 export function allBorradores(): ViajeResponse[] {
-  return borradores
+  return borradores.filter((borrador) => borrador.estado !== 'CANCELADO')
 }
 
 export function findBorrador(id: number): ViajeResponse | undefined {
@@ -363,7 +495,7 @@ function syncGeneradoFromSeleccionado(viajeId: number): void {
 export function replaceCircuitoItem(
   viajeId: number,
   itemId: number,
-  alternativa: AlternativaReemplazoResponse,
+  alternativa: OpcionSustitucionResponse,
 ): boolean {
   const item = findCircuitoItem(viajeId, itemId)
   if (item === undefined) return false
@@ -522,6 +654,193 @@ export function createCircuito(viajeId: number): GeneracionCircuitoResponse {
   return created
 }
 
+/** Antes de confirmar: parada de una alternativa todavía sin elegir. */
+function findAlternativaGeneradaItem(
+  viajeId: number,
+  estrategia: string,
+  itemId: number,
+) {
+  const circuito = circuitos.get(viajeId)
+  const alternativa = circuito?.alternativas.find((alt) => alt.estrategia === estrategia)
+  const item = alternativa?.propuestas.find((candidate) => candidate.itemId === itemId)
+  if (circuito === undefined || alternativa === undefined || item === undefined) return undefined
+  return { circuito, alternativa, item }
+}
+
+export function hasAlternativaGeneradaItem(
+  viajeId: number,
+  estrategia: string,
+  itemId: number,
+): boolean {
+  return findAlternativaGeneradaItem(viajeId, estrategia, itemId) !== undefined
+}
+
+/** Como el backend: quita la parada, renumera el día y devuelve todas las alternativas. */
+export function removeAlternativaGeneradaItem(
+  viajeId: number,
+  estrategia: string,
+  itemId: number,
+): GeneracionCircuitoResponse | undefined {
+  const found = findAlternativaGeneradaItem(viajeId, estrategia, itemId)
+  if (found === undefined) return undefined
+  const { circuito, alternativa, item } = found
+  alternativa.propuestas = alternativa.propuestas.filter((candidate) => candidate !== item)
+  alternativa.propuestas
+    .filter((candidate) => candidate.fecha === item.fecha)
+    .forEach((candidate, index) => {
+      candidate.orden = index + 1
+    })
+  return circuito
+}
+
+export function replaceAlternativaGeneradaItem(
+  viajeId: number,
+  estrategia: string,
+  itemId: number,
+  reemplazo: OpcionSustitucionResponse,
+): GeneracionCircuitoResponse | undefined {
+  const found = findAlternativaGeneradaItem(viajeId, estrategia, itemId)
+  if (found === undefined) return undefined
+  const { circuito, item } = found
+  item.propuestaId = reemplazo.propuestaId
+  item.propuestaNombre = reemplazo.propuestaNombre
+  item.tipo = reemplazo.tipo
+  item.categoria = reemplazo.categoria
+  item.ciudad = reemplazo.ciudad
+  item.localidad = reemplazo.localidad
+  item.direccion = reemplazo.direccion
+  item.horaInicio = reemplazo.horaInicio
+  item.horaFin = reemplazo.horaFin
+  item.duracionMinutos = reemplazo.duracionMinutos
+  return circuito
+}
+
+/** Mismos topes que `dayMinimum` del backend. */
+const MINIMO_POR_RITMO: Record<string, number> = {
+  TRANQUILO: 2,
+  EQUILIBRADO: 4,
+  INTENSIVO: 5,
+  MANUAL: 0,
+}
+
+function fechasEntre(desde: string, hasta: string): string[] {
+  const fechas: string[] = []
+  const cursor = new Date(`${desde}T00:00:00Z`)
+  const fin = new Date(`${hasta}T00:00:00Z`)
+  while (cursor <= fin) {
+    fechas.push(cursor.toISOString().slice(0, 10))
+    cursor.setUTCDate(cursor.getUTCDate() + 1)
+  }
+  return fechas
+}
+
+/** Como `alternativeDaySummaries`: cuenta en vivo las paradas de cada día de la alternativa. */
+export function diasAlternativaGenerada(
+  viajeId: number,
+  estrategia: string,
+): ResumenDiaAlternativaResponse[] | undefined {
+  const viaje = borradores.find((candidate) => candidate.id === viajeId)
+  const circuito = circuitos.get(viajeId)
+  const alternativa = circuito?.alternativas.find((alt) => alt.estrategia === estrategia)
+  if (viaje === undefined || alternativa === undefined) return undefined
+  if (!viaje.fechaInicio || !viaje.fechaFin) return []
+  const minimo = MINIMO_POR_RITMO[viaje.ritmo ?? 'EQUILIBRADO'] ?? 0
+  return fechasEntre(viaje.fechaInicio, viaje.fechaFin).map((fecha) => {
+    const items = alternativa.propuestas.filter((item) => item.fecha === fecha)
+    const agregadas = items.filter((item) => agregadasAntesDeConfirmar.has(item.itemId)).length
+    const pendiente = minimo > 0 && items.length < minimo
+    return {
+      fecha,
+      resumen: {
+        asignadas: items.length - agregadas,
+        minimo,
+        agregadasPorUsuario: agregadas,
+        avisoDescartado: false,
+        mensaje: pendiente
+          ? `Se asignaron ${items.length} de ${minimo} paradas pedidas para este día. La generación no rellena sola: podés completar con sugerencias.`
+          : null,
+        pendiente,
+        puedeCompletar: pendiente,
+      },
+    }
+  })
+}
+
+export function sugerenciasDiaAlternativa(
+  viajeId: number,
+  estrategia: string,
+  fecha: string,
+): SugerenciasDiaResponse | undefined {
+  const dia = diasAlternativaGenerada(viajeId, estrategia)?.find((d) => d.fecha === fecha)
+  if (dia === undefined) return undefined
+  const alternativa = circuitos
+    .get(viajeId)
+    ?.alternativas.find((alt) => alt.estrategia === estrategia)
+  const usadas = new Set(alternativa?.propuestas.map((item) => item.propuestaId) ?? [])
+  const sugerencias =
+    !dia.resumen.pendiente || sugerenciasVacias
+      ? []
+      : SUGERENCIAS_DIA.sugerencias.filter((s) => !usadas.has(s.propuestaId))
+  return {
+    sugerencias,
+    noEntran: SUGERENCIAS_DIA.noEntran ?? [],
+    mensaje: sugerencias.length === 0 ? 'No encontramos propuestas para completar este día' : null,
+  }
+}
+
+export function addSuggestedAlternativaItem(
+  viajeId: number,
+  estrategia: string,
+  fecha: string,
+  propuestaId: number,
+): GeneracionCircuitoResponse | 'not-found' | 'invalid' {
+  const circuito = circuitos.get(viajeId)
+  const alternativa = circuito?.alternativas.find((alt) => alt.estrategia === estrategia)
+  const disponibles = sugerenciasDiaAlternativa(viajeId, estrategia, fecha)
+  if (circuito === undefined || alternativa === undefined || disponibles === undefined) {
+    return 'not-found'
+  }
+  const sugerencia = disponibles.sugerencias.find((s) => s.propuestaId === propuestaId)
+  if (sugerencia === undefined) return 'invalid'
+  const itemId = nextCircuitoItemId++
+  alternativa.propuestas.push({
+    itemId,
+    propuestaId: sugerencia.propuestaId,
+    propuestaNombre: sugerencia.nombre,
+    descripcion: sugerencia.descripcion,
+    categoria: sugerencia.categoria,
+    tipo: sugerencia.tipo,
+    fecha,
+    orden: 0,
+    horaInicio: sugerencia.horaInicio,
+    horaFin: sugerencia.horaFin,
+    trasladoKm: sugerencia.trasladoKm,
+    trasladoMinutos: sugerencia.trasladoMinutos,
+    disponible: true,
+    motivoNoDisponible: null,
+    imagenes: sugerencia.imagenes,
+    ciudad: sugerencia.ciudad,
+    localidad: sugerencia.localidad,
+    direccion: sugerencia.direccion,
+    lugarRecinto: sugerencia.lugarRecinto,
+    latitud: sugerencia.latitud,
+    longitud: sugerencia.longitud,
+    tipoAcceso: sugerencia.tipoAcceso,
+    montoEstimado: sugerencia.montoEstimado,
+    descripcionArancel: sugerencia.descripcionArancel,
+    sitioOficial: sugerencia.sitioOficial,
+    duracionMinutos: sugerencia.duracionMinutos,
+  })
+  agregadasAntesDeConfirmar.add(itemId)
+  alternativa.propuestas
+    .filter((item) => item.fecha === fecha)
+    .sort((a, b) => (a.horaInicio ?? '').localeCompare(b.horaInicio ?? ''))
+    .forEach((item, index) => {
+      item.orden = index + 1
+    })
+  return circuito
+}
+
 export function selectCircuito(
   viajeId: number,
   estrategia: CircuitStrategy,
@@ -539,6 +858,14 @@ export function deleteBorrador(id: number): boolean {
   const index = borradores.findIndex((borrador) => borrador.id === id)
   if (index === -1) return false
   borradores.splice(index, 1)
+  return true
+}
+
+/** Baja lógica de un viaje confirmado: lo pasa a CANCELADO y deja de listarse. */
+export function cancelarViaje(id: number): boolean {
+  const viaje = borradores.find((candidate) => candidate.id === id)
+  if (viaje === undefined) return false
+  viaje.estado = 'CANCELADO'
   return true
 }
 

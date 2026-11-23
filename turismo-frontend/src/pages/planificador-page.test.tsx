@@ -2,12 +2,33 @@ import { screen } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
+import { useLocation } from 'react-router-dom'
+
 import { PlanificadorPage } from '@/pages/planificador-page'
-import { renderWithProviders } from '@/test/utils'
+import { renderRoute, renderWithProviders } from '@/test/utils'
+
+/** Muestra la URL actual para poder revisar los parámetros que escribe la pantalla. */
+function UrlActual() {
+  const location = useLocation()
+  return <output data-testid="url-actual">{location.search}</output>
+}
 
 // El mapa de destino es Leaflet puro y jsdom no tiene layout: se reemplaza por un stub.
 vi.mock('@/components/planificador/destino-mapa', () => ({
   DestinoMapa: () => null,
+}))
+
+vi.mock('@/components/planificador/sustitucion-mapa', () => ({
+  SustitucionMapa: () => null,
+}))
+
+// El detalle recomendado monta CircuitoRutaMapa (Leaflet/MapLibre + OSRM).
+vi.mock('@/components/planificador/circuito-ruta-mapa', () => ({
+  CircuitoRutaMapa: ({ dayLabel }: { dayLabel: string }) => (
+    <div role="img" aria-label={`Mapa del recorrido del ${dayLabel}`}>
+      Mapa mock
+    </div>
+  ),
 }))
 
 function isoDate(offsetDays: number): string {
@@ -192,6 +213,9 @@ describe('PlanificadorPage', () => {
       (await screen.findAllByText(/circuito peatonal histórico/i)).length,
     ).toBeGreaterThan(0)
     expect(screen.getAllByText(/semana gastronómica/i).length).toBeGreaterThan(0)
+    // Antes de confirmar se puede sustituir o eliminar cada parada.
+    expect(screen.getAllByRole('button', { name: /^sustituir /i }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: /^eliminar /i }).length).toBeGreaterThan(0)
 
     await user.click(screen.getByRole('button', { name: /confirmar y guardar circuito/i }))
 
@@ -200,6 +224,74 @@ describe('PlanificadorPage', () => {
     ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /ver en mis viajes/i })).toBeInTheDocument()
   }, 15000)
+
+  it('guarda en la URL el viaje, la alternativa abierta y el día', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(
+      <>
+        <PlanificadorPage />
+        <UrlActual />
+      </>,
+      { authenticated: true },
+    )
+
+    await reachCircuitStep(user)
+    expect(screen.getByTestId('url-actual').textContent).toMatch(/viaje=\d+/)
+
+    await user.click(screen.getAllByRole('button', { name: /ver detalle/i })[0])
+    await screen.findByRole('button', { name: /confirmar y guardar circuito/i })
+    const params = new URLSearchParams(screen.getByTestId('url-actual').textContent ?? '')
+    expect(params.get('viaje')).not.toBeNull()
+    expect(params.get('alternativa')).not.toBeNull()
+    expect(params.get('dia')).toBe('1')
+
+    // "Volver" desde un detalle abierto en la lista equivale al "atrás" del navegador.
+    await user.click(screen.getByRole('button', { name: /volver a circuitos recomendados/i }))
+    expect(await screen.findByText('Circuitos Recomendados')).toBeInTheDocument()
+    expect(screen.getByTestId('url-actual').textContent).not.toMatch(/alternativa=/)
+  }, 15000)
+
+  it('al recargar (F5) en el detalle vuelve a abrir el mismo circuito', async () => {
+    renderRoute({
+      route: '/planificar',
+      initialEntry: '/planificar?viaje=2&alternativa=INTERESES&dia=1',
+      children: <PlanificadorPage />,
+      authenticated: true,
+    })
+
+    expect(
+      (await screen.findAllByText('Festival de Doma y Folklore de Jesús María')).length,
+    ).toBeGreaterThan(0)
+    expect(screen.getByText('Circuito recomendado')).toBeInTheDocument()
+    expect(screen.queryByText('Circuitos Recomendados')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /empecemos/i })).not.toBeInTheDocument()
+  })
+
+  it('con el circuito ya confirmado no ofrece sustituir ni eliminar en el detalle', async () => {
+    renderRoute({
+      route: '/planificar',
+      initialEntry: '/planificar?viaje=2&alternativa=INTERESES&dia=1',
+      children: <PlanificadorPage />,
+      authenticated: true,
+    })
+
+    expect(
+      (await screen.findAllByText('Festival de Doma y Folklore de Jesús María')).length,
+    ).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: /^sustituir /i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^eliminar /i })).not.toBeInTheDocument()
+  })
+
+  it('si el viaje de la URL no existe arranca el planificador de cero', async () => {
+    renderRoute({
+      route: '/planificar',
+      initialEntry: '/planificar?viaje=999',
+      children: <PlanificadorPage />,
+      authenticated: true,
+    })
+
+    expect(await screen.findByRole('button', { name: /empecemos/i })).toBeInTheDocument()
+  })
 
   it('regenera el circuito después de confirmar el reemplazo', async () => {
     const user = userEvent.setup()

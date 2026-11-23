@@ -9,9 +9,9 @@ export const VIAJEZASO_PATHS: ViajezasoPaths = {
   sobreNosotros: '/sobre-nosotros',
 }
 
-/** Sin perfiles oficiales cargados: el diálogo muestra el aviso de enlace pendiente. */
+/** Enlaces a redes sociales oficiales. */
 export const VIAJEZASO_SOCIALS: Record<string, string> = {
   facebook: '',
-  instagram: '',
+  instagram: 'https://www.instagram.com/viajesazo.app/?utm_source=ig_web_button_share_sheet',
   tiktok: '',
 }

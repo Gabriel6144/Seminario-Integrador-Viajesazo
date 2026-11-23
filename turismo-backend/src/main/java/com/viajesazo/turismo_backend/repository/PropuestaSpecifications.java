@@ -1,6 +1,7 @@
 package com.viajesazo.turismo_backend.repository;
 
 import java.text.Normalizer;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -20,6 +21,7 @@ import com.viajesazo.turismo_backend.model.TipoRegistro;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Path;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 
@@ -87,6 +89,10 @@ public final class PropuestaSpecifications {
 				predicates.add(cb.equal(normalizedLower(cb, root.get("ubicacion").get("localidad")),
 						normalize(filtro.localidad())));
 			}
+			if (hasText(filtro.ciudad())) {
+				predicates.add(cb.equal(normalizedLower(cb, root.get("ubicacion").get("ciudad")),
+						normalize(filtro.ciudad())));
+			}
 			if (hasText(filtro.ubicacion())) {
 				String like = "%" + normalize(filtro.ubicacion()) + "%";
 				predicates.add(cb.or(
@@ -95,23 +101,29 @@ public final class PropuestaSpecifications {
 						cb.like(normalizedLower(cb, root.get("ubicacion").get("direccion")), like)));
 			}
 			if (hasText(filtro.q())) {
-				String like = "%" + filtro.q().trim().toLowerCase() + "%";
+				String like = "%" + normalize(filtro.q()) + "%";
 				predicates.add(cb.or(
-						cb.like(cb.lower(root.get("nombre")), like),
-						cb.like(cb.lower(root.get("descripcion")), like)));
+						cb.like(normalizedLower(cb, root.get("nombre")), like),
+						cb.like(normalizedLower(cb, root.get("descripcion")), like),
+						cb.like(normalizedLower(cb, root.get("lugarRecinto")), like),
+						cb.like(normalizedLower(cb, root.get("ubicacion").get("localidad")), like)));
 			}
 			if (filtro.fechaDesde() != null || filtro.fechaHasta() != null) {
-				if (filtro.tipo() != TipoRegistro.EVENTO) {
-					throw new BusinessRuleException(
-							"los filtros de fecha solo aplican a eventos; indicá tipo=EVENTO");
+				if (filtro.tipo() == TipoRegistro.EVENTO) {
+					predicates.add(eventDateOverlap(cb, root, filtro));
+				} else if (filtro.tipo() == TipoRegistro.ACTIVIDAD) {
+					predicates.add(activityDateOverlap(cb, root, filtro));
+				} else {
+					predicates.add(cb.or(
+							cb.and(cb.equal(root.type(), Evento.class),
+									eventDateOverlap(cb, root, filtro)),
+							cb.and(cb.equal(root.type(), Actividad.class),
+									activityDateOverlap(cb, root, filtro))));
 				}
-				Root<Evento> evento = cb.treat(root, Evento.class);
-				if (filtro.fechaDesde() != null) {
-					predicates.add(cb.greaterThanOrEqualTo(evento.get("fechaFin"), filtro.fechaDesde()));
-				}
-				if (filtro.fechaHasta() != null) {
-					predicates.add(cb.lessThanOrEqualTo(evento.get("fechaInicio"), filtro.fechaHasta()));
-				}
+			}
+			if (!filtro.incluirCanceladas() && filtro.estado() == null) {
+				predicates.add(cb.notEqual(root.get("estadoPropuesta").get("nombre"),
+						NombreEstado.CANCELADO.name()));
 			}
 
 			return predicates.isEmpty() ? cb.conjunction() : cb.and(predicates.toArray(Predicate[]::new));
@@ -165,6 +177,31 @@ public final class PropuestaSpecifications {
 			return cb.treat(root, Actividad.class).get(property);
 		}
 		throw new BusinessRuleException("orden no permitido: " + property);
+	}
+
+	private static Predicate eventDateOverlap(CriteriaBuilder cb, Root<PropuestaTuristica> root,
+			PropuestaFiltro filtro) {
+		Root<Evento> evento = cb.treat(root, Evento.class);
+		return dateOverlap(cb, evento.get("fechaInicio"), evento.get("fechaFin"), filtro);
+	}
+
+	private static Predicate activityDateOverlap(CriteriaBuilder cb, Root<PropuestaTuristica> root,
+			PropuestaFiltro filtro) {
+		Root<Actividad> actividad = cb.treat(root, Actividad.class);
+		return dateOverlap(cb, actividad.get("fechaInicio"), actividad.get("fechaFin"), filtro);
+	}
+
+	private static Predicate dateOverlap(CriteriaBuilder cb, Path<LocalDate> inicio, Path<LocalDate> fin,
+			PropuestaFiltro filtro) {
+		if (filtro.fechaDesde() != null && filtro.fechaHasta() != null) {
+			return cb.and(
+					cb.greaterThanOrEqualTo(fin, filtro.fechaDesde()),
+					cb.lessThanOrEqualTo(inicio, filtro.fechaHasta()));
+		}
+		if (filtro.fechaDesde() != null) {
+			return cb.greaterThanOrEqualTo(fin, filtro.fechaDesde());
+		}
+		return cb.lessThanOrEqualTo(inicio, filtro.fechaHasta());
 	}
 
 	private static boolean isCountQuery(CriteriaQuery<?> query) {

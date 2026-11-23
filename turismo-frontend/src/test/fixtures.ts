@@ -1,12 +1,13 @@
 import type {
   AdminDashboardResponse,
-  AlternativasReemplazoResponse,
   CircuitoSeleccionadoResponse,
   EventoResponse,
   GeneracionCircuitoResponse,
+  OpcionesSustitucionResponse,
   Page,
   PropuestaInscriptosResponse,
   PublicadorResponse,
+  SugerenciasDiaResponse,
   ViajeResponse,
 } from '@/types/api'
 
@@ -68,7 +69,7 @@ export const FOLKLORE: EventoResponse = {
   fechaFin: '2026-10-04',
   horarioInicio: '20:00:00',
   horarioFin: '23:30:00',
-  imagenes: ['https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Festival_de_Doma_y_Folklore_de_Jes%C3%BAs_Mar%C3%ADa.jpg/1200px-Festival_de_Doma_y_Folklore_de_Jes%C3%BAs_Mar%C3%ADa.jpg'],
+  imagenes: ['https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/46_Festival_de_la_Doma_y_el_Folklore_Jesus_Mar%C3%ADa.jpg/1280px-46_Festival_de_la_Doma_y_el_Folklore_Jesus_Mar%C3%ADa.jpg'],
   publicadorId: 1,
   publicadorNombre: 'Turismo Córdoba',
 }
@@ -454,23 +455,79 @@ export const CIRCUITO: GeneracionCircuitoResponse = {
 }
 
 /** VZ-28: opciones que el backend considera válidas para la parada 101 del circuito seleccionado. */
-export const ALTERNATIVAS_REEMPLAZO: AlternativasReemplazoResponse = {
-  alternativas: [
+/** Respuesta de "Sustituir parada" para la parada 101 del viaje 2 (y antes de confirmar). */
+export const OPCIONES_SUSTITUCION: OpcionesSustitucionResponse = {
+  fecha: '2026-12-05',
+  huecoInicio: '06:00:00',
+  huecoFin: '23:59:00',
+  paradaAnterior: null,
+  paradaSiguiente: null,
+  opciones: [
     {
       propuestaId: 2,
       propuestaNombre: 'Feria de Artesanos',
+      descripcion: 'Artesanías regionales en el centro.',
       tipo: 'EVENTO',
       categoria: 'CULTURA',
+      imagen: null,
       ciudad: 'Córdoba',
       localidad: 'Centro',
       direccion: 'Av. Colón 200',
+      latitud: -31.413,
+      longitud: -64.19,
       horaInicio: '20:30:00',
       horaFin: '22:30:00',
       duracionMinutos: 120,
+      meGusta: true,
+      totalMeGusta: 14,
+      enIntereses: true,
+      distanciaKm: 0.8,
+      minutosTraslado: 2,
+    },
+    {
+      propuestaId: 8,
+      propuestaNombre: 'Bicicleteada por el Parque Sarmiento',
+      descripcion: null,
+      tipo: 'ACTIVIDAD',
+      categoria: 'NATURALEZA',
+      imagen: null,
+      ciudad: 'Córdoba',
+      localidad: 'Nueva Córdoba',
+      direccion: 'Parque Sarmiento',
+      latitud: -31.43,
+      longitud: -64.18,
+      horaInicio: '18:00:00',
+      horaFin: '19:30:00',
+      duracionMinutos: 90,
+      meGusta: false,
+      totalMeGusta: 6,
+      enIntereses: false,
+      distanciaKm: 2.3,
+      minutosTraslado: 5,
+    },
+  ],
+  noEntran: [
+    {
+      propuestaId: 9,
+      propuestaNombre: 'Cabalgata en las Sierras Chicas',
+      tipo: 'ACTIVIDAD',
+      meGusta: true,
+      motivo: 'Queda a 38,0 km de tu zona y tu radio es de 25,0 km',
     },
   ],
   mensaje: null,
 }
+
+const RESUMEN_DIA_INCOMPLETO = {
+  asignadas: 1,
+  minimo: 2,
+  agregadasPorUsuario: 0,
+  avisoDescartado: false,
+  mensaje:
+    'Se asignaron 1 de 2 paradas pedidas para este día. La generación no rellena sola: podés completar con sugerencias.',
+  pendiente: true,
+  puedeCompletar: true,
+} as const
 
 export const CIRCUITO_SELECCIONADO: CircuitoSeleccionadoResponse = {
   circuitoId: 1,
@@ -484,6 +541,7 @@ export const CIRCUITO_SELECCIONADO: CircuitoSeleccionadoResponse = {
   dias: [
     {
       fecha: '2026-12-05',
+      resumen: { ...RESUMEN_DIA_INCOMPLETO, asignadas: 1 },
       items: [
         {
           itemId: 101,
@@ -497,15 +555,23 @@ export const CIRCUITO_SELECCIONADO: CircuitoSeleccionadoResponse = {
           horaInicio: '20:00:00',
           horaFin: '23:30:00',
           duracionMinutos: 210,
+          origen: 'GENERADO',
         },
       ],
     },
     {
       fecha: '2026-12-06',
+      resumen: {
+        ...RESUMEN_DIA_INCOMPLETO,
+        asignadas: 0,
+        mensaje:
+          'Se asignaron 0 de 2 paradas pedidas para este día. La generación no rellena sola: podés completar con sugerencias.',
+      },
       items: [],
     },
     {
       fecha: '2026-12-07',
+      resumen: { ...RESUMEN_DIA_INCOMPLETO, asignadas: 1 },
       items: [
         {
           itemId: 301,
@@ -519,10 +585,69 @@ export const CIRCUITO_SELECCIONADO: CircuitoSeleccionadoResponse = {
           horaInicio: '09:00:00',
           horaFin: '11:00:00',
           duracionMinutos: 120,
+          origen: 'GENERADO',
         },
       ],
     },
   ],
+}
+
+/** Sugerencias de fase 4B para completar un día incompleto (viaje 2). */
+export const SUGERENCIAS_DIA: SugerenciasDiaResponse = {
+  sugerencias: [
+    {
+      propuestaId: 2,
+      nombre: 'Feria de Artesanos',
+      tipo: 'EVENTO',
+      categoria: 'CULTURA',
+      motivoSugerencia: 'OTRA_CATEGORIA',
+      textoMotivo: 'Fuera de tus preferencias',
+      horaInicio: '16:00:00',
+      horaFin: '18:00:00',
+      trasladoKm: 1.2,
+      trasladoMinutos: 8,
+      duracionMinutos: 120,
+      imagenes: ['https://example.com/feria.jpg'],
+      ciudad: 'Córdoba',
+      localidad: 'Centro',
+      direccion: 'Av. Colón 200',
+      lugarRecinto: 'Plaza San Martín',
+      latitud: -31.416,
+      longitud: -64.183,
+      tipoAcceso: 'GRATUITO',
+      montoEstimado: null,
+      descripcionArancel: null,
+      sitioOficial: null,
+      descripcion: 'Feria de artesanías locales en el centro.',
+    },
+    {
+      propuestaId: 4,
+      nombre: 'Caminata al mirador',
+      tipo: 'ACTIVIDAD',
+      categoria: 'NATURALEZA',
+      motivoSugerencia: 'OTRO_TIPO',
+      textoMotivo: 'De tus preferencias, otro tipo',
+      horaInicio: '10:00:00',
+      horaFin: '12:00:00',
+      trasladoKm: 2.5,
+      trasladoMinutos: 15,
+      duracionMinutos: 120,
+      imagenes: ['https://example.com/mirador.jpg'],
+      ciudad: 'Villa Carlos Paz',
+      localidad: 'Centro',
+      direccion: 'Camino al mirador',
+      lugarRecinto: null,
+      latitud: -31.43,
+      longitud: -64.5,
+      tipoAcceso: 'GRATUITO',
+      montoEstimado: null,
+      descripcionArancel: null,
+      sitioOficial: null,
+      descripcion: 'Sendero corto con vista al lago.',
+    },
+  ],
+  noEntran: [],
+  mensaje: null,
 }
 
 /** Respuesta de ejemplo de `GET /api/admin/dashboard`. */

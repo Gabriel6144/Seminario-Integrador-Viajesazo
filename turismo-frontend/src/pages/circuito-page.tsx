@@ -1,45 +1,50 @@
-import { ArrowLeftIcon, ClockIcon, MapPinIcon } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ArrowLeftIcon } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import {
+  useAgregarParadaSugerida,
   useAlternativasReemplazo,
   useCircuito,
   useCircuitoSeleccionado,
+  useDescartarAvisoDia,
   useEliminarParadaCircuito,
   useGenerarCircuito,
   useReemplazarParadaCircuito,
   useSeleccionarCircuito,
+  useSugerenciasDia,
 } from '@/api/circuitos'
-import { useViaje } from '@/api/viajes'
-import { CategoriaBadge } from '@/components/categoria-badge'
-import { CircuitoDetalleView } from '@/components/planificador/circuito-detalle-view'
+import { useCancelarViaje, useViaje } from '@/api/viajes'
+import { CircuitoDiaSplitView } from '@/components/planificador/circuito-dia-split-view'
 import { CircuitoMapaGeneralView } from '@/components/planificador/circuito-mapa-general-view'
+import { CircuitoPdfPreviewDialog } from '@/components/planificador/circuito-pdf-preview-dialog'
+import { CompletarDiaDialog } from '@/components/planificador/completar-dia-dialog'
 import {
+  enrichCircuitoConSeleccionado,
   firstDayWithStops,
   toCircuitoRecomendado,
 } from '@/components/planificador/circuito-view-model'
-import { Paso10Circuito } from '@/components/planificador/paso-10-circuito'
+import { EliminarParadaDialog } from '@/components/planificador/parada-dialogs'
+import { SustituirParadaPanel } from '@/components/planificador/sustituir-parada-panel'
+import { PARAM_DIA, Paso10Circuito } from '@/components/planificador/paso-10-circuito'
 import type { ParadaCircuitoDetalle } from '@/components/planificador/types'
 import { PlanificadorRegenerateModal } from '@/components/planificador/planificador-regenerate-modal'
 import { ErrorState } from '@/components/query-state'
 import {
   AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatTimeRange } from '@/lib/dates'
 import { toUserMessage } from '@/lib/http'
 import { parseId } from '@/lib/parse-id'
-import type { AlternativaItemResponse, CircuitStrategy, TipoRitmo } from '@/types/api'
+import type {
+  CircuitStrategy,
+  TipoRitmo,
+} from '@/types/api'
 
 const MOTIVO_LABELS: Record<string, string> = {
   FECHAS: 'fechas del viaje',
@@ -53,15 +58,6 @@ const RHYTHM_LABELS: Record<TipoRitmo, string> = {
   EQUILIBRADO: 'Equilibrado',
   INTENSIVO: 'Intensivo',
   MANUAL: 'Manual',
-}
-
-function locationLabel(
-  item: Pick<AlternativaItemResponse, 'direccion' | 'localidad' | 'ciudad'>,
-): string {
-  const parts = [item.direccion, item.localidad, item.ciudad]
-    .filter((part): part is string => Boolean(part && part.trim()))
-    .filter((part, index, all) => all.indexOf(part) === index)
-  return parts.length > 0 ? parts.join(', ') : 'Ubicación a confirmar'
 }
 
 function CircuitoSkeleton() {
@@ -97,18 +93,28 @@ export function CircuitoPage() {
   const circuitoGenerado = useCircuito(viajeId)
   const viajeQuery = useViaje(viajeId)
   const regenerar = useGenerarCircuito()
+  const cancelarViaje = useCancelarViaje()
   const eliminar = useEliminarParadaCircuito()
   const reemplazar = useReemplazarParadaCircuito()
   const seleccionar = useSeleccionarCircuito()
+  const agregarSugerida = useAgregarParadaSugerida()
+  const descartarAviso = useDescartarAvisoDia()
   const [isRegenerateModalOpen, setIsRegenerateModalOpen] = useState(false)
-  const [itemToDelete, setItemToDelete] = useState<AlternativaItemResponse | null>(null)
-  const [itemToReplace, setItemToReplace] = useState<AlternativaItemResponse | null>(null)
-  const [selectedPropuestaId, setSelectedPropuestaId] = useState<number | null>(null)
-  const [activeDay, setActiveDay] = useState(1)
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
+  const [isPdfPreviewOpen, setIsPdfPreviewOpen] = useState(false)
+  const [stopToDelete, setStopToDelete] = useState<ParadaCircuitoDetalle | null>(null)
+  const [stopToReplace, setStopToReplace] = useState<ParadaCircuitoDetalle | null>(null)
+  const [sugerenciasFecha, setSugerenciasFecha] = useState<string | null>(null)
+  const [addingPropuestaId, setAddingPropuestaId] = useState<number | null>(null)
+  const [sugerenciaError, setSugerenciaError] = useState<string | null>(null)
   const [showMap, setShowMap] = useState(false)
   const [selectionActiveDay, setSelectionActiveDay] = useState(1)
   const [selectionSuccess, setSelectionSuccess] = useState(false)
-  const alternativas = useAlternativasReemplazo(viajeId, itemToReplace?.itemId ?? null)
+  const alternativas = useAlternativasReemplazo(
+    viajeId,
+    stopToReplace === null ? null : Number(stopToReplace.id),
+  )
+  const sugerencias = useSugerenciasDia(viajeId, sugerenciasFecha)
 
   const handleRegenerate = () => {
     if (viajeId === null) return
@@ -125,6 +131,20 @@ export function CircuitoPage() {
     )
   }
 
+  const handleCancelarViaje = () => {
+    if (viajeId === null) return
+    cancelarViaje.mutate(viajeId, {
+      onSuccess: () => {
+        setIsCancelModalOpen(false)
+        toast.success('Viaje cancelado correctamente')
+        navigate('/borradores')
+      },
+      onError: (error: unknown) => {
+        toast.error(toUserMessage(error) || 'No pudimos cancelar el viaje')
+      },
+    })
+  }
+
   const circuito = query.data
   const alternativaSeleccionada = useMemo(() => {
     if (!circuito || !circuitoGenerado.data) return null
@@ -137,19 +157,44 @@ export function CircuitoPage() {
 
   const richCircuito = useMemo(() => {
     if (!alternativaSeleccionada) return null
-    return toCircuitoRecomendado(
+    const rhythmLabel = viajeQuery.data?.ritmo
+      ? RHYTHM_LABELS[viajeQuery.data.ritmo]
+      : 'Equilibrado'
+    const base = toCircuitoRecomendado(
       alternativaSeleccionada,
-      'Equilibrado',
+      rhythmLabel,
       viajeQuery.data?.fechaInicio ?? undefined,
       viajeQuery.data?.fechaFin ?? undefined,
     )
-  }, [alternativaSeleccionada, viajeQuery.data?.fechaInicio, viajeQuery.data?.fechaFin])
+    return enrichCircuitoConSeleccionado(base, circuito)
+  }, [
+    alternativaSeleccionada,
+    circuito,
+    viajeQuery.data?.ritmo,
+    viajeQuery.data?.fechaInicio,
+    viajeQuery.data?.fechaFin,
+  ])
 
-  useEffect(() => {
-    if (richCircuito) {
-      setActiveDay(firstDayWithStops(richCircuito))
-    }
-  }, [richCircuito])
+  // El día que se está viendo vive en la URL (`?dia=2`): un F5 vuelve al mismo día y, después de
+  // sustituir o eliminar una parada, la vista se queda donde estaba en lugar de saltar al primero.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const diaEnUrl = Number(searchParams.get(PARAM_DIA))
+  const activeDay =
+    richCircuito === null
+      ? 1
+      : richCircuito.days.some((day) => day.number === diaEnUrl)
+        ? diaEnUrl
+        : firstDayWithStops(richCircuito)
+  const setActiveDay = (day: number) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.set(PARAM_DIA, String(day))
+        return next
+      },
+      { replace: true },
+    )
+  }
 
   if (viajeId === null) return <IdInvalido />
 
@@ -230,6 +275,7 @@ export function CircuitoPage() {
           </div>
           <Paso10Circuito
             circuito={circuitoGenerado.data}
+            viajeId={viajeId}
             rhythm={rhythmLabel}
             dateFrom={dateFrom}
             dateTo={dateTo}
@@ -292,20 +338,12 @@ export function CircuitoPage() {
     )
   }
 
-  const findSelectedItem = (itemId: number): AlternativaItemResponse | null => {
-    for (const dia of circuito.dias) {
-      const item = dia.items.find((candidate) => candidate.itemId === itemId)
-      if (item) return item
-    }
-    return null
-  }
-
   const handleDelete = () => {
-    const target = itemToDelete
+    const target = stopToDelete
     if (target === null) return
-    eliminar.mutateAsync({ viajeId, itemId: target.itemId }).then(
+    eliminar.mutateAsync({ viajeId, itemId: Number(target.id) }).then(
       () => {
-        setItemToDelete(null)
+        setStopToDelete(null)
         toast.success('Parada eliminada correctamente')
       },
       (error: unknown) => {
@@ -314,36 +352,61 @@ export function CircuitoPage() {
     )
   }
 
-  const closeReplace = () => {
-    setItemToReplace(null)
-    setSelectedPropuestaId(null)
-  }
+  const closeReplace = () => setStopToReplace(null)
+  const openReplaceByStop = (stop: ParadaCircuitoDetalle) => setStopToReplace(stop)
+  const openDeleteByStop = (stop: ParadaCircuitoDetalle) => setStopToDelete(stop)
 
-  const openReplace = (item: AlternativaItemResponse) => {
-    setSelectedPropuestaId(null)
-    setItemToReplace(item)
-  }
-
-  const openReplaceByStop = (stop: ParadaCircuitoDetalle) => {
-    const item = findSelectedItem(Number(stop.id))
-    if (item) openReplace(item)
-  }
-
-  const openDeleteByStop = (stop: ParadaCircuitoDetalle) => {
-    const item = findSelectedItem(Number(stop.id))
-    if (item) setItemToDelete(item)
-  }
-
-  const handleReplace = () => {
-    const target = itemToReplace
-    if (target === null || selectedPropuestaId === null) return
-    reemplazar.mutateAsync({ viajeId, itemId: target.itemId, propuestaId: selectedPropuestaId }).then(
+  const handleReplace = (propuestaId: number) => {
+    const target = stopToReplace
+    if (target === null) return
+    reemplazar.mutateAsync({ viajeId, itemId: Number(target.id), propuestaId }).then(
       () => {
         closeReplace()
         toast.success('Parada reemplazada correctamente')
       },
       (error: unknown) => {
         toast.error(toUserMessage(error) || 'No pudimos reemplazar la parada')
+      },
+    )
+  }
+
+  const closeSugerencias = () => {
+    setSugerenciasFecha(null)
+    setAddingPropuestaId(null)
+    setSugerenciaError(null)
+  }
+
+  const handleDejarloAsi = (fecha: string) => {
+    descartarAviso.mutate(
+      { viajeId, fecha },
+      {
+        onSuccess: () => {
+          toast.success('Dejamos el día como está')
+        },
+        onError: (error) => {
+          toast.error(toUserMessage(error) || 'No pudimos guardar la decisión')
+        },
+      },
+    )
+  }
+
+  const handleAgregarSugerencia = (propuestaId: number) => {
+    if (sugerenciasFecha === null) return
+    setAddingPropuestaId(propuestaId)
+    setSugerenciaError(null)
+    agregarSugerida.mutate(
+      { viajeId, fecha: sugerenciasFecha, propuestaId },
+      {
+        onSuccess: () => {
+          toast.success('Parada agregada al día')
+          setAddingPropuestaId(null)
+        },
+        onError: (error) => {
+          const message = toUserMessage(error) || 'No pudimos agregar la sugerencia'
+          setSugerenciaError(message)
+          toast.error(message)
+          setAddingPropuestaId(null)
+        },
       },
     )
   }
@@ -358,13 +421,37 @@ export function CircuitoPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Link
-        to="/borradores"
-        className="flex w-fit items-center gap-2 text-sm font-semibold text-sky-700 transition-colors hover:text-sky-900"
-      >
-        <ArrowLeftIcon className="size-4" aria-hidden />
-        Volver a Mis viajes
-      </Link>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Link
+          to="/borradores"
+          className="flex w-fit items-center gap-2 text-sm font-semibold text-sky-700 transition-colors hover:text-sky-900"
+        >
+          <ArrowLeftIcon className="size-4" aria-hidden />
+          Volver a Mis viajes
+        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setIsPdfPreviewOpen(true)}
+            className="rounded-xl"
+          >
+            <span className="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+            Exportar PDF
+          </Button>
+          {viajeQuery.data?.estado === 'PLANIFICADO' ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsCancelModalOpen(true)}
+              className="rounded-xl border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+            >
+              <span className="material-symbols-outlined text-[18px]">cancel</span>
+              Cancelar viaje
+            </Button>
+          ) : null}
+        </div>
+      </div>
 
       {circuito.advertencia && (
         <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
@@ -399,20 +486,20 @@ export function CircuitoPage() {
       )}
 
       {richCircuito ? (
-        <CircuitoDetalleView
+        <CircuitoDiaSplitView
           circuito={richCircuito}
           activeDay={activeDay}
-          selectedStrategy={circuito.estrategia}
           onChangeActiveDay={setActiveDay}
           onBackToList={() => window.history.back()}
           onExploreMap={() => setShowMap(true)}
-          editable
           onReplaceStop={openReplaceByStop}
           onDeleteStop={openDeleteByStop}
+          viajeId={viajeId}
           headerTitle="Circuito confirmado"
           backAriaLabel="Volver a Mis viajes"
-          showHeroBadge={false}
-          ritmo={viajeQuery.data?.ritmo ?? null}
+          onVerSugerencias={setSugerenciasFecha}
+          onDejarloAsi={handleDejarloAsi}
+          descartandoAviso={descartarAviso.isPending}
         />
       ) : circuitoGenerado.isPending ? (
         <CircuitoSkeleton />
@@ -422,117 +509,33 @@ export function CircuitoPage() {
         </p>
       )}
 
-      <AlertDialog
-        open={itemToDelete !== null}
-        onOpenChange={(open) => {
-          if (!open) setItemToDelete(null)
-        }}
-      >
-        <AlertDialogContent className="max-w-lg rounded-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="font-heading text-lg font-bold">
-              Eliminar parada
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              ¿Querés eliminar “{itemToDelete?.propuestaNombre}” del circuito? Se
-              recalcularán los traslados y las métricas del recorrido.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={eliminar.isPending}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={eliminar.isPending}
-              className="bg-red-600 text-white hover:bg-red-700"
-            >
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <EliminarParadaDialog
+        parada={stopToDelete}
+        paradasDelDia={richCircuito?.stopsByDay[activeDay] ?? []}
+        confirmado
+        isPending={eliminar.isPending}
+        onCancel={() => setStopToDelete(null)}
+        onConfirm={handleDelete}
+      />
 
-      <AlertDialog
-        open={itemToReplace !== null}
-        onOpenChange={(open) => {
-          if (!open) closeReplace()
-        }}
-      >
-        <AlertDialogContent className="max-w-lg rounded-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="font-heading text-lg font-bold">
-              Sustituir parada
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Elegí una propuesta para reemplazar “{itemToReplace?.propuestaNombre}”. Solo se
-              muestran opciones que entran en el mismo bloque horario y respetan los traslados.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
+      <SustituirParadaPanel
+        parada={stopToReplace}
+        diaLabel={richCircuito?.days.find((day) => day.number === activeDay)?.label ?? ''}
+        opciones={alternativas}
+        isPending={reemplazar.isPending}
+        onCancel={closeReplace}
+        onConfirm={handleReplace}
+      />
 
-          <div className="flex max-h-72 flex-col gap-2 overflow-y-auto py-2">
-            {alternativas.isPending && (
-              <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">
-                Buscando alternativas...
-              </p>
-            )}
-            {alternativas.isError && (
-              <p className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                {toUserMessage(alternativas.error)}
-              </p>
-            )}
-            {alternativas.isSuccess && alternativas.data.alternativas.length === 0 && (
-              <p className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">
-                {alternativas.data.mensaje ??
-                  'No hay propuestas disponibles para reemplazar esta parada.'}
-              </p>
-            )}
-            {alternativas.isSuccess &&
-              alternativas.data.alternativas.map((alternativa) => (
-                <button
-                  key={alternativa.propuestaId}
-                  type="button"
-                  onClick={() => setSelectedPropuestaId(alternativa.propuestaId)}
-                  aria-pressed={selectedPropuestaId === alternativa.propuestaId}
-                  className={`flex w-full flex-col gap-1 rounded-xl border p-3 text-left transition-colors ${
-                    selectedPropuestaId === alternativa.propuestaId
-                      ? 'border-sky-600 bg-sky-50'
-                      : 'border-slate-200 hover:border-sky-300 hover:bg-slate-50'
-                  }`}
-                >
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="font-heading text-sm font-bold text-slate-900">
-                      {alternativa.propuestaNombre}
-                    </span>
-                    <CategoriaBadge categoria={alternativa.categoria} />
-                  </span>
-                  <span className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
-                    <span className="flex items-center gap-1">
-                      <ClockIcon className="size-3.5" aria-hidden />
-                      {formatTimeRange(alternativa.horaInicio, alternativa.horaFin) ??
-                        'A confirmar'}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <MapPinIcon className="size-3.5" aria-hidden />
-                      {locationLabel(alternativa)}
-                    </span>
-                  </span>
-                </button>
-              ))}
-          </div>
-
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={reemplazar.isPending} onClick={closeReplace}>
-              Cancelar
-            </AlertDialogCancel>
-            <Button
-              type="button"
-              onClick={handleReplace}
-              disabled={selectedPropuestaId === null || reemplazar.isPending}
-            >
-              {reemplazar.isPending ? 'Reemplazando...' : 'Reemplazar'}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <CompletarDiaDialog
+        abierto={sugerenciasFecha !== null}
+        sugerencias={sugerencias}
+        agregandoId={addingPropuestaId}
+        isPending={agregarSugerida.isPending}
+        error={sugerenciaError}
+        onClose={closeSugerencias}
+        onAgregar={handleAgregarSugerencia}
+      />
 
       <PlanificadorRegenerateModal
         isOpen={isRegenerateModalOpen}
@@ -540,11 +543,68 @@ export function CircuitoPage() {
         onClose={() => setIsRegenerateModalOpen(false)}
         onConfirm={handleRegenerate}
       />
+
+      {richCircuito ? (
+        <CircuitoPdfPreviewDialog
+          abierto={isPdfPreviewOpen}
+          circuito={richCircuito}
+          viaje={viajeQuery.data ?? null}
+          onClose={() => setIsPdfPreviewOpen(false)}
+        />
+      ) : null}
+
+      <AlertDialog
+        open={isCancelModalOpen}
+        onOpenChange={(open) => {
+          if (!open && !cancelarViaje.isPending) setIsCancelModalOpen(false)
+        }}
+      >
+        <AlertDialogContent className="max-w-[380px] gap-5 rounded-3xl">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#ffdad6]">
+              <span className="material-symbols-outlined text-[28px] text-[#bb0413]">
+                warning
+              </span>
+            </div>
+            <div className="flex flex-col text-left">
+              <AlertDialogTitle className="font-heading text-[22px] font-bold leading-tight text-[#191c1e]">
+                ¿Cancelar este viaje?
+              </AlertDialogTitle>
+              <span className="mt-1 text-[11px] font-bold uppercase tracking-wider text-[#bb0413]">
+                ACCIÓN IRREVERSIBLE
+              </span>
+            </div>
+          </div>
+
+          <AlertDialogDescription className="text-left text-[15px] leading-relaxed text-[#3f484e]">
+            Vas a dejar de figurar como inscripto en las propuestas de este circuito. El viaje
+            deja de aparecer en Mis viajes y no se puede recuperar.
+          </AlertDialogDescription>
+
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsCancelModalOpen(false)}
+              disabled={cancelarViaje.isPending}
+              className="h-14 rounded-2xl"
+            >
+              Mantener viaje
+            </Button>
+            <Button
+              type="button"
+              onClick={handleCancelarViaje}
+              disabled={cancelarViaje.isPending}
+              className="h-14 rounded-2xl bg-[#bb0413] text-white hover:bg-[#93000b]"
+            >
+              {cancelarViaje.isPending ? 'Cancelando...' : 'Sí, cancelar'}
+            </Button>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
-
-// Header visual se renderiza con el mismo formato de alternativas (CircuitoDetalleView).
 
 function describeReasons(motivos: string[]): string {
   const labels = motivos.map((motivo) => MOTIVO_LABELS[motivo] ?? motivo.toLowerCase())

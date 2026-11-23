@@ -22,6 +22,8 @@ public class CircuitGenerator {
 
 	private static final LocalTime PLANNING_DAY_START = LocalTime.of(6, 0);
 	private static final LocalTime PLANNING_DAY_END = LocalTime.of(23, 59);
+	/** "Cerca de todo" agrupa por tramos de 500 m para que los Me gusta puedan desempatar. */
+	private static final double NEARBY_STEP_KM = 0.5;
 
 	private final DistanceProvider distanceProvider;
 
@@ -259,22 +261,38 @@ public class CircuitGenerator {
 		if (feasible.isEmpty()) {
 			return null;
 		}
+		// Los Me gusta del turista y la popularidad deciden ANTES del desempate por nombre o por la
+		// distancia exacta; si no, en la práctica nunca llegaban a pesar.
+		Comparator<CircuitCandidate> likedFirst = Comparator
+				.comparing((CircuitCandidate candidate) -> !likedIds.contains(candidate.id()));
+		Comparator<CircuitCandidate> popularFirst = Comparator
+				.comparingLong((CircuitCandidate candidate) -> -likeCounts.getOrDefault(candidate.id(), 0L));
 		Comparator<CircuitCandidate> comparator;
 		if (strategy == CircuitStrategy.CERCANIA && previous != null) {
-			comparator = Comparator.comparingDouble(candidate -> distance(previous, candidate).distanceKm());
+			// "Cerca de todo": por tramos de distancia; dentro del tramo gana lo que le gustó.
+			comparator = Comparator
+					.comparingDouble((CircuitCandidate candidate) ->
+							Math.floor(distance(previous, candidate).distanceKm() / NEARBY_STEP_KM))
+					.thenComparing(likedFirst)
+					.thenComparing(popularFirst)
+					.thenComparingDouble((CircuitCandidate candidate) -> distance(previous, candidate).distanceKm());
 		} else if (strategy == CircuitStrategy.DESCUBRIMIENTO) {
 			comparator = Comparator
 					.comparing((CircuitCandidate candidate) -> covered.contains(candidate.category()))
+					.thenComparing(likedFirst)
 					.thenComparingInt(this::availabilityCount)
+					.thenComparing(popularFirst)
 					.thenComparing(CircuitCandidate::name);
 		} else {
+			// "Según tus intereses" (y la primera parada de "Cerca de todo"): intereses, Me gusta del
+			// turista y popularidad. Antes, como todas las candidatas ya son de sus intereses, quedaba
+			// en orden alfabético.
 			comparator = Comparator
 					.comparingInt((CircuitCandidate candidate) -> interestScore(candidate, interests)).reversed()
+					.thenComparing(likedFirst)
+					.thenComparing(popularFirst)
 					.thenComparing(CircuitCandidate::name);
 		}
-		comparator = comparator
-				.thenComparing((CircuitCandidate candidate) -> !likedIds.contains(candidate.id()))
-				.thenComparingLong((CircuitCandidate candidate) -> -likeCounts.getOrDefault(candidate.id(), 0L));
 		return feasible.stream().sorted(comparator).findFirst().orElse(null);
 	}
 

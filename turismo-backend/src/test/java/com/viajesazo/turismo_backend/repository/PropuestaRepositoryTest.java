@@ -22,7 +22,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 import com.viajesazo.turismo_backend.dto.request.PropuestaFiltro;
+import com.viajesazo.turismo_backend.dto.response.PropuestaResumenContadoresResponse;
 import com.viajesazo.turismo_backend.dto.response.PropuestaResumenResponse;
+import com.viajesazo.turismo_backend.dto.response.ZonaResponse;
 import com.viajesazo.turismo_backend.exception.BusinessRuleException;
 import com.viajesazo.turismo_backend.mapper.PropuestaResumenMapper;
 import com.viajesazo.turismo_backend.model.Actividad;
@@ -161,7 +163,7 @@ class PropuestaRepositoryTest {
 	void filtersByPublisherAndState() {
 		Page<PropuestaResumenResponse> page = search(
 				new PropuestaFiltro(null, null, null, null, null, NombreEstado.INICIADO, publisher.getId(),
-						null, null, null, null, null),
+						null, null, null, null, null, null, false),
 				Sort.unsorted());
 
 		assertThat(page.getTotalElements()).isEqualTo(4);
@@ -179,13 +181,111 @@ class PropuestaRepositoryTest {
 	}
 
 	@Test
-	@DisplayName("US3: las fechas sin tipo EVENTO se rechazan")
-	void rejectsDateFilterWithoutEventType() {
-		PropuestaFiltro filtro = filtro(null, null, null, null, null, LocalDate.parse("2026-10-15"), null);
+	@DisplayName("US3: el rango de fechas también aplica a actividades")
+	void filtersByDateRangeAcrossEventsAndActivities() {
+		Page<PropuestaResumenResponse> page = search(
+				filtro(null, null, null, null, null, LocalDate.parse("2026-10-15"), null),
+				Sort.unsorted());
 
-		assertThatThrownBy(() -> search(filtro, Sort.unsorted()))
-				.isInstanceOf(BusinessRuleException.class)
-				.hasMessageContaining("tipo=EVENTO");
+		assertThat(page.getContent()).extracting(PropuestaResumenResponse::nombre)
+				.containsExactlyInAnyOrder("Maratón de las Sierras",
+						"Senderismo en las sierras", "Visita guiada por el centro");
+	}
+
+	@Test
+	@DisplayName("US3: filtra por ciudad sin distinguir mayúsculas ni tildes")
+	void filtersByCiudad() {
+		PropuestaFiltro porCiudad = new PropuestaFiltro(null, null, null, null, null, null, null, null,
+				"cosquin", null, null, null, null, false);
+
+		assertThat(search(porCiudad, Sort.unsorted()).getTotalElements()).isEqualTo(4);
+	}
+
+	@Test
+	@DisplayName("US3: la búsqueda de texto ignora tildes también en la localidad")
+	void searchesByTextWithoutAccents() {
+		Page<PropuestaResumenResponse> page = search(
+				filtro(null, null, null, "cosquin", null, null, null), Sort.unsorted());
+
+		assertThat(page.getTotalElements()).isEqualTo(4);
+	}
+
+	@Test
+	@DisplayName("US3: el catálogo oculta las canceladas salvo que se pidan explícitamente")
+	void excludesCancelledByDefault() {
+		EstadoPropuesta cancelado = estadoPropuestaRepository.save(EstadoPropuesta.builder()
+				.nombre("CANCELADO")
+				.descripcion("Propuesta cancelada")
+				.build());
+		Evento canceladoEvent = evento("Evento cancelado", "No debe aparecer", TipoPropuesta.FERIA,
+				InteresCategoria.CULTURA, LocalDate.parse("2026-10-20"), LocalDate.parse("2026-10-21"));
+		canceladoEvent.setEstadoPropuesta(cancelado);
+		propuestaRepository.save(canceladoEvent);
+
+		assertThat(search(filtro(null, null, null, null, null, null, null), Sort.unsorted())
+				.getContent()).extracting(PropuestaResumenResponse::nombre)
+						.doesNotContain("Evento cancelado");
+
+		PropuestaFiltro incluyendo = new PropuestaFiltro(null, null, null, null, null, null, null, null,
+				null, null, null, null, null, true);
+		assertThat(search(incluyendo, Sort.unsorted()).getContent())
+				.extracting(PropuestaResumenResponse::nombre)
+				.contains("Evento cancelado");
+
+		PropuestaFiltro soloCanceladas = new PropuestaFiltro(null, null, null, null, null,
+				NombreEstado.CANCELADO, null, null, null, null, null, null, null, false);
+		assertThat(search(soloCanceladas, Sort.unsorted()).getContent())
+				.extracting(PropuestaResumenResponse::nombre)
+				.containsExactly("Evento cancelado");
+	}
+
+	@Test
+	@DisplayName("US3: la paginación se aplica después de filtrar y el total es el filtrado")
+	void paginatesFilteredResults() {
+		PropuestaFiltro soloEventos = filtro(TipoRegistro.EVENTO, null, null, null, null, null, null);
+
+		Page<PropuestaResumenResponse> first = service.search(soloEventos,
+				PageRequest.of(0, 1, Sort.unsorted()));
+		Page<PropuestaResumenResponse> second = service.search(soloEventos,
+				PageRequest.of(1, 1, Sort.unsorted()));
+
+		assertThat(first.getTotalElements()).isEqualTo(2);
+		assertThat(first.getTotalPages()).isEqualTo(2);
+		assertThat(first.getContent()).extracting(PropuestaResumenResponse::nombre)
+				.containsExactly("Festival de Folklore");
+		assertThat(second.getContent()).extracting(PropuestaResumenResponse::nombre)
+				.containsExactly("Maratón de las Sierras");
+	}
+
+	@Test
+	@DisplayName("US3: el resumen cuenta total, eventos y actividades con los filtros")
+	void summaryCounts() {
+		PropuestaResumenContadoresResponse summary = service
+				.summary(filtro(null, null, null, null, null, null, null));
+
+		assertThat(summary.total()).isEqualTo(4);
+		assertThat(summary.eventos()).isEqualTo(2);
+		assertThat(summary.actividades()).isEqualTo(2);
+	}
+
+	@Test
+	@DisplayName("US3: las zonas devuelven ciudad y localidad distintas")
+	void zonesAreDistinct() {
+		Ubicacion jesusMaria = ubicacionRepository.save(Ubicacion.builder()
+				.ciudad("Jesús María")
+				.localidad("Jesús María")
+				.direccion("Av. San Martín 100")
+				.latitud(new BigDecimal("-30.98000000"))
+				.longitud(new BigDecimal("-64.09000000"))
+				.build());
+		Evento pena = evento("Peña de Jesús María", "Música en vivo", TipoPropuesta.FESTIVAL,
+				InteresCategoria.MUSICA, LocalDate.parse("2026-10-20"), LocalDate.parse("2026-10-21"));
+		pena.setUbicacion(jesusMaria);
+		propuestaRepository.save(pena);
+
+		List<ZonaResponse> zonas = service.zones(null, false);
+
+		assertThat(zonas).extracting(ZonaResponse::ciudad).contains("Cosquín", "Jesús María");
 	}
 
 	@Test
@@ -342,14 +442,14 @@ class PropuestaRepositoryTest {
 
 	private PropuestaFiltro filtro(TipoRegistro tipo, TipoPropuesta tipoPropuesta, InteresCategoria categoria,
 			String q, String localidad, LocalDate fechaDesde, LocalDate fechaHasta) {
-		return new PropuestaFiltro(tipo, tipoPropuesta, categoria, null, null, null, null, localidad, null, q,
-				fechaDesde, fechaHasta);
+		return new PropuestaFiltro(tipo, tipoPropuesta, categoria, null, null, null, null, localidad, null,
+				null, q, fechaDesde, fechaHasta, false);
 	}
 
 	private PropuestaFiltro agendaFiltro(TipoPropuesta tipoPropuesta, InteresCategoria categoria,
 			TipoAcceso tipoAcceso, String ubicacion, LocalDate fechaDesde, LocalDate fechaHasta) {
 		return new PropuestaFiltro(TipoRegistro.EVENTO, tipoPropuesta, categoria, null, tipoAcceso, null, null,
-				null, ubicacion, null, fechaDesde, fechaHasta);
+				null, null, ubicacion, null, fechaDesde, fechaHasta, false);
 	}
 
 	private Evento evento(String nombre, String descripcion, TipoPropuesta tipoPropuesta,

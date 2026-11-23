@@ -2,6 +2,7 @@ package com.viajesazo.turismo_backend.service;
 
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -12,9 +13,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.viajesazo.turismo_backend.dto.request.PropuestaFiltro;
+import com.viajesazo.turismo_backend.dto.response.PropuestaResumenContadoresResponse;
 import com.viajesazo.turismo_backend.dto.response.PropuestaResumenResponse;
+import com.viajesazo.turismo_backend.dto.response.ZonaResponse;
 import com.viajesazo.turismo_backend.exception.BusinessRuleException;
 import com.viajesazo.turismo_backend.mapper.PropuestaResumenMapper;
+import com.viajesazo.turismo_backend.model.Actividad;
+import com.viajesazo.turismo_backend.model.Evento;
 import com.viajesazo.turismo_backend.model.PropuestaTuristica;
 import com.viajesazo.turismo_backend.model.TipoRegistro;
 import com.viajesazo.turismo_backend.repository.PropuestaRepository;
@@ -26,7 +31,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class PropuestaQueryService {
 
-	private static final Sort DEFAULT_SORT = Sort.by(Sort.Direction.ASC, "nombre");
+	private static final Sort DEFAULT_SORT = Sort.by(Sort.Direction.ASC, "nombre")
+			.and(Sort.by(Sort.Direction.ASC, "id"));
 	private static final Sort AGENDA_SORT = Sort.by(Sort.Direction.ASC, "fechaInicio", "horarioInicio");
 
 	private final PropuestaRepository propuestaRepository;
@@ -68,15 +74,45 @@ public class PropuestaQueryService {
 				filtro.estado(),
 				filtro.publicadorId(),
 				filtro.localidad(),
+				filtro.ciudad(),
 				filtro.ubicacion(),
 				filtro.q(),
 				from,
-				filtro.fechaHasta());
+				filtro.fechaHasta(),
+				false);
 		Specification<PropuestaTuristica> specification = PropuestaSpecifications.filter(agendaFiltro)
 				.and(PropuestaSpecifications.notCancelled())
 				.and(PropuestaSpecifications.sorted(AGENDA_SORT, TipoRegistro.EVENTO));
 		Pageable unsorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
 		return propuestaRepository.findAll(specification, unsorted).map(mapper::toResponse);
+	}
+
+	/**
+	 * Contadores del listado (total, eventos y actividades) con los mismos filtros que
+	 * {@link #search}, pero sin la píldora de tipo: las tres cifras siempre describen el
+	 * conjunto filtrado completo.
+	 */
+	@Transactional(readOnly = true)
+	public PropuestaResumenContadoresResponse summary(PropuestaFiltro filtro) {
+		PropuestaFiltro sinTipo = new PropuestaFiltro(null, filtro.tipoPropuesta(), filtro.categoria(),
+				filtro.modalidad(), filtro.tipoAcceso(), filtro.estado(), filtro.publicadorId(),
+				filtro.localidad(), filtro.ciudad(), filtro.ubicacion(), filtro.q(), filtro.fechaDesde(),
+				filtro.fechaHasta(), filtro.incluirCanceladas());
+		Specification<PropuestaTuristica> base = PropuestaSpecifications.filter(sinTipo);
+		long total = propuestaRepository.count(base);
+		long eventos = propuestaRepository.count(
+				base.and((root, query, cb) -> cb.equal(root.type(), Evento.class)));
+		long actividades = propuestaRepository.count(
+				base.and((root, query, cb) -> cb.equal(root.type(), Actividad.class)));
+		return new PropuestaResumenContadoresResponse(total, eventos, actividades);
+	}
+
+	/** Ciudades y localidades distintas para el selector de zona. */
+	@Transactional(readOnly = true)
+	public List<ZonaResponse> zones(Long publicadorId, boolean incluirCanceladas) {
+		return propuestaRepository.findDistinctZonas(publicadorId, incluirCanceladas).stream()
+				.map(row -> new ZonaResponse((String) row[0], (String) row[1]))
+				.toList();
 	}
 
 	private Sort validSort(Sort requested, TipoRegistro tipo) {
