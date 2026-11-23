@@ -10,7 +10,7 @@ export function AuthBackButton() {
   return (
     <button
       type="button"
-      className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-[#65b7e8] hover:text-[#9dd4f0] hover:underline"
+      className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-[#00658d] hover:text-[#008ab7] hover:underline"
       onClick={() => {
         const idx = (window.history.state as { idx?: number } | null)?.idx
         if (typeof idx === 'number' && idx > 0) {

@@ -23,7 +23,7 @@ export function SobreNosotrosPage() {
 function SobreNosotrosContent() {
   const { copy, paths, asset } = useViajezaso()
   const root = useRef<HTMLElement>(null)
-  usePageEffects(root, `${copy.navAbout} · Viajezaso`)
+  usePageEffects(root, `${copy.navAbout} · Viajesazo`)
   return (
     <main id="contenido" ref={root} className="about-view">
       <section

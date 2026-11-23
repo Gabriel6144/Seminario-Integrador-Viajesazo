@@ -105,7 +105,7 @@ export function LoginPage() {
           {serverError === null ? null : (
             <div
               role="alert"
-              className="rounded-lg border border-red-400/40 bg-red-500/15 px-4 py-3 text-sm text-red-200"
+              className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
             >
               {serverError}
             </div>
@@ -114,7 +114,7 @@ export function LoginPage() {
           {forgotSuccess ? (
             <div
               role="status"
-              className="rounded-lg border border-[#65b7e8]/35 bg-[#00658d]/25 px-4 py-3 text-sm text-white/90"
+              className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-[#00658d]"
             >
               {FORGOT_SUCCESS_MESSAGE}
             </div>
@@ -243,7 +243,7 @@ export function LoginPage() {
                 />
                 <button
                   type="button"
-                  className="absolute inset-y-0 right-0 flex items-center px-3 text-white/55 hover:text-white"
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 hover:text-[#191c1e]"
                   aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                   onClick={() => setShowPassword((prev) => !prev)}
                 >

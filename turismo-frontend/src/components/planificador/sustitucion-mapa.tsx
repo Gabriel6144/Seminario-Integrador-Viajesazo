@@ -29,18 +29,18 @@ const GRIS = '#94a3b8'
 type Leaflet = typeof import('leaflet')
 
 function pinVecina(numero: string): string {
-  return `<span style="display:flex;width:28px;height:28px;align-items:center;justify-content:center;border-radius:999px;background:#0f172a;color:#fff;font:800 12px Inter,sans-serif;border:3px solid #fff;box-shadow:0 2px 6px rgba(15,23,42,.3)">${numero}</span>`
+  return `<span style="display:flex;width:28px;height:28px;align-items:center;justify-content:center;border-radius:999px;background:#0f172a;color:#fff;font:800 12px Nunito,sans-serif;border:3px solid #fff;box-shadow:0 2px 6px rgba(15,23,42,.3)">${numero}</span>`
 }
 
 function pinActual(): string {
-  return `<span style="display:flex;width:26px;height:26px;align-items:center;justify-content:center;border-radius:999px;background:#fff;color:#64748b;font:800 12px Inter,sans-serif;border:2px dashed ${GRIS}">×</span>`
+  return `<span style="display:flex;width:26px;height:26px;align-items:center;justify-content:center;border-radius:999px;background:#fff;color:#64748b;font:800 12px Nunito,sans-serif;border:2px dashed ${GRIS}">×</span>`
 }
 
 function pinOpcion(letra: string, seleccionada: boolean): string {
   const size = seleccionada ? 38 : 30
   const fondo = seleccionada ? AZUL : '#fff'
   const color = seleccionada ? '#fff' : AZUL
-  return `<span style="display:flex;width:${size}px;height:${size}px;align-items:center;justify-content:center;border-radius:999px 999px 999px 4px;transform:rotate(-45deg);background:${fondo};border:2px solid ${AZUL};box-shadow:0 3px 8px rgba(15,23,42,.25)"><span style="transform:rotate(45deg);color:${color};font:800 13px Inter,sans-serif">${letra}</span></span>`
+  return `<span style="display:flex;width:${size}px;height:${size}px;align-items:center;justify-content:center;border-radius:999px 999px 999px 4px;transform:rotate(-45deg);background:${fondo};border:2px solid ${AZUL};box-shadow:0 3px 8px rgba(15,23,42,.25)"><span style="transform:rotate(45deg);color:${color};font:800 13px Nunito,sans-serif">${letra}</span></span>`
 }
 
 /** Tooltip con el nombre como texto plano: los nombres vienen de los publicadores. */

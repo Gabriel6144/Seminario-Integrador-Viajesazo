@@ -10,35 +10,35 @@ type AuthFormPanelProps = {
 }
 
 /**
- * Panel derecho del split auth: card oscura con título y formulario.
+ * Panel derecho del split auth: card clara con el tono de la página inicial.
  */
 export function AuthFormPanel({ title, subtitle, children, footer }: AuthFormPanelProps) {
   return (
-    <section className="flex flex-1 items-center justify-center bg-[#0f1418] px-5 py-8 md:px-10 md:py-12">
+    <section className="flex flex-1 items-center justify-center bg-[#eef2f6] px-5 py-8 md:px-10 md:py-12">
       <div className="w-full max-w-md">
         <AuthBackButton />
-        <div className="rounded-2xl border border-white/10 bg-[#1a1f24] p-6 shadow-xl shadow-black/30 sm:p-8">
+        <div className="rounded-2xl border border-[#dbe8ee] bg-white p-6 shadow-[0_12px_32px_rgba(15,23,42,0.06)] sm:p-8">
           <div className="mb-6 flex flex-col gap-1">
-            <h2 className="font-heading text-xl font-bold tracking-tight text-white sm:text-2xl">
+            <h2 className="font-heading text-xl font-bold tracking-tight text-[#191c1e] sm:text-2xl">
               {title}
             </h2>
-            {subtitle ? <p className="text-sm text-white/65">{subtitle}</p> : null}
+            {subtitle ? <p className="text-sm text-[#475569]">{subtitle}</p> : null}
           </div>
           {children}
         </div>
-        {footer ? <div className="mt-5 text-center text-sm text-white/70">{footer}</div> : null}
+        {footer ? <div className="mt-5 text-center text-sm text-[#475569]">{footer}</div> : null}
       </div>
     </section>
   )
 }
 
-/** Clases compartidas para inputs sobre card oscura. */
+/** Clases compartidas para inputs sobre card clara. */
 export const authInputClassName =
-  'h-10 border-white/15 bg-white/5 text-white placeholder:text-white/40 focus-visible:border-[#65b7e8] focus-visible:ring-[#65b7e8]/30'
+  'h-10 border-slate-200 bg-slate-50/70 text-[#191c1e] placeholder:text-slate-400 focus-visible:border-[#00658d] focus-visible:ring-[#00658d]/25'
 
-/** Clases para labels sobre card oscura. */
-export const authLabelClassName = 'text-white/85'
+/** Clases para labels sobre card clara. */
+export const authLabelClassName = 'text-[#191c1e] font-semibold'
 
-/** Link / acción secundaria sobre fondo oscuro. */
+/** Link / acción secundaria sobre fondo claro. */
 export const authLinkClassName =
-  'font-semibold text-[#65b7e8] hover:text-[#9dd4f0] hover:underline'
+  'font-semibold text-[#00658d] hover:text-[#008ab7] hover:underline'
