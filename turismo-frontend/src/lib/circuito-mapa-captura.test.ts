@@ -67,6 +67,28 @@ describe('captureCircuitoDiaMapa', () => {
     ])
   })
 
+  it('proyecta la ruta OSRM cuando se pasa', async () => {
+    const result = await captureCircuitoDiaMapa(
+      [
+        { number: 1, title: 'A', latitud: -31.4, longitud: -64.2 },
+        { number: 2, title: 'B', latitud: -31.41, longitud: -64.19 },
+      ],
+      {
+        route: [
+          [-31.4, -64.2],
+          [-31.405, -64.195],
+          [-31.41, -64.19],
+        ],
+      },
+    )
+
+    expect(result?.routePoints).toEqual([
+      { x: 100, y: 80 },
+      { x: 100, y: 80 },
+      { x: 100, y: 80 },
+    ])
+  })
+
   it('devuelve null cuando no hay coordenadas', async () => {
     const result = await captureCircuitoDiaMapa([{ number: 1, title: 'A' }])
 

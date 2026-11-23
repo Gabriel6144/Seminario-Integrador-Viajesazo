@@ -5,7 +5,7 @@ import type {
 import type { ViajeResponse } from '@/types/api'
 
 /** Medidas en puntos del mapa de cada día dentro de la página A4 vertical. */
-export const DAY_MAP = { width: 302, height: 400 } as const
+export const DAY_MAP = { width: 302, height: 410 } as const
 
 export interface DayMapStopData {
   number: number
@@ -27,11 +27,6 @@ export interface DayStopData {
   location: string
 }
 
-export interface DayAttributeData {
-  label: string
-  value: string
-}
-
 export interface DayData {
   number: number
   title: string
@@ -39,9 +34,7 @@ export interface DayData {
   dateLabel: string
   location: string
   summary: string
-  timeRange: string
   totalKm: number
-  attributes: DayAttributeData[]
   stops: DayStopData[]
   mapStops: DayMapStopData[]
 }
@@ -68,10 +61,6 @@ function clock(value: string): string {
 
 function startTime(stop: ParadaCircuitoDetalle): string {
   return clock(stop.horaInicio ?? '') || clock(stop.hours.split(/\s*[-–]\s*/)[0] ?? '') || stop.time
-}
-
-function endTime(stop: ParadaCircuitoDetalle): string {
-  return clock(stop.horaFin ?? '') || clock(stop.hours.split(/\s*[-–]\s*/)[1] ?? '')
 }
 
 function mainCategory(stops: ParadaCircuitoDetalle[]): string {
@@ -128,12 +117,6 @@ export function buildDayData(
     location: stop.location,
   }))
 
-  const first = rawStops[0]
-  const last = rawStops[rawStops.length - 1]
-  const start = first ? startTime(first) : ''
-  const end = last ? endTime(last) : ''
-  const timeRange = start && end ? `${start} – ${end}` : start || 'Horario a confirmar'
-
   return {
     number: day.number,
     title: routeTitle(rawStops, day.label),
@@ -141,16 +124,7 @@ export function buildDayData(
     dateLabel: day.label,
     location: dayLocation(rawStops, viaje, day.summary),
     summary: day.summary,
-    timeRange,
     totalKm,
-    attributes: [
-      { label: 'HORARIO', value: timeRange },
-      { label: 'DISTANCIA', value: formatKilometers(totalKm) },
-      {
-        label: 'PARADAS',
-        value: `${rawStops.length} ${rawStops.length === 1 ? 'parada' : 'paradas'}`,
-      },
-    ],
     stops,
     mapStops: rawStops.map((stop) => ({
       number: stop.number,

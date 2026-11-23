@@ -69,7 +69,7 @@ export const FOLKLORE: EventoResponse = {
   fechaFin: '2026-10-04',
   horarioInicio: '20:00:00',
   horarioFin: '23:30:00',
-  imagenes: ['https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Festival_de_Doma_y_Folklore_de_Jes%C3%BAs_Mar%C3%ADa.jpg/1200px-Festival_de_Doma_y_Folklore_de_Jes%C3%BAs_Mar%C3%ADa.jpg'],
+  imagenes: ['https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/46_Festival_de_la_Doma_y_el_Folklore_Jesus_Mar%C3%ADa.jpg/1280px-46_Festival_de_la_Doma_y_el_Folklore_Jesus_Mar%C3%ADa.jpg'],
   publicadorId: 1,
   publicadorNombre: 'Turismo Córdoba',
 }

@@ -13,6 +13,8 @@ export interface CapturaMapaOptions {
   width?: number
   height?: number
   timeoutMs?: number
+  /** Geometría OSRM del día en `[lat, lng]`. Si falta, el mapa se dibuja sin ruta. */
+  route?: [number, number][]
 }
 
 export interface CapturaMapaPunto {
@@ -25,6 +27,8 @@ export interface CapturaMapaPunto {
 export interface CapturaMapa {
   image: string
   points: CapturaMapaPunto[]
+  /** Ruta proyectada, solo si se pasó una geometría OSRM y MapLibre pudo dibujarla. */
+  routePoints?: { x: number; y: number }[]
   width: number
   height: number
 }
@@ -61,6 +65,7 @@ export async function captureCircuitoDiaMapa(
       width,
       height,
       options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+      options.route,
     )
   } catch {
     // Sin WebGL, sin red o con tiles lentos: el SVG garantiza que haya mapa.
@@ -74,6 +79,7 @@ async function captureWithMapLibre(
   width: number,
   height: number,
   timeoutMs: number,
+  route?: [number, number][],
 ): Promise<CapturaMapa> {
   const { Map: MapLibreMap, LngLatBounds } = await import('maplibre-gl')
 
@@ -82,6 +88,9 @@ async function captureWithMapLibre(
   document.body.appendChild(container)
 
   const first = stops[0]
+  const validRoute = (route ?? []).filter(
+    ([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng),
+  )
   const map = new MapLibreMap({
     container,
     style: STYLE_URL,
@@ -132,13 +141,16 @@ async function captureWithMapLibre(
             // Si el estilo no expone capas, seguimos con el mapa base.
           }
 
-          if (stops.length === 1) {
+          if (stops.length === 1 && validRoute.length < 2) {
             map.setCenter([first.longitud as number, first.latitud as number])
             map.setZoom(14)
           } else {
             const bounds = new LngLatBounds()
             for (const stop of stops) {
               bounds.extend([stop.longitud as number, stop.latitud as number])
+            }
+            for (const [lat, lng] of validRoute) {
+              bounds.extend([lng, lat])
             }
             map.fitBounds(bounds, { padding: 48, duration: 0 })
           }
@@ -153,10 +165,18 @@ async function captureWithMapLibre(
       const point = map.project([stop.longitud as number, stop.latitud as number])
       return { number: stop.number, x: point.x, y: point.y }
     })
+    const routePoints =
+      validRoute.length >= 2
+        ? validRoute.map(([lat, lng]) => {
+            const point = map.project([lng, lat])
+            return { x: point.x, y: point.y }
+          })
+        : undefined
 
     return {
       image: map.getCanvas().toDataURL('image/png'),
       points,
+      routePoints,
       width,
       height,
     }

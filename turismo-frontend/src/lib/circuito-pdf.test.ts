@@ -91,6 +91,7 @@ const ASSETS: CircuitoPdfAssets = {
   logoDataUrl: 'data:image/png;base64,logo',
   heroDataUrl: 'data:image/png;base64,hero',
   dayMaps: { 1: 'data:image/png;base64,mapa1', 2: null },
+  dayGalleries: { 1: 'data:image/jpeg;base64,galeria1', 2: null },
   dayBadges: {
     1: 'data:image/png;base64,badge1',
     2: 'data:image/png;base64,badge2',
@@ -137,13 +138,13 @@ describe('buildCircuitoPdfDefinition', () => {
     expect(definition.defaultStyle?.font).toBe('Inter')
 
     expect(summarySection.pageOrientation).toBe('landscape')
-    expect(summarySection.pageMargins).toEqual([12, 12, 12, 12])
+    expect(summarySection.pageMargins).toEqual([0, 0, 0, 0])
     expect(summarySection.footer).toBeNull()
     expect(daysSection.pageOrientation).toBe('portrait')
     expect(daysSection.pageMargins).toEqual([32, 32, 32, 40])
   })
 
-  it('usa la paleta del Stitch y pinta el resumen oscuro y los días en papel', () => {
+  it('usa la paleta del Stitch y pinta el resumen blanco y los días en papel', () => {
     const serialized = JSON.stringify(summarySection)
     expect(serialized).toContain('#e05d52')
     expect(serialized).toContain('#007bb8')
@@ -152,7 +153,7 @@ describe('buildCircuitoPdfDefinition', () => {
 
     const background = definition.background
     expect(typeof background).toBe('function')
-    const dark = (background as (page: number, size: { width: number; height: number }) => Content)(
+    const portada = (background as (page: number, size: { width: number; height: number }) => Content)(
       1,
       { width: 842, height: 595 },
     )
@@ -160,7 +161,8 @@ describe('buildCircuitoPdfDefinition', () => {
       2,
       { width: 595, height: 842 },
     )
-    expect(JSON.stringify(dark)).toContain('#0E1612')
+    expect(JSON.stringify(portada)).toContain('#ffffff')
+    expect(JSON.stringify(portada)).not.toContain('#0E1612')
     expect(JSON.stringify(paper)).toContain('#FCFAF6')
   })
 
@@ -193,19 +195,25 @@ describe('buildCircuitoPdfDefinition', () => {
     expect(JSON.stringify(dayStacks[0])).toContain('"unbreakable":true')
   })
 
-  it('arma la página del día con título, badge, atributos y timeline', () => {
+  it('arma la página del día con título, badge, galería y timeline', () => {
     const serialized = JSON.stringify(daysSection)
     expect(serialized).toContain('CENTRO — CÓRDOBA')
     expect(serialized).toContain('DÍA 1 · CULTURA')
     expect(serialized).toContain('MARTES 20')
-    expect(serialized).toContain('HORARIO')
-    expect(serialized).toContain('DISTANCIA')
-    expect(serialized).toContain('2 paradas')
+    expect(serialized).not.toContain('HORARIO')
+    expect(serialized).not.toContain('DISTANCIA')
     expect(serialized).toContain('Museo de la Ciudad')
     expect(serialized).toContain('Peña del Centro')
     expect(serialized).toContain('data:image/png;base64,mapa1')
+    expect(serialized).toContain('data:image/jpeg;base64,galeria1')
     expect(serialized).toContain('data:image/png;base64,daystop1')
     expect(serialized).toContain('data:image/png;base64,daystop2')
+  })
+
+  it('ancla la galería al pie de la página', () => {
+    const serialized = JSON.stringify(daysSection)
+    expect(serialized).toContain('"absolutePosition":{"x":32,"y":577}')
+    expect(serialized).toContain('data:image/jpeg;base64,galeria1')
   })
 
   it('muestra un día libre cuando no hay paradas', () => {

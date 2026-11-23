@@ -204,21 +204,28 @@ publicador). Por eso:
 - **Cancelar viaje**: `useCancelarViaje` usa el `DELETE /api/viajes/{id}` (baja lógica) con
   confirmación desde Mis Viajes y desde la página del circuito. Solo para `PLANIFICADO`.
 - **Exportar PDF estilo Stitch**: `pdfmake` en el front (UMD cargado sólo al exportar). El resumen
-  va en una **sección A4 horizontal** con hero compuesto (foto del Stitch + degradado + textos),
-  timeline con todas las paradas y footer del Stitch. Las **páginas por día** son A4 vertical con
-  micro-header, título de ruta, badge coral, mapa grande (MapLibre capturado + overlay de ruta,
-  pines numerados, etiquetas, norte, leyenda y escala) y timeline con píldoras de hora, círculos
-  outline y línea ondulada. Sin fotos de paradas. Fuentes Caveat/Montserrat/Inter; si el mapa falla
-  cae al SVG esquemático (`circuito-svg.ts`). La definición pura está en
-  `src/lib/circuito-pdf.ts` + `src/lib/circuito-pdf-day.ts`; el hero y los badges se componen con
-  canvas en `src/lib/circuito-pdf-hero.ts`, y el mapa del día en
-  `src/lib/circuito-pdf-day-map.ts`. El fondo de página lo pinta la definición (oscuro en el
-  resumen, papel en los días).
+  va en una **sección A4 horizontal full-bleed** (842×595, márgenes 0), con página blanca, hero de
+  404×595 y columna derecha del mismo blanco para que no quede marco ni franja rasgada. Hero
+  compuesto (foto del Stitch + degradado + textos), timeline con todas las paradas y footer del
+  Stitch. Las **páginas por día** son A4 vertical con micro-header, título de ruta, badge coral,
+  mapa grande (MapLibre capturado + ruta OSRM del día, pines numerados, etiquetas, norte, leyenda y
+  escala) y timeline con píldoras de hora, círculos outline y línea ondulada. Debajo del mapa va una
+  **galería editorial** full width anclada al pie de la página con hasta 3 tarjetas (foto inclinada
+  **por encima** de una cápsula crema con número, hora, título y descripción), más una pastilla
+  “+N paradas más”. El mapa usa 302×410 y la timeline tiene más aire. Fuentes
+  Caveat/Montserrat/Inter; si el mapa falla cae al SVG esquemático (`circuito-svg.ts`). La
+  definición pura está en `src/lib/circuito-pdf.ts` + `src/lib/circuito-pdf-day.ts`; el hero y los
+  badges se componen con canvas en `src/lib/circuito-pdf-hero.ts`, el mapa del día en
+  `src/lib/circuito-pdf-day-map.ts` y la galería en `src/lib/circuito-pdf-day-gallery.ts`. La ruta
+  del día se busca primero en la caché de `rutaQueryKey`; si no está, se pide a OSRM y, si falla,
+  **no se dibuja línea**. Las fotos se prueban en orden y, si el host no manda CORS, se piden al
+  proxy `wsrv.nl` (`loadFirstPhotoDataUrl`). El fondo de página lo pinta la definición (blanco en
+  el resumen, papel en los días).
 
 ## Estado y pendientes (al 20/11/2026)
 
 - Backend: compila y pasan los tests de generador, servicio, controlador y repositorios.
-- Frontend: **328 tests en 41 archivos, 324 en verde** en la corrida completa. Los 3 que fallan son
+- Frontend: **338 tests en 42 archivos, 334 en verde** en la corrida completa. Los 3 que fallan son
   de `evento-detail-page.test.tsx` y ya fallaban antes (no son del circuito); el de
   `planificador-page` de la URL es flaky bajo carga y pasa solo.
 - Pendientes conocidos, todavía no pedidos:

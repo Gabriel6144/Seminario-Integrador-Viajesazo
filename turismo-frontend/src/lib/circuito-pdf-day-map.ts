@@ -5,6 +5,7 @@ import { loadCanvasFonts } from '@/lib/pdf-assets'
 const PAPER = '#FCFAF6'
 const DEEP_BLUE = '#004e7c'
 const BLUE = '#00658d'
+const ROUTE_BLUE = '#008fbb'
 const CORAL = '#e05d52'
 const CHARCOAL = '#1C2421'
 const SLATE = '#4A5551'
@@ -18,6 +19,8 @@ export interface DayMapComposeInput {
   width: number
   height: number
   stops: DayMapStopData[]
+  /** Ruta OSRM proyectada por la captura; si falta, el mapa no dibuja línea. */
+  routePoints?: { x: number; y: number }[]
   dayNumber: number
   routeTitle: string
   totalKm: number
@@ -85,8 +88,13 @@ export async function composeDayMapDataUrl(
     context.fillRect(0, 0, width, height)
 
     const points = projectPoints(input.capture, input.stops, width, height)
-    const route = points.map((point) => ({ x: point.px, y: point.py }))
-    drawRoute(context, route)
+    const routeScaleX = width / input.capture.width
+    const routeScaleY = height / input.capture.height
+    const route = (input.routePoints ?? []).map((point) => ({
+      x: point.x * routeScaleX,
+      y: point.y * routeScaleY,
+    }))
+    if (route.length >= 2) drawRoute(context, route)
     drawPins(context, points)
 
     if (points.length <= 5) {
@@ -95,7 +103,7 @@ export async function composeDayMapDataUrl(
 
     drawHeaderCard(context, input)
     drawNorth(context, width)
-    drawLegend(context, height)
+    drawLegend(context, height, route.length >= 2)
     const scaleBar = buildScaleBar(input.capture, input.stops, width, height)
     if (scaleBar) drawScaleBar(context, scaleBar, width, height)
 
@@ -163,23 +171,16 @@ function roundedRect(
   context.closePath()
 }
 
-function smoothPath(
+function polylinePath(
   context: CanvasRenderingContext2D,
   points: { x: number; y: number }[],
 ): void {
   if (points.length === 0) return
   context.beginPath()
   context.moveTo(points[0].x, points[0].y)
-  if (points.length === 1) return
   for (let index = 1; index < points.length; index += 1) {
-    const previous = points[index - 1]
-    const current = points[index]
-    const midX = (previous.x + current.x) / 2
-    const midY = (previous.y + current.y) / 2
-    context.quadraticCurveTo(previous.x, previous.y, midX, midY)
+    context.lineTo(points[index].x, points[index].y)
   }
-  const last = points[points.length - 1]
-  context.lineTo(last.x, last.y)
 }
 
 function drawRoute(
@@ -191,15 +192,14 @@ function drawRoute(
   context.lineCap = 'round'
   context.lineJoin = 'round'
   context.setLineDash([])
-  context.strokeStyle = 'rgba(255,255,255,0.92)'
-  context.lineWidth = 5.5
-  smoothPath(context, points)
+  context.strokeStyle = 'rgba(255,255,255,0.96)'
+  context.lineWidth = 6
+  polylinePath(context, points)
   context.stroke()
 
-  context.setLineDash([5, 4])
-  context.strokeStyle = BLUE
-  context.lineWidth = 2.4
-  smoothPath(context, points)
+  context.strokeStyle = ROUTE_BLUE
+  context.lineWidth = 2.6
+  polylinePath(context, points)
   context.stroke()
   context.restore()
 }
@@ -419,7 +419,12 @@ function drawNorth(context: CanvasRenderingContext2D, width: number): void {
   context.fillText('N', cx, cy + 4)
 }
 
-function drawLegend(context: CanvasRenderingContext2D, height: number): void {
+function drawLegend(
+  context: CanvasRenderingContext2D,
+  height: number,
+  hasRoute: boolean,
+): void {
+  if (!hasRoute) return
   const x = 10
   const y = height - 28
   roundedRect(context, x, y, 86, 18, 6)
@@ -430,8 +435,8 @@ function drawLegend(context: CanvasRenderingContext2D, height: number): void {
   context.stroke()
 
   context.save()
-  context.setLineDash([3, 3])
-  context.strokeStyle = BLUE
+  context.setLineDash([])
+  context.strokeStyle = ROUTE_BLUE
   context.lineWidth = 1.6
   context.beginPath()
   context.moveTo(x + 8, y + 9)

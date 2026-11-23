@@ -14,6 +14,7 @@ import {
   routeTitle,
   type DayData,
 } from '@/lib/circuito-pdf-day'
+import { DAY_GALLERY } from '@/lib/circuito-pdf-day-gallery'
 
 const INTEREST_LABELS: Record<string, string> = {
   NATURALEZA: 'Naturaleza',
@@ -33,6 +34,8 @@ export interface CircuitoPdfAssets {
   heroDataUrl: string | null
   /** Mapa de cada día con overlay (ruta, pines, etiquetas), como PNG data URL. */
   dayMaps: Record<number, string | null>
+  /** Galería editorial de paradas de cada día, como JPEG data URL. */
+  dayGalleries: Record<number, string | null>
   /** Círculo con el número del día, por `day.number`. */
   dayBadges: Record<number, string | null>
   /** Círculo coral con el número global de la parada, por número. */
@@ -47,6 +50,9 @@ const PAGE_WIDTH = 531
 const DAY_MARGIN = 32
 const DAY_GAP = 16
 const DAY_HEADER_TOP = 152
+const PAGE_HEIGHT = 842
+const DAY_BOTTOM_MARGIN = 40
+const DAY_GALLERY_TOP = PAGE_HEIGHT - DAY_BOTTOM_MARGIN - DAY_GALLERY.height
 
 const STITCH = {
   cordobaBlue: '#0083ca',
@@ -61,15 +67,15 @@ const STITCH = {
   muted: '#7A8883',
   sky100: '#e0f2fe',
   sky200: '#bae6fd',
-  darkPage: '#0E1612',
-  white: '#ffffff',
+  white: '#FCFAF6',
+  pageWhite: '#ffffff',
 } as const
 
 const DAY_BADGE_COLORS = ['#0083ca', '#009de0', '#00639e', '#38b6ff', '#0072b2']
 
-const SUMMARY_WIDTH = 816
-const SUMMARY_HEIGHT = 565
-const HERO_WIDTH = 392
+const SUMMARY_WIDTH = 842
+const SUMMARY_HEIGHT = 595
+const HERO_WIDTH = 404
 const RIGHT_WIDTH = SUMMARY_WIDTH - HERO_WIDTH
 const RIGHT_PADDING = 18
 const SUMMARY_FOOTER_HEIGHT = 42
@@ -471,11 +477,8 @@ function summaryFooter(): Content {
 }
 
 const posterLayout: TableLayout = {
-  hLineWidth: (index, node) => (index === 0 || index === node.table.body.length ? 0.5 : 0),
-  vLineWidth: (index, node) =>
-    index === 0 || index === (node.table.widths?.length ?? 0) ? 0.5 : 0,
-  hLineColor: () => STITCH.charcoal,
-  vLineColor: () => STITCH.charcoal,
+  hLineWidth: () => 0,
+  vLineWidth: () => 0,
   paddingLeft: () => 0,
   paddingRight: () => 0,
   paddingTop: () => 0,
@@ -507,11 +510,11 @@ function buildSummarySection(
       body: [
         [
           {
-            fillColor: STITCH.paper,
+            fillColor: STITCH.pageWhite,
             margin: [RIGHT_PADDING, 16, RIGHT_PADDING, 0],
             stack: [
               {
-                absolutePosition: { x: 12 + HERO_WIDTH + RIGHT_PADDING + 15, y: 140 },
+                absolutePosition: { x: HERO_WIDTH + RIGHT_PADDING + 15, y: 140 },
                 canvas: [
                   {
                     type: 'line',
@@ -531,7 +534,7 @@ function buildSummarySection(
         ],
         [
           {
-            fillColor: STITCH.paper,
+            fillColor: STITCH.pageWhite,
             margin: [RIGHT_PADDING, 0, RIGHT_PADDING, 4],
             stack: [summaryFooter()],
           },
@@ -544,7 +547,7 @@ function buildSummarySection(
   return {
     pageOrientation: 'landscape',
     pageSize: 'A4',
-    pageMargins: [12, 12, 12, 12],
+    pageMargins: [0, 0, 0, 0],
     footer: null,
     section: {
       table: {
@@ -708,47 +711,35 @@ function dayMapBlock(data: DayData, assets: CircuitoPdfAssets): Content {
   }
 }
 
-function dayAttributes(data: DayData): Content {
+function dayGallery(data: DayData, assets: CircuitoPdfAssets): Content {
+  const image = assets.dayGalleries[data.number]
+  if (image) {
+    return {
+      absolutePosition: { x: DAY_MARGIN, y: DAY_GALLERY_TOP },
+      image,
+      width: DAY_GALLERY.width,
+      height: DAY_GALLERY.height,
+    }
+  }
   return {
+    absolutePosition: { x: DAY_MARGIN, y: DAY_GALLERY_TOP },
     table: {
-      widths: ['*'],
-      body: data.attributes.map((attribute) => [
-        {
-          columns: [
-            {
-              width: 62,
-              text: attribute.label,
-              font: HEADING_FONT,
-              bold: true,
-              fontSize: 6.2,
-              characterSpacing: 0.9,
-              color: STITCH.muted,
-              margin: [0, 6, 0, 0],
-            },
-            {
-              width: '*',
-              text: attribute.value,
-              font: HEADING_FONT,
-              bold: true,
-              fontSize: 8.2,
-              color: STITCH.charcoal,
-              alignment: 'right',
-              margin: [0, 4, 0, 0],
-            },
-          ],
-        },
-      ]),
+      widths: [DAY_GALLERY.width],
+      heights: [DAY_GALLERY.height],
+      body: [
+        [
+          {
+            text: 'Galería no disponible',
+            fontSize: 7.2,
+            color: STITCH.slate,
+            fillColor: STITCH.sky100,
+            alignment: 'center',
+            margin: [0, 100, 0, 0],
+          },
+        ],
+      ],
     },
-    layout: {
-      hLineWidth: (index, node) => (index === 0 ? 0 : index === node.table.body.length ? 0 : 0.5),
-      hLineColor: () => STITCH.sky200,
-      vLineWidth: () => 0,
-      paddingLeft: () => 0,
-      paddingRight: () => 0,
-      paddingTop: () => 0,
-      paddingBottom: () => 0,
-    },
-    margin: [0, 8, 0, 0],
+    layout: 'noBorders',
   }
 }
 
@@ -866,12 +857,12 @@ function timelineRow(
       ],
     },
     layout: 'noBorders',
-    margin: [0, 0, 0, compact ? 6 : 10],
+    margin: [0, 0, 0, compact ? 8 : 16],
   }
 }
 
 function timelineConnector(rows: number, compact: boolean): Content {
-  const height = rows * (compact ? 44 : 62)
+  const height = rows * (compact ? 34 : 66)
   const x = DAY_MARGIN + DAY_MAP.width + DAY_GAP + (compact ? 38 : 44) + (compact ? 11 : 13)
   const points: { x: number; y: number }[] = []
   for (let y = 0; y <= height; y += 8) {
@@ -958,7 +949,7 @@ function daySection(
       columns: [
         {
           width: DAY_MAP.width,
-          stack: [dayMapBlock(data, assets), dayAttributes(data)],
+          stack: [dayMapBlock(data, assets)],
         },
         {
           width: '*',
@@ -968,6 +959,7 @@ function daySection(
       ],
       columnGap: 0,
     })
+    contenido.push(dayGallery(data, assets))
   }
 
   return {
@@ -1102,7 +1094,7 @@ export function buildCircuitoPdfDefinition(
           y: 0,
           w: pageSize.width,
           h: pageSize.height,
-          color: currentPage === 1 ? STITCH.darkPage : STITCH.paper,
+          color: currentPage === 1 ? STITCH.pageWhite : STITCH.paper,
         },
       ],
     }),

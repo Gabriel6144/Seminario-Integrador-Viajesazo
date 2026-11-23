@@ -1,8 +1,10 @@
 ﻿import type { TDocumentDefinitions } from 'pdfmake/interfaces'
+import { useQueryClient } from '@tanstack/react-query'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
+import { rutaQueryKey } from '@/api/rutas'
 import { Button } from '@/components/ui/button'
 import { captureCircuitoDiaMapa } from '@/lib/circuito-mapa-captura'
 import {
@@ -12,6 +14,10 @@ import {
   SUMMARY_HERO,
 } from '@/lib/circuito-pdf'
 import { buildDayData, DAY_MAP } from '@/lib/circuito-pdf-day'
+import {
+  composeDayGalleryDataUrl,
+  DAY_GALLERY,
+} from '@/lib/circuito-pdf-day-gallery'
 import { composeDayMapDataUrl } from '@/lib/circuito-pdf-day-map'
 import {
   buildNumberBadgeDataUrl,
@@ -21,10 +27,12 @@ import {
 import {
   loadBrandFonts,
   loadCanvasFonts,
+  loadFirstPhotoDataUrl,
   loadHeroDataUrl,
   loadLogoDataUrl,
 } from '@/lib/pdf-assets'
 import { loadPdfMake } from '@/lib/pdfmake'
+import { obtenerRutaDia, type RutaDia } from '@/lib/rutas'
 import type { ViajeResponse } from '@/types/api'
 import type { CircuitoRecomendado } from './types'
 
@@ -66,6 +74,7 @@ export function CircuitoPdfPreviewDialog({
   const [descargando, setDescargando] = useState(false)
   const definicionRef = useRef<TDocumentDefinitions | null>(null)
   const pdfUrlRef = useRef<string | null>(null)
+  const queryClient = useQueryClient()
 
   const reemplazarPdfUrl = useCallback((next: string | null) => {
     if (pdfUrlRef.current) {
@@ -110,6 +119,39 @@ export function CircuitoPdfPreviewDialog({
           circuito.days.map(async (day) => {
             const dayStops = circuito.stopsByDay[day.number] ?? []
             const data = buildDayData(day, circuito, viaje)
+            const coords = dayStops.flatMap((stop) =>
+              typeof stop.latitud === 'number' && typeof stop.longitud === 'number'
+                ? [{ lat: stop.latitud, lng: stop.longitud }]
+                : [],
+            )
+            const routePromise: Promise<RutaDia | null> =
+              coords.length >= 2
+                ? viaje
+                  ? queryClient
+                      .fetchQuery<RutaDia>({
+                        queryKey: rutaQueryKey(
+                          viaje.id,
+                          circuito.estrategia,
+                          day.fecha,
+                          dayStops.map((stop) => stop.id),
+                        ),
+                        queryFn: ({ signal }) => obtenerRutaDia(coords, signal),
+                        staleTime: Infinity,
+                        retry: false,
+                      })
+                      .catch(() => null)
+                  : obtenerRutaDia(coords).catch(() => null)
+                : Promise.resolve(null)
+            const [route, photos] = await Promise.all([
+              routePromise,
+              Promise.all(
+                dayStops.map((stop) =>
+                  loadFirstPhotoDataUrl(
+                    stop.images.length > 0 ? stop.images : [stop.image],
+                  ),
+                ),
+              ),
+            ])
             const capture = await captureCircuitoDiaMapa(
               dayStops.map((stop) => ({
                 number: stop.number,
@@ -117,18 +159,31 @@ export function CircuitoPdfPreviewDialog({
                 latitud: stop.latitud,
                 longitud: stop.longitud,
               })),
-              { width: DAY_MAP.width * 2, height: DAY_MAP.height * 2 },
+              {
+                width: DAY_MAP.width * 2,
+                height: DAY_MAP.height * 2,
+                route: route?.geometria,
+              },
             )
             const map = await composeDayMapDataUrl({
               capture,
               width: DAY_MAP.width,
               height: DAY_MAP.height,
               stops: data.mapStops,
+              routePoints: capture?.routePoints,
               dayNumber: day.number,
               routeTitle: data.title,
               totalKm: data.totalKm,
             })
-            return [day.number, map] as const
+            const gallery = await composeDayGalleryDataUrl({
+              stops: data.stops.map((stop, index) => ({
+                ...stop,
+                imageDataUrl: photos[index] ?? null,
+              })),
+              width: DAY_GALLERY.width,
+              height: DAY_GALLERY.height,
+            })
+            return [day.number, { map, gallery }] as const
           }),
         ),
         Promise.all(
@@ -163,7 +218,12 @@ export function CircuitoPdfPreviewDialog({
         ),
       ])
 
-      const dayMaps = Object.fromEntries(dayEntries) as Record<number, string | null>
+      const dayMaps = Object.fromEntries(
+        dayEntries.map(([number, entry]) => [number, entry.map]),
+      ) as Record<number, string | null>
+      const dayGalleries = Object.fromEntries(
+        dayEntries.map(([number, entry]) => [number, entry.gallery]),
+      ) as Record<number, string | null>
       const dayBadges = Object.fromEntries(dayBadgeEntries) as Record<number, string | null>
       const stopBadges: Record<string, string | null> = Object.fromEntries(stopBadgeEntries)
       const dayStopBadges: Record<string, string | null> =
@@ -173,6 +233,7 @@ export function CircuitoPdfPreviewDialog({
         logoDataUrl,
         heroDataUrl,
         dayMaps,
+        dayGalleries,
         dayBadges,
         stopBadges,
         dayStopBadges,
@@ -191,7 +252,7 @@ export function CircuitoPdfPreviewDialog({
       )
       setEstado('error')
     }
-  }, [circuito, viaje, reemplazarPdfUrl])
+  }, [circuito, viaje, reemplazarPdfUrl, queryClient])
 
   useEffect(() => {
     if (abierto) {

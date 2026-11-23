@@ -4,7 +4,43 @@ vi.mock('@/lib/pdfmake', () => ({
   registerBrandFonts: vi.fn(() => Promise.resolve()),
 }))
 
-import { loadImageDataUrl, resetPdfAssetsForTests } from '@/lib/pdf-assets'
+import {
+  buildImageProxyUrl,
+  loadFirstPhotoDataUrl,
+  loadImageDataUrl,
+  loadPhotoDataUrl,
+  resetPdfAssetsForTests,
+} from '@/lib/pdf-assets'
+
+describe('loadPhotoDataUrl', () => {
+  beforeEach(() => {
+    resetPdfAssetsForTests()
+  })
+
+  it('devuelve null cuando la parada no tiene foto', async () => {
+    expect(await loadPhotoDataUrl(null)).toBeNull()
+    expect(await loadPhotoDataUrl('')).toBeNull()
+  })
+
+  it('saltea placeholders y URLs vacías al buscar la primera foto', async () => {
+    expect(
+      await loadFirstPhotoDataUrl([null, '', 'https://placehold.co/800x500']),
+    ).toBeNull()
+  })
+})
+
+describe('buildImageProxyUrl', () => {
+  it('manda las URLs externas al proxy con CORS', () => {
+    expect(buildImageProxyUrl('https://cdn.example.com/foto.jpg')).toBe(
+      'https://wsrv.nl/?url=https%3A%2F%2Fcdn.example.com%2Ffoto.jpg&w=900&output=jpg',
+    )
+  })
+
+  it('no proxea las imágenes subidas al backend ni los data URLs', () => {
+    expect(buildImageProxyUrl('/api/archivos/foto.jpg')).toBeNull()
+    expect(buildImageProxyUrl('data:image/png;base64,abc')).toBeNull()
+  })
+})
 
 describe('loadImageDataUrl', () => {
   beforeEach(() => {

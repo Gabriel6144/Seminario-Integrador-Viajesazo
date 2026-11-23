@@ -17,7 +17,7 @@ acoplados de build: cada uno tiene su `package.json` / `pom.xml` y sus propios c
   (VZ-26/VZ-28/VZ-29)** y ruta 404. La agenda filtra y pagina en el servidor. El alta/edición de eventos
   soporta **tipo de acceso y arancel** (`GRATUITO` / `DE_PAGO` con monto y link al sitio oficial)
   y **ubicación con mapa** (Leaflet + OpenStreetMap), incluido un **selector de ubicación** con
-  buscador y pin arrastrable. **328 tests en 41 archivos (324 en verde, 23/11/2026).** Los 3 que
+  buscador y pin arrastrable. **338 tests en 42 archivos (334 en verde, 23/11/2026).** Los 3 que
   fallan son preexistentes y ajenos al circuito: los de `evento-detail-page.test.tsx`; el de
   `planificador-page` de la URL es flaky bajo carga y pasa solo.
 - **Autenticación activa:** access JWT en memoria (`src/lib/auth-session.ts`), refresh en cookie
@@ -235,17 +235,25 @@ animación de generación y el 10 muestra las tres alternativas reales.
   cabecera del circuito confirmado, solo con `estado === 'PLANIFICADO'`; pide confirmación y
   navega a `/borradores`.
 - **Exportar PDF estilo Stitch**: `CircuitoPdfPreviewDialog` + `pdfmake` (UMD cargado con `?url`
-  sólo al exportar). El resumen es una `ContentSection` **A4 horizontal** con fondo verde oscuro,
-  hero compuesto como PNG (foto + degradado + textos), timeline con todas las paradas y footer del
-  Stitch. Las páginas por día son una sección **A4 vertical** con micro-header, título de ruta,
-  badge coral, mapa 7/12 y timeline 5/12. El mapa se captura con MapLibre (`circuito-mapa-captura.ts`
-  devuelve la imagen + las coordenadas proyectadas) y se compone en
-  `src/lib/circuito-pdf-day-map.ts` con ruta, pines numerados, etiquetas, norte, leyenda y escala;
-  si falla, cae al SVG (`circuito-svg.ts`). La timeline usa píldoras de hora y círculos outline
-  (`buildOutlineBadgeDataUrl`), sin fotos. `src/lib/circuito-pdf.ts` arma la definición pura y
+  sólo al exportar). El resumen es una `ContentSection` **A4 horizontal full-bleed** (842×595,
+  márgenes 0), con página blanca, hero de 404×595 y columna derecha del mismo blanco para que no
+  quede marco. Hero compuesto como PNG (foto + degradado + textos), timeline con todas las paradas
+  y footer del Stitch. Las páginas por día son una sección **A4 vertical** con micro-header, título
+  de ruta, badge coral, mapa 7/12 y timeline 5/12. El mapa se captura con MapLibre
+  (`circuito-mapa-captura.ts` devuelve la imagen + las coordenadas proyectadas) y se compone en
+  `src/lib/circuito-pdf-day-map.ts` con la ruta del día, pines numerados, etiquetas, norte, leyenda
+  y escala. La ruta se busca primero en la caché de `rutaQueryKey`; si no está, se pide a OSRM y, si
+  falla, no se dibuja línea. Si el mapa falla, cae al SVG (`circuito-svg.ts`). La timeline usa
+  píldoras de hora y círculos outline (`buildOutlineBadgeDataUrl`). Debajo del mapa va una
+  **galería editorial full width anclada al pie de la página** con hasta 3 tarjetas (foto inclinada
+  **por encima** de una cápsula crema con número, hora, título y descripción) y una pastilla “+N
+  paradas más”; se compone en canvas en `src/lib/circuito-pdf-day-gallery.ts`. El mapa mide 302×410
+  y la timeline tiene más espaciado entre filas. `src/lib/circuito-pdf.ts` arma la definición pura y
   `src/lib/circuito-pdf-day.ts` los datos del día; `src/lib/circuito-pdf-hero.ts` compone el hero y
-  los badges; `src/lib/pdf-assets.ts` carga fuentes/logo/hero con fallback. El preview es un iframe;
-  no hay opciones de diseño.
+  los badges; `src/lib/pdf-assets.ts` carga fuentes/logo/hero y las fotos. Las fotos se prueban en
+  orden (`loadFirstPhotoDataUrl`) y, si el host no manda CORS, se piden al proxy `wsrv.nl`, que
+  devuelve la imagen con CORS y ya redimensionada. El preview es un iframe; no hay opciones de
+  diseño.
 - **MSW** agrega los handlers `GET /api/viajes/:id/circuito/seleccionado`, `DELETE
   .../items/:itemId`, `GET .../items/:itemId/alternativas`, `PUT .../items/:itemId`,
   `GET/POST .../dias/:fecha/sugerencias|items` y `PUT .../dias/:fecha/aviso`, además de
@@ -440,13 +448,14 @@ Cuidado con los bordes de la paginación: `pointer-events-none` depende del CSS 
 
 ## Tests
 
-Vitest + Testing Library + MSW. 328 tests en 41 archivos (324 en verde; 3 en rojo preexistentes de
+Vitest + Testing Library + MSW. 338 tests en 42 archivos (334 en verde; 3 en rojo preexistentes de
 `evento-detail-page` y el de la URL de `planificador-page`, que es flaky bajo carga). Los mapas
 (`circuito-ruta-mapa`, `sustitucion-mapa`) se mockean en los tests de páginas; el PDF mockea
-`circuito-pdf-day-map` y `circuito-mapa-captura` porque jsdom no tiene canvas/WebGL.
-`circuito-view-model` cubre el adaptador real, `borradores-page` el listado mixto
-borrador/confirmado y `circuito-page` la vista día por día del seleccionado (días vacíos,
-regeneración, eliminación confirmada/cancelada, reemplazo, ausencia de alternativas y cancelación).
+`circuito-pdf-day-map`, `circuito-pdf-day-gallery`, `circuito-mapa-captura` y `obtenerRutaDia`
+porque jsdom no tiene canvas/WebGL ni red. `circuito-view-model` cubre el adaptador real,
+`borradores-page` el listado mixto borrador/confirmado y `circuito-page` la vista día por día del
+seleccionado (días vacíos, regeneración, eliminación confirmada/cancelada, reemplazo, ausencia de
+alternativas y cancelación).
 
 - **Nominatim se mockea con handlers MSW** (`/nominatim/search` y `/nominatim/reverse`), igual que
   la API: `onUnhandledRequest: 'error'` no perdona una request real. El test del selector mockea

@@ -77,7 +77,7 @@ const CIRCUITO: CircuitoRecomendado = {
 }
 
 describe('buildDayData', () => {
-  it('arma título, badge, ubicación y atributos del día', () => {
+  it('arma título, badge, ubicación y distancia del día', () => {
     const data = buildDayData(CIRCUITO.days[0], CIRCUITO, BORRADORES[1])
 
     expect(data.number).toBe(1)
@@ -85,15 +85,7 @@ describe('buildDayData', () => {
     expect(data.badge).toBe('DÍA 1 · CULTURA')
     expect(data.dateLabel).toBe('Martes 20')
     expect(data.location).toBe('Centro, Córdoba')
-    expect(data.timeRange).toBe('09:00 – 23:00')
     expect(data.totalKm).toBe(2.4)
-    expect(data.attributes.map((attribute) => attribute.label)).toEqual([
-      'HORARIO',
-      'DISTANCIA',
-      'PARADAS',
-    ])
-    expect(data.attributes[1].value).toBe('2,4 km')
-    expect(data.attributes[2].value).toBe('2 paradas')
   })
 
   it('deja las paradas listas para la timeline y para el mapa', () => {
@@ -120,8 +112,6 @@ describe('buildDayData', () => {
 
     expect(data.title).toBe('Miércoles 21')
     expect(data.badge).toBe('DÍA 2')
-    expect(data.timeRange).toBe('Horario a confirmar')
-    expect(data.attributes[2].value).toBe('0 paradas')
     expect(data.location).toBe('Villa Carlos Paz')
     expect(data.stops).toEqual([])
     expect(data.mapStops).toEqual([])

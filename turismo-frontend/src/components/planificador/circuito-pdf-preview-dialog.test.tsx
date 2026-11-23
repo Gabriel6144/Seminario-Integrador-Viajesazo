@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { downloadMock } = vi.hoisted(() => ({ downloadMock: vi.fn() }))
@@ -8,10 +8,21 @@ vi.mock('@/lib/pdf-assets', () => ({
   loadCanvasFonts: vi.fn(() => Promise.resolve()),
   loadLogoDataUrl: vi.fn(() => Promise.resolve('data:image/png;base64,logo')),
   loadHeroDataUrl: vi.fn(() => Promise.resolve('data:image/jpeg;base64,hero')),
+  loadPhotoDataUrl: vi.fn(() => Promise.resolve(null)),
+  loadFirstPhotoDataUrl: vi.fn(() => Promise.resolve(null)),
 }))
 
 vi.mock('@/lib/circuito-mapa-captura', () => ({
   captureCircuitoDiaMapa: vi.fn(() => Promise.resolve(null)),
+}))
+
+vi.mock('@/lib/rutas', () => ({
+  obtenerRutaDia: vi.fn(() => Promise.resolve({ geometria: [] })),
+}))
+
+vi.mock('@/lib/circuito-pdf-day-gallery', () => ({
+  composeDayGalleryDataUrl: vi.fn(() => Promise.resolve(null)),
+  DAY_GALLERY: { width: 531, height: 225 },
 }))
 
 vi.mock('@/lib/circuito-pdf-day-map', () => ({
@@ -27,7 +38,7 @@ vi.mock('@/lib/circuito-pdf-hero', () => ({
 vi.mock('@/lib/circuito-pdf', () => ({
   buildCircuitoPdfDefinition: vi.fn(() => ({ content: ['test'] })),
   DAY_BADGE_COLORS: ['#0083ca'],
-  SUMMARY_HERO: { width: 392, height: 565 },
+  SUMMARY_HERO: { width: 404, height: 595 },
   buildSummaryData: vi.fn(() => ({
     title: 'Córdoba',
     ribbon: '1 DÍA DE CULTURA',
@@ -74,7 +85,7 @@ import type {
   ParadaCircuitoDetalle,
 } from '@/components/planificador/types'
 import { BORRADORES } from '@/test/fixtures'
-import { user } from '@/test/utils'
+import { renderWithProviders, user } from '@/test/utils'
 
 function stop(overrides: Partial<ParadaCircuitoDetalle> = {}): ParadaCircuitoDetalle {
   return {
@@ -138,7 +149,7 @@ describe('CircuitoPdfPreviewDialog', () => {
 
   it('genera el PDF, muestra el preview y permite descargarlo', async () => {
     const usuario = user()
-    render(
+    renderWithProviders(
       <CircuitoPdfPreviewDialog
         abierto
         circuito={CIRCUITO}
@@ -167,7 +178,7 @@ describe('CircuitoPdfPreviewDialog', () => {
       }),
     } as never)
 
-    render(
+    renderWithProviders(
       <CircuitoPdfPreviewDialog
         abierto
         circuito={CIRCUITO}
