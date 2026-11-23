@@ -216,6 +216,7 @@ export function findSugerenciasDia(
   if (!dia.resumen?.pendiente || sugerenciasVacias) {
     return {
       sugerencias: [],
+      noEntran: [],
       mensaje: 'No encontramos propuestas para completar este día',
     }
   }
@@ -227,6 +228,7 @@ export function findSugerenciasDia(
   )
   return {
     sugerencias,
+    noEntran: SUGERENCIAS_DIA.noEntran ?? [],
     mensaje:
       sugerencias.length === 0
         ? 'No encontramos propuestas para completar este día'
@@ -376,7 +378,7 @@ export function allPublicadores(): PublicadorResponse[] {
 }
 
 export function allBorradores(): ViajeResponse[] {
-  return borradores
+  return borradores.filter((borrador) => borrador.estado !== 'CANCELADO')
 }
 
 export function findBorrador(id: number): ViajeResponse | undefined {
@@ -781,6 +783,7 @@ export function sugerenciasDiaAlternativa(
       : SUGERENCIAS_DIA.sugerencias.filter((s) => !usadas.has(s.propuestaId))
   return {
     sugerencias,
+    noEntran: SUGERENCIAS_DIA.noEntran ?? [],
     mensaje: sugerencias.length === 0 ? 'No encontramos propuestas para completar este día' : null,
   }
 }
@@ -855,6 +858,14 @@ export function deleteBorrador(id: number): boolean {
   const index = borradores.findIndex((borrador) => borrador.id === id)
   if (index === -1) return false
   borradores.splice(index, 1)
+  return true
+}
+
+/** Baja lógica de un viaje confirmado: lo pasa a CANCELADO y deja de listarse. */
+export function cancelarViaje(id: number): boolean {
+  const viaje = borradores.find((candidate) => candidate.id === id)
+  if (viaje === undefined) return false
+  viaje.estado = 'CANCELADO'
   return true
 }
 

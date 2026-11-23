@@ -1,8 +1,10 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
+import { Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { CircuitoPage } from '@/pages/circuito-page'
+import { SUGERENCIAS_DIA } from '@/test/fixtures'
 import { createCircuito, resetStore, setSugerenciasVacias } from '@/test/store'
 import { server } from '@/test/server'
 import { renderRoute, user } from '@/test/utils'
@@ -19,6 +21,20 @@ vi.mock('@/components/planificador/circuito-ruta-mapa', () => ({
     </div>
   ),
 }))
+
+vi.mock('@/components/planificador/circuito-pdf-preview-dialog', () => ({
+  CircuitoPdfPreviewDialog: ({ abierto }: { abierto: boolean }) =>
+    abierto ? <div>Vista previa del PDF</div> : null,
+}))
+
+function CircuitoConRutas() {
+  return (
+    <Routes>
+      <Route path="/viajes/:id/circuito" element={<CircuitoPage />} />
+      <Route path="/borradores" element={<div>Mis viajes</div>} />
+    </Routes>
+  )
+}
 
 describe('CircuitoPage', () => {
   beforeEach(() => {
@@ -443,6 +459,53 @@ describe('CircuitoPage', () => {
     })
   })
 
+  it('muestra las sugerencias de tus intereses y las que no entran', async () => {
+    server.use(
+      http.get('/api/viajes/2/circuito/seleccionado/dias/:fecha/sugerencias', () =>
+        HttpResponse.json({
+          sugerencias: [
+            {
+              ...SUGERENCIAS_DIA.sugerencias[0],
+              propuestaId: 30,
+              nombre: 'Museo de la Ciudad',
+              motivoSugerencia: 'DE_TUS_INTERESES',
+              textoMotivo: 'Es de tus intereses: Cultura',
+            },
+          ],
+          noEntran: [
+            {
+              propuestaId: 31,
+              propuestaNombre: 'Cena show',
+              tipo: 'EVENTO',
+              meGusta: true,
+              motivo:
+                'Su horario (21:00 – 23:00) no entra en el día contando los traslados',
+            },
+          ],
+          mensaje: null,
+        }),
+      ),
+    )
+
+    const usuario = user()
+    renderRoute({
+      route: '/viajes/:id/circuito',
+      initialEntry: '/viajes/2/circuito',
+      children: <CircuitoPage />,
+    })
+
+    await screen.findByText('Festival de Doma y Folklore de Jesús María')
+    await usuario.click(
+      screen.getByRole('button', { name: /Ver sugerencias para completar/i }),
+    )
+
+    expect(await screen.findByText('De tus intereses')).toBeInTheDocument()
+    expect(screen.getByText('Museo de la Ciudad')).toBeInTheDocument()
+    expect(screen.getByText(/No entran ese día \(1\)/i)).toBeInTheDocument()
+    expect(screen.getByText(/Cena show/i)).toBeInTheDocument()
+    expect(screen.getByText(/Su horario \(21:00/i)).toBeInTheDocument()
+  })
+
   it('muestra el mensaje cuando no hay sugerencias', async () => {
     setSugerenciasVacias(true)
     const usuario = user()
@@ -503,5 +566,36 @@ describe('CircuitoPage', () => {
       await screen.findByText(/ya no es una sugerencia válida/i),
     ).toBeInTheDocument()
     expect(screen.queryByText('Agregada por vos')).not.toBeInTheDocument()
+  })
+
+  it('cancela el viaje y vuelve a Mis viajes', async () => {
+    const usuario = user()
+    renderRoute({
+      route: '*',
+      initialEntry: '/viajes/2/circuito',
+      children: <CircuitoConRutas />,
+    })
+
+    await screen.findByText('Festival de Doma y Folklore de Jesús María')
+    await usuario.click(screen.getByRole('button', { name: /Cancelar viaje/i }))
+    expect(await screen.findByText('¿Cancelar este viaje?')).toBeInTheDocument()
+
+    await usuario.click(screen.getByRole('button', { name: /Sí,\s*cancelar/i }))
+
+    expect(await screen.findByText('Mis viajes')).toBeInTheDocument()
+  })
+
+  it('abre la vista previa del PDF al exportar', async () => {
+    const usuario = user()
+    renderRoute({
+      route: '/viajes/:id/circuito',
+      initialEntry: '/viajes/2/circuito',
+      children: <CircuitoPage />,
+    })
+
+    await screen.findByText('Festival de Doma y Folklore de Jesús María')
+    await usuario.click(screen.getByRole('button', { name: /Exportar PDF/i }))
+
+    expect(await screen.findByText('Vista previa del PDF')).toBeInTheDocument()
   })
 })

@@ -646,6 +646,7 @@ export const SUGERENCIAS_DIA: SugerenciasDiaResponse = {
       descripcion: 'Sendero corto con vista al lago.',
     },
   ],
+  noEntran: [],
   mensaje: null,
 }
 

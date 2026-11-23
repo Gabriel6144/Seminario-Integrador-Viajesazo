@@ -17,8 +17,9 @@ acoplados de build: cada uno tiene su `package.json` / `pom.xml` y sus propios c
   (VZ-26/VZ-28/VZ-29)** y ruta 404. La agenda filtra y pagina en el servidor. El alta/edición de eventos
   soporta **tipo de acceso y arancel** (`GRATUITO` / `DE_PAGO` con monto y link al sitio oficial)
   y **ubicación con mapa** (Leaflet + OpenStreetMap), incluido un **selector de ubicación** con
-  buscador y pin arrastrable. **285 tests en 34 archivos (282 en verde, 20/11/2026).** Los 3 que fallan son
-  preexistentes y ajenos al circuito: los de `evento-detail-page.test.tsx`.
+  buscador y pin arrastrable. **328 tests en 41 archivos (324 en verde, 23/11/2026).** Los 3 que
+  fallan son preexistentes y ajenos al circuito: los de `evento-detail-page.test.tsx`; el de
+  `planificador-page` de la URL es flaky bajo carga y pasa solo.
 - **Autenticación activa:** access JWT en memoria (`src/lib/auth-session.ts`), refresh en cookie
   HttpOnly vía `credentials: 'include'` en `src/lib/http.ts` (single-flight refresh en 401).
   Una cuenta = un rol. Registro elige TURISTA o PUBLICADOR. Guards:
@@ -76,6 +77,11 @@ Cosas que se olvidan fácil y ya están resueltas en el código, para no volver 
   `tipoPropuesta`, `categoria`, `ubicacion`, `tipoAcceso`, `page` y `size` a `GET /api/agenda`.
   El cliente no vuelve a filtrar ni a ordenar: el backend ya devuelve solo eventos no cancelados,
   ordenados por fecha/hora, y pagina. `keepPreviousData` evita el parpadeo al cambiar de página.
+- **El catálogo (`/propuestas`) también filtra en el servidor.** `usePropuestas` manda `q`,
+  `ciudad`, `localidad`, `estado`, `tipoPropuesta`, `categoria`, `fechaDesde/Hasta`,
+  `publicadorId` e `incluirCanceladas`; el cliente no vuelve a filtrar la página. Los contadores
+  de las píldoras salen de `GET /api/propuestas/resumen` y las zonas del selector de
+  `GET /api/propuestas/zonas`. Al cambiar cualquier filtro se vuelve a `page=0`.
 - **`/api/agenda` no es la agenda semanal**: la semanal (`/api/agenda/semanal`, US6) va de hoy al
   domingo y no acepta filtros; su cantidad de eventos depende del día en que se corre la app. La
   agenda turística (VZ-18) usa una ventana abierta y filtros explícitos.
@@ -221,6 +227,25 @@ animación de generación y el 10 muestra las tres alternativas reales.
   paradas con `origen === 'SUGERENCIA_ACEPTADA'` muestran el badge “Agregada por vos”.
   `enrichCircuitoConSeleccionado` une `resumen`/`origen` del seleccionado al view-model que sale
   de la generación (imágenes/coords).
+- **Sugerencias (22/11/2026).** `MotivoSugerencia` suma `DE_TUS_INTERESES`; `CompletarDiaDialog`
+  agrupa "De tus intereses" primero y muestra una sección "No entran ese día" con
+  `SugerenciasDiaResponse.noEntran` (opcional en el tipo). El backend ya no sugiere en días
+  pasados ni después de "Dejarlo así".
+- **Cancelar viaje** (`useCancelarViaje`, baja lógica): botón en la tarjeta de Mis Viajes y en la
+  cabecera del circuito confirmado, solo con `estado === 'PLANIFICADO'`; pide confirmación y
+  navega a `/borradores`.
+- **Exportar PDF estilo Stitch**: `CircuitoPdfPreviewDialog` + `pdfmake` (UMD cargado con `?url`
+  sólo al exportar). El resumen es una `ContentSection` **A4 horizontal** con fondo verde oscuro,
+  hero compuesto como PNG (foto + degradado + textos), timeline con todas las paradas y footer del
+  Stitch. Las páginas por día son una sección **A4 vertical** con micro-header, título de ruta,
+  badge coral, mapa 7/12 y timeline 5/12. El mapa se captura con MapLibre (`circuito-mapa-captura.ts`
+  devuelve la imagen + las coordenadas proyectadas) y se compone en
+  `src/lib/circuito-pdf-day-map.ts` con ruta, pines numerados, etiquetas, norte, leyenda y escala;
+  si falla, cae al SVG (`circuito-svg.ts`). La timeline usa píldoras de hora y círculos outline
+  (`buildOutlineBadgeDataUrl`), sin fotos. `src/lib/circuito-pdf.ts` arma la definición pura y
+  `src/lib/circuito-pdf-day.ts` los datos del día; `src/lib/circuito-pdf-hero.ts` compone el hero y
+  los badges; `src/lib/pdf-assets.ts` carga fuentes/logo/hero con fallback. El preview es un iframe;
+  no hay opciones de diseño.
 - **MSW** agrega los handlers `GET /api/viajes/:id/circuito/seleccionado`, `DELETE
   .../items/:itemId`, `GET .../items/:itemId/alternativas`, `PUT .../items/:itemId`,
   `GET/POST .../dias/:fecha/sugerencias|items` y `PUT .../dias/:fecha/aviso`, además de
@@ -415,12 +440,13 @@ Cuidado con los bordes de la paginación: `pointer-events-none` depende del CSS 
 
 ## Tests
 
-Vitest + Testing Library + MSW. 285 tests en 34 archivos (3 en rojo, preexistentes y ajenos al
-circuito: los de `evento-detail-page`). Los mapas (`circuito-ruta-mapa`, `sustitucion-mapa`) se
-mockean en los tests de páginas. `circuito-view-model`
-cubre el adaptador real, `borradores-page` el listado mixto borrador/confirmado y
-`circuito-page` la vista día por día del seleccionado (días vacíos, regeneración, eliminación
-confirmada/cancelada, reemplazo, ausencia de alternativas y cancelación).
+Vitest + Testing Library + MSW. 328 tests en 41 archivos (324 en verde; 3 en rojo preexistentes de
+`evento-detail-page` y el de la URL de `planificador-page`, que es flaky bajo carga). Los mapas
+(`circuito-ruta-mapa`, `sustitucion-mapa`) se mockean en los tests de páginas; el PDF mockea
+`circuito-pdf-day-map` y `circuito-mapa-captura` porque jsdom no tiene canvas/WebGL.
+`circuito-view-model` cubre el adaptador real, `borradores-page` el listado mixto
+borrador/confirmado y `circuito-page` la vista día por día del seleccionado (días vacíos,
+regeneración, eliminación confirmada/cancelada, reemplazo, ausencia de alternativas y cancelación).
 
 - **Nominatim se mockea con handlers MSW** (`/nominatim/search` y `/nominatim/reverse`), igual que
   la API: `onUnhandledRequest: 'error'` no perdona una request real. El test del selector mockea

@@ -21,11 +21,16 @@ import type {
 } from '@/types/api'
 
 const SUGERENCIA_GROUP_LABELS: Record<MotivoSugerencia, string> = {
+  DE_TUS_INTERESES: 'De tus intereses',
   OTRO_TIPO: 'De tus preferencias, otro tipo',
   OTRA_CATEGORIA: 'Fuera de tus preferencias',
 }
 
-const SUGERENCIA_GROUP_ORDER: MotivoSugerencia[] = ['OTRO_TIPO', 'OTRA_CATEGORIA']
+const SUGERENCIA_GROUP_ORDER: MotivoSugerencia[] = [
+  'DE_TUS_INTERESES',
+  'OTRO_TIPO',
+  'OTRA_CATEGORIA',
+]
 
 function locationLabel(
   item: Pick<SugerenciaDiaResponse, 'direccion' | 'localidad' | 'ciudad'>,
@@ -69,6 +74,7 @@ export function CompletarDiaDialog({
       items: items.filter((item) => item.motivoSugerencia === motivo),
     })).filter((group) => group.items.length > 0)
   }, [sugerencias.data?.sugerencias])
+  const noEntran = sugerencias.data?.noEntran ?? []
 
   return (
     <AlertDialog
@@ -157,6 +163,21 @@ export function CompletarDiaDialog({
               ))}
             </div>
           ))}
+          {noEntran.length > 0 && (
+            <details className="rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+              <summary className="cursor-pointer text-xs font-semibold text-amber-900">
+                No entran ese día ({noEntran.length})
+              </summary>
+              <ul className="mt-2 flex flex-col gap-1.5">
+                {noEntran.map((item) => (
+                  <li key={item.propuestaId} className="text-xs text-amber-900">
+                    <span className="font-semibold">{item.propuestaNombre}</span>
+                    {item.meGusta ? ' (te gustó)' : ''}: {item.motivo}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
         </div>
 
         <AlertDialogFooter>

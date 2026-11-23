@@ -18,8 +18,10 @@ public record PropuestaFiltro(
 		NombreEstado estado,
 		Long publicadorId,
 		String localidad,
+		String ciudad,
 		String ubicacion,
 		String q,
 		LocalDate fechaDesde,
-		LocalDate fechaHasta
+		LocalDate fechaHasta,
+		boolean incluirCanceladas
 ) {}

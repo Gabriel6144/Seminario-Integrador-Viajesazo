@@ -7,10 +7,13 @@ import { EVENTOS, FOLKLORE, errorBody, page } from '../test/fixtures'
 import { server } from '../test/server'
 import { renderRoute, user } from '../test/utils'
 
-import type { EventoResponse } from '@/types/api'
+import type { EventoResponse, UsuarioResponse } from '@/types/api'
 
-function renderListado(initialEntry = '/') {
-  return renderRoute({ route: '/', initialEntry, children: <EventosPage /> })
+function renderListado(
+  initialEntry = '/',
+  options?: { authenticated?: boolean; user?: UsuarioResponse | null },
+) {
+  return renderRoute({ route: '/', initialEntry, children: <EventosPage />, ...options })
 }
 
 /**
@@ -41,11 +44,11 @@ function paginaDe(eventos: EventoResponse[]) {
   })
 }
 
-/** Registra las URLs pedidas a `/api/propuestas` mientras corre el callback. */
+/** Registra las URLs pedidas a `/api/propuestas` (el listado) mientras corre el callback. */
 async function captureRequests(action: () => Promise<void>): Promise<string[]> {
   const requests: string[] = []
   server.events.on('request:start', ({ request }) => {
-    if (request.url.includes('/api/propuestas')) requests.push(request.url)
+    if (new URL(request.url).pathname === '/api/propuestas') requests.push(request.url)
   })
   try {
     await action()
@@ -53,6 +56,19 @@ async function captureRequests(action: () => Promise<void>): Promise<string[]> {
     server.events.removeAllListeners()
   }
   return requests
+}
+
+/** Espera la próxima request al listado que cumpla el predicado. Evita el TDZ de `requests`. */
+function waitForRequest(match: (url: string) => boolean): Promise<string> {
+  return new Promise((resolve) => {
+    const listener = ({ request }: { request: Request }) => {
+      if (new URL(request.url).pathname !== '/api/propuestas') return
+      if (!match(request.url)) return
+      server.events.removeAllListeners()
+      resolve(request.url)
+    }
+    server.events.on('request:start', listener)
+  })
 }
 
 describe('EventosPage', () => {
@@ -218,5 +234,115 @@ describe('EventosPage', () => {
     })
 
     expect(requests).toHaveLength(0)
+  })
+
+  it('manda la búsqueda al servidor en vez de filtrar la página', async () => {
+    renderListado('/')
+    const input = await screen.findByLabelText('Buscar por nombre o localidad')
+
+    const request = waitForRequest((url) => decodeURIComponent(url).includes('q=folklore'))
+    await user().type(input, 'folklore')
+
+    expect(decodeURIComponent(await request)).toContain('q=folklore')
+  })
+
+  it('alimenta las píldoras con los contadores del resumen', async () => {
+    renderListado('/')
+
+    expect(await screen.findByText('Todas las propuestas (4)')).toBeInTheDocument()
+    expect(screen.getByText('Eventos (4)')).toBeInTheDocument()
+    expect(screen.getByText('Actividades (0)')).toBeInTheDocument()
+  })
+
+  it('arma el selector de zona con las zonas del servidor', async () => {
+    renderListado('/')
+    await screen.findByRole('link', { name: FOLKLORE.nombre })
+
+    await user().click(screen.getByRole('button', { name: /Filtros avanzados/ }))
+    const zona = screen.getByLabelText('Filtrar por zona')
+
+    expect(within(zona).getByRole('option', { name: 'Jesús María' })).toBeInTheDocument()
+    expect(within(zona).getByRole('option', { name: 'Río Ceballos' })).toBeInTheDocument()
+    expect(within(zona).getByRole('option', { name: 'Córdoba' })).toBeInTheDocument()
+  })
+
+  it('manda la zona elegida como ciudad y vuelve a la primera página', async () => {
+    const muchos = Array.from({ length: 13 }, (_, index) => ({
+      ...FOLKLORE,
+      id: index + 1,
+      nombre: `Evento ${index + 1}`,
+    }))
+    server.use(paginaDe(muchos))
+
+    const captured: string[] = []
+    server.events.on('request:start', ({ request }) => {
+      if (new URL(request.url).pathname === '/api/propuestas') captured.push(request.url)
+    })
+
+    renderListado('/?page=1')
+    await screen.findByText('Mostrando 13–13 de 13')
+
+    await user().click(screen.getByRole('button', { name: /Filtros avanzados/ }))
+    await screen.findByRole('option', { name: 'Jesús María' })
+    await user().selectOptions(screen.getByLabelText('Filtrar por zona'), 'Jesús María')
+
+    await waitFor(() => {
+      const conPaginaCero = captured.some((url) => {
+        const params = new URL(url).searchParams
+        return params.get('ciudad') === 'Jesús María' && params.get('page') === '0'
+      })
+      expect(conPaginaCero).toBe(true)
+    })
+
+    const conCiudad = captured.find((url) => {
+      const params = new URL(url).searchParams
+      return params.get('ciudad') === 'Jesús María' && params.get('page') === '0'
+    })
+    server.events.removeAllListeners()
+
+    expect(conCiudad).toBeDefined()
+    expect(conCiudad).toContain('page=0')
+  })
+
+  it('traduce "Próximos" a un fechaDesde del servidor', async () => {
+    renderListado('/')
+    await screen.findByRole('link', { name: FOLKLORE.nombre })
+
+    await user().click(screen.getByRole('button', { name: /Filtros avanzados/ }))
+    const request = waitForRequest((url) => url.includes('fechaDesde='))
+    await user().selectOptions(screen.getByLabelText('Filtrar por fecha'), 'PROXIMOS')
+
+    expect(await request).toContain('fechaDesde=')
+  })
+
+  it('oculta el estado CANCELADO a los turistas', async () => {
+    renderListado('/')
+    await screen.findByRole('link', { name: FOLKLORE.nombre })
+
+    await user().click(screen.getByRole('button', { name: /Filtros avanzados/ }))
+    const estado = screen.getByLabelText('Filtrar por estado')
+
+    expect(within(estado).queryByRole('option', { name: 'Cancelado' })).not.toBeInTheDocument()
+  })
+
+  it('el publicador pide incluirCanceladas y puede filtrar por CANCELADO', async () => {
+    const publicador: UsuarioResponse = {
+      id: 2,
+      nombre: 'Publicador Demo',
+      email: 'publicador@test.com',
+      telefono: null,
+      roles: ['PUBLICADOR'],
+      publicadorId: 1,
+    }
+
+    const request = waitForRequest((url) => url.includes('incluirCanceladas=true'))
+    renderListado('/', { authenticated: true, user: publicador })
+
+    expect(await request).toContain('incluirCanceladas=true')
+
+    await screen.findByRole('link', { name: FOLKLORE.nombre })
+    await user().click(screen.getByRole('button', { name: /Filtros avanzados/ }))
+    const estado = screen.getByLabelText('Filtrar por estado')
+    expect(within(estado).getByRole('option', { name: 'Cancelado' })).toBeInTheDocument()
   })
 })

@@ -103,6 +103,9 @@ export interface ParadaCircuitoDetalle {
   description: string
   detailDescription: string
   location: string
+  /** Ciudad y localidad sueltas, para armar la ruta del día en el resumen del PDF. */
+  ciudad?: string | null
+  localidad?: string | null
   hours: string
   price: string
   /** Primera imagen (compatibilidad con vistas existentes). */

@@ -316,6 +316,19 @@ export interface PropuestaResumenResponse {
   publicadorNombre: string
 }
 
+/** Espejo de `dto/response/PropuestaResumenContadoresResponse.java`. */
+export interface PropuestaResumenContadoresResponse {
+  total: number
+  eventos: number
+  actividades: number
+}
+
+/** Espejo de `dto/response/ZonaResponse.java`. */
+export interface ZonaResponse {
+  ciudad: string | null
+  localidad: string | null
+}
+
 export interface ActividadRequest {
   nombre: string
   descripcion: string | null
@@ -703,7 +716,7 @@ export interface CircuitoResponse {
 export type OrigenCircuitoItem = 'GENERADO' | 'SUGERENCIA_ACEPTADA' | 'REEMPLAZO'
 
 /** Espejo de `model/MotivoSugerencia.java`. */
-export type MotivoSugerencia = 'OTRA_CATEGORIA' | 'OTRO_TIPO'
+export type MotivoSugerencia = 'OTRA_CATEGORIA' | 'OTRO_TIPO' | 'DE_TUS_INTERESES'
 
 /** Espejo de `dto/response/AlternativaItemResponse.java` (VZ-26). */
 export interface AlternativaItemResponse {
@@ -771,6 +784,8 @@ export interface SugerenciaDiaResponse {
 /** Espejo de `dto/response/SugerenciasDiaResponse.java`. */
 export interface SugerenciasDiaResponse {
   sugerencias: SugerenciaDiaResponse[]
+  /** Propuestas que le gustaron o son de sus intereses pero no entran, con el motivo. */
+  noEntran?: PropuestaFueraDeHuecoResponse[]
   mensaje: string | null
 }
 

@@ -353,6 +353,14 @@ Decisiones que no son obvias:
 - **El detalle reutiliza `GET /api/eventos/{id}`**; no hay endpoint de detalle de agenda.
 - **`/api/propuestas` también acepta `ubicacion`** (mismo criterio), además de los filtros que ya
   tenía.
+- **Filtros del catálogo (22/11/2026):** `/api/propuestas` suma `ciudad` e `incluirCanceladas`
+  (por defecto oculta `CANCELADO`; el publicador puede pedirlas). El rango de fechas ahora aplica a
+  eventos **y** actividades por solapamiento sobre `fechaInicio/fechaFin`, sin exigir
+  `tipo=EVENTO`. El texto `q` ignora tildes y busca también recinto y localidad. El orden por
+  defecto es `nombre,id` para que la paginación sea estable.
+- **`GET /api/propuestas/resumen`** devuelve `{ total, eventos, actividades }` con los mismos
+  filtros (sin `tipo`). **`GET /api/propuestas/zonas`** devuelve las ciudades/localidades distintas
+  para el selector (opcional `publicadorId`).
 
 ## API del Sprint 3/4 – Circuitos automáticos (VZ-25/VZ-26/VZ-28/VZ-29)
 
@@ -444,6 +452,12 @@ Decisiones y trampas:
   sugerencias (`daySuggestions` / `addSuggestedItem` / `discardDayNotice`) dejan la decisión al
   usuario: se relaja solo categoría o tipo (según ritmo MANUAL), sin tocar `isEligible` del
   generate/replace. Cada ítem guarda `origen` (`GENERADO` / `SUGERENCIA_ACEPTADA` / `REEMPLAZO`).
+- **Sugerencias: compatibilidad y motivos.** Respetan la agenda de la actividad
+  (`fechaInicio/fechaFin`), la ventana 06:00–23:59 y el desborde de medianoche (se calcula en
+  minutos enteros, no con `LocalTime.plusMinutes`). En el circuito confirmado no se devuelven en
+  días pasados ni con "Dejarlo así". `MotivoSugerencia` suma `DE_TUS_INTERESES` (fuera de MANUAL
+  también se ofrecen propuestas de los intereses) y `SugerenciasDiaResponse` trae `noEntran[]` con
+  el motivo (radio, día u horario) para las que le gustaron o son de sus intereses.
 - **Los Me gusta pesan en la generación** (`CircuitGenerator.choose()`): `CERCANIA` (con parada
   previa) ordena por tramos de 500 m → Me gusta → popularidad → distancia; `DESCUBRIMIENTO` por
   categoría no cubierta → Me gusta → disponibilidad → popularidad → nombre; el resto por afinidad

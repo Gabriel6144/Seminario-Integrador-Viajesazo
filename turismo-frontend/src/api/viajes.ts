@@ -111,3 +111,21 @@ export function useDescartarBorrador() {
     },
   })
 }
+
+/**
+ * VZ-23: baja lógica de un viaje confirmado. El backend lo pasa a `CANCELADO` y responde 204;
+ * deja de listarse y el turista deja de figurar en las inscripciones de sus propuestas.
+ */
+export function useCancelarViaje() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: number) => apiDelete(`/api/viajes/${id}`),
+    onSuccess: (_data, id) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.viajesAll() })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.borradoresAll() })
+      queryClient.removeQueries({ queryKey: queryKeys.viaje(id) })
+      queryClient.removeQueries({ queryKey: queryKeys.circuito(id) })
+    },
+  })
+}

@@ -30,17 +30,20 @@ export const queryKeys = {
   eventos: (page: number, size: number) => ['eventos', { page, size }] as const,
   eventosAll: () => ['eventos'] as const,
   evento: (id: number) => ['evento', id] as const,
-  propuestas: (page: number, size: number, tipo?: string, publicadorId?: number) =>
+  propuestas: (page: number, size: number, filtros: Record<string, string> = {}) =>
     [
       'propuestas',
       {
         page,
         size,
-        ...(tipo ? { tipo } : {}),
-        ...(publicadorId != null ? { publicadorId } : {}),
+        ...filtros,
       },
     ] as const,
   propuestasAll: () => ['propuestas'] as const,
+  propuestasResumen: (filtros: Record<string, string>) =>
+    ['propuestas', 'resumen', filtros] as const,
+  propuestasZonas: (filtros: Record<string, string>) =>
+    ['propuestas', 'zonas', filtros] as const,
   actividad: (id: number) => ['actividad', id] as const,
   actividadesAll: () => ['actividades'] as const,
   publicadores: (page: number, size: number) => ['publicadores', { page, size }] as const,

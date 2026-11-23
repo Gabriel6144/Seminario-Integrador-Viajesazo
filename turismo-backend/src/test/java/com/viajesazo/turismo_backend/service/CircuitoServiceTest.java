@@ -884,8 +884,8 @@ class CircuitoServiceTest {
     }
 
     @Test
-    @DisplayName("sugerencias OTRA_CATEGORIA y no OTRO_TIPO fuera de MANUAL")
-    void suggestsOtherCategoryButNotOtherTypeOutsideManual() {
+    @DisplayName("sugerencias fuera de intereses y también de tus intereses fuera de MANUAL")
+    void suggestsOtherCategoryAndInInterestsOutsideManual() {
         Viaje trip = validTrip();
         trip.setRitmo(TipoRitmo.EQUILIBRADO);
         Circuito circuito = selectedCircuit(trip);
@@ -905,10 +905,127 @@ class CircuitoServiceTest {
 
         assertThat(response.sugerencias()).extracting(
                 com.viajesazo.turismo_backend.dto.response.SugerenciaDiaResponse::propuestaId)
-                .contains(10L)
-                .doesNotContain(11L);
-        assertThat(response.sugerencias()).allMatch(s ->
+                .contains(10L, 11L);
+        assertThat(response.sugerencias()).anyMatch(s ->
                 s.motivoSugerencia() == com.viajesazo.turismo_backend.model.MotivoSugerencia.OTRA_CATEGORIA);
+        assertThat(response.sugerencias()).anyMatch(s ->
+                s.motivoSugerencia() == com.viajesazo.turismo_backend.model.MotivoSugerencia.DE_TUS_INTERESES
+                        && s.textoMotivo().contains("Es de tus intereses"));
+    }
+
+    @Test
+    @DisplayName("sugerencias: respeta la agenda de la actividad (fechaInicio/fechaFin)")
+    void suggestionsRespectActivityAgendaDates() {
+        Viaje trip = validTrip();
+        trip.setRitmo(TipoRitmo.EQUILIBRADO);
+        Circuito circuito = selectedCircuit(trip);
+        circuito.setRitmoSnapshot(TipoRitmo.EQUILIBRADO);
+        CircuitoAlternativa alternative = circuito.getAlternativas().get(0);
+        alternative.addItem(locatedItem(1L, LocalTime.of(9, 0), LocalTime.of(10, 0), 1,
+                -31.40, -64.20, InteresCategoria.CULTURA));
+        Actividad activity = activity(11L, "Actividad fuera de agenda", InteresCategoria.CULTURA,
+                LocalTime.of(14, 0), LocalTime.of(18, 0), 60, -31.41, -64.21);
+        activity.setFechaInicio(LocalDate.of(2026, 11, 1));
+        when(viajeRepository.findByIdAndEstadoNotIn(any(), any())).thenReturn(Optional.of(trip));
+        when(circuitoRepository.findByViajeId(7L)).thenReturn(Optional.of(circuito));
+        when(propuestaRepository.findAll()).thenReturn(List.<PropuestaTuristica>of(activity));
+
+        var response = service.daySuggestions(7L, ITEM_DATE);
+
+        assertThat(response.sugerencias()).isEmpty();
+        assertThat(response.noEntran()).extracting(
+                com.viajesazo.turismo_backend.dto.response.PropuestaFueraDeHuecoResponse::propuestaId)
+                .contains(11L);
+        assertThat(response.noEntran().get(0).motivo()).contains("No está disponible ese día");
+    }
+
+    @Test
+    @DisplayName("sugerencias: una actividad que se pasa de medianoche no entra")
+    void suggestionsRejectActivityThatCrossesMidnight() {
+        Viaje trip = validTrip();
+        trip.setRitmo(TipoRitmo.EQUILIBRADO);
+        Circuito circuito = selectedCircuit(trip);
+        circuito.setRitmoSnapshot(TipoRitmo.EQUILIBRADO);
+        CircuitoAlternativa alternative = circuito.getAlternativas().get(0);
+        when(viajeRepository.findByIdAndEstadoNotIn(any(), any())).thenReturn(Optional.of(trip));
+        when(circuitoRepository.findByViajeId(7L)).thenReturn(Optional.of(circuito));
+        when(propuestaRepository.findAll()).thenReturn(List.<PropuestaTuristica>of(
+                activity(11L, "Actividad nocturna larga", InteresCategoria.CULTURA,
+                        LocalTime.of(22, 0), LocalTime.of(23, 59), 120, -31.41, -64.21)));
+
+        var response = service.daySuggestions(7L, ITEM_DATE);
+
+        assertThat(response.sugerencias()).isEmpty();
+        assertThat(response.noEntran()).extracting(
+                com.viajesazo.turismo_backend.dto.response.PropuestaFueraDeHuecoResponse::propuestaId)
+                .contains(11L);
+    }
+
+    @Test
+    @DisplayName("sugerencias: una actividad antes de las 06:00 no entra")
+    void suggestionsRejectActivityBeforeDayWindow() {
+        Viaje trip = validTrip();
+        trip.setRitmo(TipoRitmo.EQUILIBRADO);
+        Circuito circuito = selectedCircuit(trip);
+        circuito.setRitmoSnapshot(TipoRitmo.EQUILIBRADO);
+        CircuitoAlternativa alternative = circuito.getAlternativas().get(0);
+        when(viajeRepository.findByIdAndEstadoNotIn(any(), any())).thenReturn(Optional.of(trip));
+        when(circuitoRepository.findByViajeId(7L)).thenReturn(Optional.of(circuito));
+        when(propuestaRepository.findAll()).thenReturn(List.<PropuestaTuristica>of(
+                activity(11L, "Actividad madrugada", InteresCategoria.CULTURA,
+                        LocalTime.of(5, 0), LocalTime.of(6, 30), 60, -31.41, -64.21)));
+
+        var response = service.daySuggestions(7L, ITEM_DATE);
+
+        assertThat(response.sugerencias()).isEmpty();
+        assertThat(response.noEntran()).extracting(
+                com.viajesazo.turismo_backend.dto.response.PropuestaFueraDeHuecoResponse::propuestaId)
+                .contains(11L);
+    }
+
+    @Test
+    @DisplayName("sugerencias: 'Dejarlo así' corta las sugerencias del día")
+    void discardedNoticeStopsSuggestions() {
+        Viaje trip = validTrip();
+        trip.setRitmo(TipoRitmo.EQUILIBRADO);
+        Circuito circuito = selectedCircuit(trip);
+        circuito.setRitmoSnapshot(TipoRitmo.EQUILIBRADO);
+        CircuitoAlternativa alternative = circuito.getAlternativas().get(0);
+        alternative.addItem(locatedItem(1L, LocalTime.of(9, 0), LocalTime.of(10, 0), 1,
+                -31.40, -64.20, InteresCategoria.CULTURA));
+        when(viajeRepository.findByIdAndEstadoNotIn(any(), any())).thenReturn(Optional.of(trip));
+        when(circuitoRepository.findByViajeId(7L)).thenReturn(Optional.of(circuito));
+        when(circuitoRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.discardDayNotice(7L, ITEM_DATE,
+                new com.viajesazo.turismo_backend.dto.request.DescartarAvisoDiaRequest(true));
+
+        assertThat(service.daySuggestions(7L, ITEM_DATE).sugerencias()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("sugerencias: noEntran explica la distancia para propuestas de interés")
+    void suggestionsExplainFarProposalsInNoEntran() {
+        Viaje trip = validTrip();
+        trip.setRitmo(TipoRitmo.EQUILIBRADO);
+        Circuito circuito = selectedCircuit(trip);
+        circuito.setRitmoSnapshot(TipoRitmo.EQUILIBRADO);
+        CircuitoAlternativa alternative = circuito.getAlternativas().get(0);
+        alternative.addItem(locatedItem(1L, LocalTime.of(9, 0), LocalTime.of(10, 0), 1,
+                -31.40, -64.20, InteresCategoria.CULTURA));
+        when(viajeRepository.findByIdAndEstadoNotIn(any(), any())).thenReturn(Optional.of(trip));
+        when(circuitoRepository.findByViajeId(7L)).thenReturn(Optional.of(circuito));
+        when(propuestaRepository.findAll()).thenReturn(List.<PropuestaTuristica>of(
+                proposal(12L, "Muy lejos", InteresCategoria.CULTURA, LocalTime.of(11, 0),
+                        LocalTime.of(12, 0), -33.0, -64.2)));
+
+        var response = service.daySuggestions(7L, ITEM_DATE);
+
+        assertThat(response.sugerencias()).isEmpty();
+        assertThat(response.noEntran()).extracting(
+                com.viajesazo.turismo_backend.dto.response.PropuestaFueraDeHuecoResponse::propuestaId)
+                .contains(12L);
+        assertThat(response.noEntran().get(0).motivo()).contains("km de tu zona");
     }
 
     @Test

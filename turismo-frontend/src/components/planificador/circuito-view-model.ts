@@ -170,6 +170,8 @@ function toStop(
       [item.descripcion, item.descripcionArancel].filter(Boolean).join(' ') ||
       'Una experiencia para sumar a tu recorrido.',
     location: locationLabel(item),
+    ciudad: item.ciudad,
+    localidad: item.localidad,
     hours:
       item.horaInicio && item.horaFin
         ? `${start} - ${end}`

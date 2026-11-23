@@ -26,7 +26,9 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.viajesazo.turismo_backend.config.AppConfig;
 import com.viajesazo.turismo_backend.dto.request.PropuestaFiltro;
+import com.viajesazo.turismo_backend.dto.response.PropuestaResumenContadoresResponse;
 import com.viajesazo.turismo_backend.dto.response.PropuestaResumenResponse;
+import com.viajesazo.turismo_backend.dto.response.ZonaResponse;
 import com.viajesazo.turismo_backend.exception.BusinessRuleException;
 import com.viajesazo.turismo_backend.model.InteresCategoria;
 import com.viajesazo.turismo_backend.model.Modalidad;
@@ -57,10 +59,12 @@ class PropuestaControllerTest {
 						.param("tipoPropuesta", "FESTIVAL")
 						.param("categoria", "CULTURA")
 						.param("localidad", "Cosquín")
+						.param("ciudad", "Cosquín")
 						.param("ubicacion", "Plaza Próspero Molina")
 						.param("q", "folklore")
 						.param("fechaDesde", "2026-10-01")
 						.param("fechaHasta", "2026-10-31")
+						.param("incluirCanceladas", "true")
 						.param("page", "0")
 						.param("size", "10"))
 				.andExpect(status().isOk())
@@ -76,10 +80,44 @@ class PropuestaControllerTest {
 		org.assertj.core.api.Assertions.assertThat(filtro.tipoPropuesta()).isEqualTo(TipoPropuesta.FESTIVAL);
 		org.assertj.core.api.Assertions.assertThat(filtro.categoria()).isEqualTo(InteresCategoria.CULTURA);
 		org.assertj.core.api.Assertions.assertThat(filtro.localidad()).isEqualTo("Cosquín");
+		org.assertj.core.api.Assertions.assertThat(filtro.ciudad()).isEqualTo("Cosquín");
 		org.assertj.core.api.Assertions.assertThat(filtro.ubicacion()).isEqualTo("Plaza Próspero Molina");
 		org.assertj.core.api.Assertions.assertThat(filtro.q()).isEqualTo("folklore");
 		org.assertj.core.api.Assertions.assertThat(filtro.fechaDesde()).isEqualTo(LocalDate.parse("2026-10-01"));
 		org.assertj.core.api.Assertions.assertThat(filtro.fechaHasta()).isEqualTo(LocalDate.parse("2026-10-31"));
+		org.assertj.core.api.Assertions.assertThat(filtro.incluirCanceladas()).isTrue();
+	}
+
+	@Test
+	@DisplayName("US3: el resumen devuelve contadores sin filtro de tipo")
+	void returnsSummary() throws Exception {
+		when(propuestaQueryService.summary(any(PropuestaFiltro.class)))
+				.thenReturn(new PropuestaResumenContadoresResponse(7, 4, 3));
+
+		mockMvc.perform(get("/api/propuestas/resumen")
+						.param("q", "folklore")
+						.param("ciudad", "Cosquín"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.total").value(7))
+				.andExpect(jsonPath("$.eventos").value(4))
+				.andExpect(jsonPath("$.actividades").value(3));
+
+		ArgumentCaptor<PropuestaFiltro> captor = ArgumentCaptor.forClass(PropuestaFiltro.class);
+		org.mockito.Mockito.verify(propuestaQueryService).summary(captor.capture());
+		org.assertj.core.api.Assertions.assertThat(captor.getValue().tipo()).isNull();
+		org.assertj.core.api.Assertions.assertThat(captor.getValue().ciudad()).isEqualTo("Cosquín");
+	}
+
+	@Test
+	@DisplayName("US3: las zonas devuelven ciudad y localidad")
+	void returnsZones() throws Exception {
+		when(propuestaQueryService.zones(any(), eq(false)))
+				.thenReturn(List.of(new ZonaResponse("Cosquín", "Cosquín")));
+
+		mockMvc.perform(get("/api/propuestas/zonas"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[0].ciudad").value("Cosquín"))
+				.andExpect(jsonPath("$[0].localidad").value("Cosquín"));
 	}
 
 	@Test

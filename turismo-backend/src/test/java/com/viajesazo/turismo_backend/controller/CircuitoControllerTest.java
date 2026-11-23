@@ -371,8 +371,8 @@ class CircuitoControllerTest {
     @DisplayName("antes de confirmar: lista sugerencias y agrega una al día de la alternativa")
     void completesADayOfAnAlternative() throws Exception {
         when(circuitoService.alternativeDaySuggestions(7L, CircuitStrategy.CERCANIA, LocalDate.of(2026, 10, 20)))
-                .thenReturn(new com.viajesazo.turismo_backend.dto.response.SugerenciasDiaResponse(List.of(),
-                        "No encontramos propuestas para completar este día"));
+                .thenReturn(new com.viajesazo.turismo_backend.dto.response.SugerenciasDiaResponse(
+                        List.of(), List.of(), "No encontramos propuestas para completar este día"));
         when(circuitoService.addAlternativeSuggestedItem(eq(7L), eq(CircuitStrategy.CERCANIA),
                 eq(LocalDate.of(2026, 10, 20)), any()))
                 .thenReturn(circuitResponse());

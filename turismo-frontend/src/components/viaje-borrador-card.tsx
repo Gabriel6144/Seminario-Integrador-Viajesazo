@@ -6,9 +6,18 @@ interface Props {
   borrador: ViajeResponse
   onDescartar: (id: number) => void
   descartando: boolean
+  /** Solo para viajes confirmados y planificados (baja lógica). */
+  onCancelar?: (id: number) => void
+  cancelando?: boolean
 }
 
-export function ViajeBorradorCard({ borrador, onDescartar, descartando }: Props) {
+export function ViajeBorradorCard({
+  borrador,
+  onDescartar,
+  descartando,
+  onCancelar,
+  cancelando = false,
+}: Props) {
   const esBorrador = borrador.estado === 'BORRADOR'
   const paso = borrador.pasoActual ?? 0
   const progreso = Math.min(100, Math.max(0, Math.round((paso / 8) * 100)))
@@ -105,13 +114,25 @@ export function ViajeBorradorCard({ borrador, onDescartar, descartando }: Props)
       </div>
 
       {!esBorrador ? (
-        <Link
-          to={`/viajes/${borrador.id}/circuito`}
-          className="mt-auto flex items-center justify-center gap-1.5 rounded-xl bg-sky-600 px-4 py-3 text-center text-xs font-bold text-white transition hover:bg-sky-700"
-        >
-          <span className="material-symbols-outlined text-base">map</span>
-          Ver circuito
-        </Link>
+        <footer className="mt-auto flex flex-wrap gap-2 pt-3">
+          <Link
+            to={`/viajes/${borrador.id}/circuito`}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-sky-600 px-4 py-3 text-center text-xs font-bold text-white transition hover:bg-sky-700"
+          >
+            <span className="material-symbols-outlined text-base">map</span>
+            Ver circuito
+          </Link>
+          {borrador.estado === 'PLANIFICADO' && onCancelar ? (
+            <button
+              type="button"
+              className="w-full rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:border-red-300 hover:text-red-600 disabled:opacity-50"
+              onClick={() => onCancelar(borrador.id)}
+              disabled={cancelando}
+            >
+              {cancelando ? 'Cancelando...' : 'Cancelar viaje'}
+            </button>
+          ) : null}
+        </footer>
       ) : (
       <footer className="mt-auto flex flex-wrap gap-2 pt-3">
         <Link

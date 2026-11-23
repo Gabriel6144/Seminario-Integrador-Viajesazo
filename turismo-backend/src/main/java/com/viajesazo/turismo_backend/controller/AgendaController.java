@@ -49,7 +49,7 @@ public class AgendaController {
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaHasta,
 			@PageableDefault(size = 20) Pageable pageable) {
 		PropuestaFiltro filtro = new PropuestaFiltro(TipoRegistro.EVENTO, tipoPropuesta, categoria, null,
-				tipoAcceso, null, null, null, ubicacion, null, fechaDesde, fechaHasta);
+				tipoAcceso, null, null, null, null, ubicacion, null, fechaDesde, fechaHasta, false);
 		return new PagedModel<>(propuestaQueryService.searchAgenda(filtro, pageable));
 	}
 

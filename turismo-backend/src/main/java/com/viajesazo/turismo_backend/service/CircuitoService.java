@@ -125,6 +125,10 @@ public class CircuitoService {
             int transferMinutes) {
     }
 
+    private record SuggestionAnalysis(List<SuggestionOption> options,
+            List<PropuestaFueraDeHuecoResponse> notFitting) {
+    }
+
     private static final int MAX_SUGERENCIAS_POR_MOTIVO = 10;
 
     @Transactional
@@ -357,11 +361,12 @@ public class CircuitoService {
         CircuitoAlternativa alternative = selectedAlternative(circuito);
         requireDateInRange(circuito, alternative, fecha);
         ensureDayStates(circuito, viaje);
-        List<SugerenciaDiaResponse> sugerencias = suggestionOptions(viaje, circuito, alternative, fecha,
-                selectedDayIncomplete(circuito, fecha)).stream()
+        SuggestionAnalysis analysis = suggestionOptions(viaje, circuito, alternative, fecha,
+                selectedDayIncomplete(circuito, fecha));
+        List<SugerenciaDiaResponse> sugerencias = analysis.options().stream()
                 .map(this::toSuggestionResponse)
                 .toList();
-        return new SugerenciasDiaResponse(sugerencias, sugerencias.isEmpty()
+        return new SugerenciasDiaResponse(sugerencias, analysis.notFitting(), sugerencias.isEmpty()
                 ? "No encontramos propuestas para completar este día"
                 : null);
     }
@@ -375,7 +380,7 @@ public class CircuitoService {
         requireDateInRange(circuito, alternative, fecha);
         ensureDayStates(circuito, viaje);
         SuggestionOption option = chosenSuggestion(suggestionOptions(viaje, circuito, alternative, fecha,
-                selectedDayIncomplete(circuito, fecha)), request);
+                selectedDayIncomplete(circuito, fecha)).options(), request);
         insertSuggestion(circuito, alternative, fecha, option);
         dayState(circuito, fecha).setAgregadasPorUsuario(
                 dayState(circuito, fecha).getAgregadasPorUsuario() + 1);
@@ -429,11 +434,12 @@ public class CircuitoService {
         Circuito circuito = findCircuit(viajeId);
         CircuitoAlternativa alternative = editableAlternative(circuito, estrategia);
         requireDateInRange(circuito, alternative, fecha);
-        List<SugerenciaDiaResponse> sugerencias = suggestionOptions(viaje, circuito, alternative, fecha,
-                liveSummary(circuito, viaje, alternative, fecha).pendiente()).stream()
+        SuggestionAnalysis analysis = suggestionOptions(viaje, circuito, alternative, fecha,
+                liveSummary(circuito, viaje, alternative, fecha).pendiente());
+        List<SugerenciaDiaResponse> sugerencias = analysis.options().stream()
                 .map(this::toSuggestionResponse)
                 .toList();
-        return new SugerenciasDiaResponse(sugerencias, sugerencias.isEmpty()
+        return new SugerenciasDiaResponse(sugerencias, analysis.notFitting(), sugerencias.isEmpty()
                 ? "No encontramos propuestas para completar este día"
                 : null);
     }
@@ -446,7 +452,7 @@ public class CircuitoService {
         CircuitoAlternativa alternative = editableAlternative(circuito, estrategia);
         requireDateInRange(circuito, alternative, fecha);
         SuggestionOption option = chosenSuggestion(suggestionOptions(viaje, circuito, alternative, fecha,
-                liveSummary(circuito, viaje, alternative, fecha).pendiente()), request);
+                liveSummary(circuito, viaje, alternative, fecha).pendiente()).options(), request);
         insertSuggestion(circuito, alternative, fecha, option);
         circuitoRepository.save(circuito);
         return toGenerationResponse(circuito);
@@ -500,7 +506,9 @@ public class CircuitoService {
     private boolean selectedDayIncomplete(Circuito circuito, LocalDate fecha) {
         CircuitoDiaEstado estado = dayState(circuito, fecha);
         return estado.getMinimo() > 0
-                && (estado.getAsignadas() + estado.getAgregadasPorUsuario()) < estado.getMinimo();
+                && (estado.getAsignadas() + estado.getAgregadasPorUsuario()) < estado.getMinimo()
+                && !estado.isAvisoDescartado()
+                && !fecha.isBefore(LocalDate.now(clock));
     }
 
     private CircuitoItem selectedItem(CircuitoAlternativa alternative, Long itemId) {
@@ -950,10 +958,14 @@ public class CircuitoService {
                     ? EVENT_START : event.getHorarioInicio();
             LocalTime end = event.getHorarioInicio() == null || event.getHorarioFin() == null
                     ? EVENT_END : event.getHorarioFin();
-            return List.of(new CircuitCandidate.TimeSlot(date, start, end));
+            return isInsideDayWindow(start, end)
+                    ? List.of(new CircuitCandidate.TimeSlot(date, start, end))
+                    : List.of();
         }
         if (proposal instanceof Actividad activity) {
-            if (activity.getDisponibilidades() == null) {
+            if (activity.getDisponibilidades() == null
+                    || activity.getFechaInicio() == null || activity.getFechaFin() == null
+                    || date.isBefore(activity.getFechaInicio()) || date.isAfter(activity.getFechaFin())) {
                 return List.of();
             }
             List<CircuitCandidate.TimeSlot> slots = new ArrayList<>();
@@ -961,15 +973,28 @@ public class CircuitoService {
                 if (availability.getDiaSemana() != date.getDayOfWeek()) {
                     continue;
                 }
-                LocalTime end = availability.getHoraInicio().plusMinutes(activity.getDuracionMinutos());
-                if (end.isAfter(availability.getHoraFin())) {
+                int startMin = minuteOfDay(availability.getHoraInicio());
+                int endMin = startMin + activity.getDuracionMinutos();
+                // Se compara en minutos enteros para no dar la vuelta con LocalTime.plusMinutes
+                // cuando el horario se pasa de medianoche.
+                if (endMin > minuteOfDay(availability.getHoraFin())
+                        || startMin < minuteOfDay(DAY_START) || endMin > minuteOfDay(DAY_END)) {
                     continue;
                 }
-                slots.add(new CircuitCandidate.TimeSlot(date, availability.getHoraInicio(), end));
+                slots.add(new CircuitCandidate.TimeSlot(date, availability.getHoraInicio(),
+                        LocalTime.ofSecondOfDay(endMin * 60L)));
             }
             return slots;
         }
         return List.of();
+    }
+
+    private static boolean isInsideDayWindow(LocalTime start, LocalTime end) {
+        int startMin = minuteOfDay(start);
+        int endMin = minuteOfDay(end);
+        return endMin > startMin
+                && startMin >= minuteOfDay(DAY_START)
+                && endMin <= minuteOfDay(DAY_END);
     }
 
     private boolean overlapsAnotherItem(CircuitoAlternativa alternative, CircuitoItem target,
@@ -1201,15 +1226,23 @@ public class CircuitoService {
     }
 
     private List<CircuitCandidate.TimeSlot> activitySlots(Actividad activity, LocalDate start, LocalDate end) {
-        if (activity.getDisponibilidades() == null || activity.getDisponibilidades().isEmpty()) return List.of();
+        if (activity.getDisponibilidades() == null || activity.getDisponibilidades().isEmpty()
+                || activity.getFechaInicio() == null || activity.getFechaFin() == null) {
+            return List.of();
+        }
         List<CircuitCandidate.TimeSlot> slots = new ArrayList<>();
-        for (LocalDate day = start; !day.isAfter(end); day = day.plusDays(1)) {
+        LocalDate first = activity.getFechaInicio().isAfter(start) ? activity.getFechaInicio() : start;
+        LocalDate last = activity.getFechaFin().isBefore(end) ? activity.getFechaFin() : end;
+        for (LocalDate day = first; !day.isAfter(last); day = day.plusDays(1)) {
             for (var availability : activity.getDisponibilidades()) {
                 if (availability.getDiaSemana() != day.getDayOfWeek()) continue;
-                LocalTime finish = availability.getHoraInicio().plusMinutes(activity.getDuracionMinutos());
-                if (!finish.isAfter(availability.getHoraFin())) {
-                    slots.add(new CircuitCandidate.TimeSlot(day, availability.getHoraInicio(), finish));
-                }
+                int startMin = minuteOfDay(availability.getHoraInicio());
+                int finishMin = startMin + activity.getDuracionMinutos();
+                int availabilityEndMin = minuteOfDay(availability.getHoraFin());
+                if (finishMin > availabilityEndMin) continue;
+                if (startMin < minuteOfDay(DAY_START) || finishMin > minuteOfDay(DAY_END)) continue;
+                slots.add(new CircuitCandidate.TimeSlot(day, availability.getHoraInicio(),
+                        LocalTime.ofSecondOfDay(finishMin * 60L)));
             }
         }
         return slots;
@@ -1452,10 +1485,10 @@ public class CircuitoService {
                 pendiente);
     }
 
-    private List<SuggestionOption> suggestionOptions(Viaje viaje, Circuito circuito,
+    private SuggestionAnalysis suggestionOptions(Viaje viaje, Circuito circuito,
             CircuitoAlternativa alternative, LocalDate fecha, boolean dayIncomplete) {
         if (!dayIncomplete) {
-            return List.of();
+            return new SuggestionAnalysis(List.of(), List.of());
         }
         TipoRitmo ritmo = circuito.getRitmoSnapshot() != null ? circuito.getRitmoSnapshot() : viaje.getRitmo();
         Set<InteresCategoria> interests = new LinkedHashSet<>(
@@ -1464,7 +1497,8 @@ public class CircuitoService {
                 .map(CircuitoItem::getPropuestaId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
-        Set<Long> likedIds = meGustaRepository.findPropuestaIdsByUsuarioId(viaje.getUsuario().getId());
+        Set<Long> likedIds = viaje.getUsuario() == null ? Set.of()
+                : meGustaRepository.findPropuestaIdsByUsuarioId(viaje.getUsuario().getId());
 
         DayQuota quota = dayQuotas(viaje).get(fecha);
         int events = (int) sortedDayItems(alternative, fecha).stream()
@@ -1474,43 +1508,88 @@ public class CircuitoService {
         boolean needEvents = ritmo == TipoRitmo.MANUAL && quota != null && events < quota.events();
         boolean needActivities = ritmo == TipoRitmo.MANUAL && quota != null && activities < quota.activities();
 
+        List<SuggestionOption> deTusIntereses = new ArrayList<>();
         List<SuggestionOption> otraCategoria = new ArrayList<>();
         List<SuggestionOption> otroTipo = new ArrayList<>();
+        List<PropuestaFueraDeHuecoResponse> notFitting = new ArrayList<>();
 
         for (PropuestaTuristica proposal : propuestaRepository.findAll()) {
-            if (proposal.getId() == null || used.contains(proposal.getId())
-                    || !isEligibleIgnoringCategory(viaje, proposal)) {
+            if (proposal.getId() == null || used.contains(proposal.getId())) {
+                continue;
+            }
+            NombreEstado state = proposal.getNombreEstado();
+            if (state == null || INACTIVE_STATES.contains(state)) {
+                continue;
+            }
+            Double zoneKm = distanceToZoneKm(viaje, proposal);
+            if (zoneKm == null) {
                 continue;
             }
             MotivoSugerencia motivo = classifySuggestion(proposal, interests, ritmo, needEvents, needActivities);
             if (motivo == null) {
                 continue;
             }
-            SuggestionOption fitted = firstFittingSuggestion(alternative, fecha, proposal, motivo);
-            if (fitted == null) {
+            boolean isLiked = likedIds.contains(proposal.getId());
+            boolean inInterests = proposal.getCategoria() != null && interests.contains(proposal.getCategoria());
+
+            if (zoneKm > viaje.getRangoInteresKm()) {
+                addNotFitting(notFitting, proposal, isLiked, inInterests,
+                        "Queda a " + kilometers(zoneKm) + " km de tu zona y tu radio es de "
+                                + kilometers(viaje.getRangoInteresKm()) + " km");
                 continue;
             }
-            if (motivo == MotivoSugerencia.OTRA_CATEGORIA) {
-                otraCategoria.add(fitted);
-            } else {
-                otroTipo.add(fitted);
+            SuggestionOption fitted = firstFittingSuggestion(alternative, fecha, proposal, motivo);
+            if (fitted == null) {
+                addNotFitting(notFitting, proposal, isLiked, inInterests,
+                        suggestionRejectionReason(fecha, proposal));
+                continue;
+            }
+            switch (motivo) {
+                case DE_TUS_INTERESES -> deTusIntereses.add(fitted);
+                case OTRO_TIPO -> otroTipo.add(fitted);
+                case OTRA_CATEGORIA -> otraCategoria.add(fitted);
             }
         }
 
         Map<Long, Long> likeCounts = likeCounts(java.util.stream.Stream
-                .concat(otraCategoria.stream(), otroTipo.stream())
+                .concat(java.util.stream.Stream.concat(deTusIntereses.stream(), otraCategoria.stream()),
+                        otroTipo.stream())
                 .map(option -> option.candidate().id())
                 .toList());
         Comparator<SuggestionOption> order = suggestionOrder(likedIds, likeCounts);
+        deTusIntereses.sort(order);
         otraCategoria.sort(order);
         otroTipo.sort(order);
 
         List<SuggestionOption> result = new ArrayList<>();
+        deTusIntereses.stream().limit(MAX_SUGERENCIAS_POR_MOTIVO).forEach(result::add);
         otraCategoria.stream().limit(MAX_SUGERENCIAS_POR_MOTIVO).forEach(result::add);
         if (ritmo == TipoRitmo.MANUAL) {
             otroTipo.stream().limit(MAX_SUGERENCIAS_POR_MOTIVO).forEach(result::add);
         }
-        return result;
+        notFitting.sort(Comparator
+                .comparing((PropuestaFueraDeHuecoResponse item) -> !item.meGusta())
+                .thenComparing(PropuestaFueraDeHuecoResponse::propuestaNombre,
+                        Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)));
+        return new SuggestionAnalysis(result, notFitting.stream().limit(MAX_NO_ENTRAN).toList());
+    }
+
+    private void addNotFitting(List<PropuestaFueraDeHuecoResponse> notFitting,
+            PropuestaTuristica proposal, boolean isLiked, boolean inInterests, String reason) {
+        if (reason != null && (isLiked || inInterests)) {
+            notFitting.add(new PropuestaFueraDeHuecoResponse(proposal.getId(), proposal.getNombre(),
+                    proposal.getTipo(), isLiked, reason));
+        }
+    }
+
+    private String suggestionRejectionReason(LocalDate fecha, PropuestaTuristica proposal) {
+        List<CircuitCandidate.TimeSlot> slots = proposalSlots(proposal, fecha);
+        if (slots.isEmpty()) {
+            return proposal instanceof Evento ? "No se realiza ese día" : "No está disponible ese día";
+        }
+        CircuitCandidate.TimeSlot first = slots.get(0);
+        return "Su horario (" + clock(first.start()) + " – " + clock(first.end())
+                + ") no entra en el día contando los traslados";
     }
 
     private MotivoSugerencia classifySuggestion(PropuestaTuristica proposal, Set<InteresCategoria> interests,
@@ -1525,50 +1604,14 @@ public class CircuitoService {
             if (!needEvents && !needActivities) {
                 return null;
             }
+            boolean typeNeeded = (type == TipoRegistro.EVENTO && needEvents)
+                    || (type == TipoRegistro.ACTIVIDAD && needActivities);
             if (!inInterests) {
-                if ((type == TipoRegistro.EVENTO && needEvents)
-                        || (type == TipoRegistro.ACTIVIDAD && needActivities)) {
-                    return MotivoSugerencia.OTRA_CATEGORIA;
-                }
-                return null;
+                return typeNeeded ? MotivoSugerencia.OTRA_CATEGORIA : null;
             }
-            if (type == TipoRegistro.EVENTO && !needEvents && needActivities) {
-                return MotivoSugerencia.OTRO_TIPO;
-            }
-            if (type == TipoRegistro.ACTIVIDAD && !needActivities && needEvents) {
-                return MotivoSugerencia.OTRO_TIPO;
-            }
-            return null;
+            return typeNeeded ? MotivoSugerencia.DE_TUS_INTERESES : MotivoSugerencia.OTRO_TIPO;
         }
-        // Ritmos no manuales: solo OTRA_CATEGORIA (categoría fuera de intereses).
-        if (!inInterests) {
-            return MotivoSugerencia.OTRA_CATEGORIA;
-        }
-        return null;
-    }
-
-    /**
-     * Misma base que {@link #isEligible} sin exigir categoría ∈ intereses.
-     * La generación y los reemplazos siguen usando {@link #isEligible} estricto.
-     */
-    private boolean isEligibleIgnoringCategory(Viaje viaje, PropuestaTuristica proposal) {
-        NombreEstado state = proposal.getNombreEstado();
-        if (state == null || INACTIVE_STATES.contains(state)) {
-            return false;
-        }
-        Ubicacion location = proposal.getUbicacion();
-        if (location == null || location.getLatitud() == null || location.getLongitud() == null) {
-            return false;
-        }
-        Ubicacion zone = viaje.getZonaInteres();
-        if (zone == null || zone.getLatitud() == null || zone.getLongitud() == null
-                || viaje.getRangoInteresKm() == null) {
-            return false;
-        }
-        double distance = distanceProvider.estimate(
-                zone.getLatitud().doubleValue(), zone.getLongitud().doubleValue(),
-                location.getLatitud().doubleValue(), location.getLongitud().doubleValue()).distanceKm();
-        return distance <= viaje.getRangoInteresKm();
+        return inInterests ? MotivoSugerencia.DE_TUS_INTERESES : MotivoSugerencia.OTRA_CATEGORIA;
     }
 
     private SuggestionOption firstFittingSuggestion(CircuitoAlternativa alternative, LocalDate fecha,
@@ -1641,6 +1684,8 @@ public class CircuitoService {
         return Comparator
                 .<SuggestionOption, Boolean>comparing(
                         option -> !likedIds.contains(option.candidate().id()))
+                .thenComparingInt(option ->
+                        option.motivo() == MotivoSugerencia.OTRA_CATEGORIA ? 1 : 0)
                 .thenComparing((SuggestionOption option) ->
                         -likeCounts.getOrDefault(option.candidate().id(), 0L))
                 .thenComparingDouble(SuggestionOption::transferKm)
@@ -1682,6 +1727,9 @@ public class CircuitoService {
     private String textoMotivo(MotivoSugerencia motivo, InteresCategoria categoria, TipoRegistro tipo) {
         if (motivo == MotivoSugerencia.OTRA_CATEGORIA) {
             return "Fuera de tus preferencias: " + categoriaLabel(categoria);
+        }
+        if (motivo == MotivoSugerencia.DE_TUS_INTERESES) {
+            return "Es de tus intereses: " + categoriaLabel(categoria);
         }
         if (tipo == TipoRegistro.ACTIVIDAD) {
             return "Es una actividad en lugar de un evento";

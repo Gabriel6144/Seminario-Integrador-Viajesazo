@@ -14,6 +14,7 @@ import {
   allBorradores,
   allEventos,
   allPublicadores,
+  cancelarViaje,
   completeBorrador,
   createBorrador,
   createCircuito,
@@ -57,6 +58,7 @@ import type {
   AuthTokenResponse,
   EventoRequest,
   LoginRequest,
+  PropuestaResumenResponse,
   PublicadorRequest,
   SeleccionCircuitoRequest,
   UsuarioRequest,
@@ -375,20 +377,41 @@ export const handlers = [
 
   http.get('/api/propuestas', ({ request }) => {
     const searchParams = new URL(request.url).searchParams
-    const tipo = searchParams.get('tipo')
-    const publicadorId = searchParams.get('publicadorId')
-    const propuestas = allEventos().map((evento) => ({
-      ...evento,
-      tipo: 'EVENTO' as const,
-      duracionMinutos: null,
-    }))
-    const filtradas = propuestas.filter((p) => {
-      if (tipo && p.tipo !== tipo) return false
-      if (publicadorId && p.publicadorId !== Number(publicadorId)) return false
-      return true
-    })
+    const filtradas = filtrarPropuestas(searchParams)
     const { content, meta } = paginate(filtradas, request.url)
     return HttpResponse.json(page(content, meta))
+  }),
+
+  http.get('/api/propuestas/resumen', ({ request }) => {
+    const searchParams = new URL(request.url).searchParams
+    const filtradas = filtrarPropuestas(searchParams, { conTipo: false })
+    return HttpResponse.json({
+      total: filtradas.length,
+      eventos: filtradas.filter((p) => p.tipo !== 'ACTIVIDAD').length,
+      actividades: filtradas.filter((p) => p.tipo === 'ACTIVIDAD').length,
+    })
+  }),
+
+  http.get('/api/propuestas/zonas', ({ request }) => {
+    const searchParams = new URL(request.url).searchParams
+    const publicadorId = searchParams.get('publicadorId')
+    const incluirCanceladas = searchParams.get('incluirCanceladas') === 'true'
+    const filtradas = propuestasMock().filter((p) => {
+      if (publicadorId && p.publicadorId !== Number(publicadorId)) return false
+      if (!incluirCanceladas && estadoNombre(p.estadoPropuesta) === 'CANCELADO') return false
+      return true
+    })
+    const unicas = new Map<string, { ciudad: string | null; localidad: string | null }>()
+    for (const p of filtradas) {
+      const key = `${p.ciudad ?? ''}|${p.localidad ?? ''}`
+      if (!unicas.has(key)) unicas.set(key, { ciudad: p.ciudad, localidad: p.localidad })
+    }
+    const zonas = [...unicas.values()].sort(
+      (a, b) =>
+        (a.ciudad ?? '').localeCompare(b.ciudad ?? '') ||
+        (a.localidad ?? '').localeCompare(b.localidad ?? ''),
+    )
+    return HttpResponse.json(zonas)
   }),
 
   http.get('/api/eventos', ({ request }) => {
@@ -546,6 +569,32 @@ export const handlers = [
   http.delete('/api/viajes/borradores/:id', ({ params }) => {
     if (!deleteBorrador(Number(params.id))) {
       return HttpResponse.json(errorBody(404, `No existe el borrador con id ${String(params.id)}`), { status: 404 })
+    }
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.delete('/api/viajes/:id', ({ params }) => {
+    const viaje = findBorrador(Number(params.id))
+    if (viaje === undefined) {
+      return HttpResponse.json(errorBody(404, `No existe el viaje con id ${String(params.id)}`), {
+        status: 404,
+      })
+    }
+    if (viaje.estado === 'EN_CURSO' || viaje.estado === 'FINALIZADO') {
+      return HttpResponse.json(
+        errorBody(400, 'el estado actual del viaje no permite cancelarlo'),
+        { status: 400 },
+      )
+    }
+    if (viaje.estado === 'CANCELADO') {
+      return HttpResponse.json(errorBody(404, `No existe el viaje con id ${String(params.id)}`), {
+        status: 404,
+      })
+    }
+    if (!cancelarViaje(Number(params.id))) {
+      return HttpResponse.json(errorBody(404, `No existe el viaje con id ${String(params.id)}`), {
+        status: 404,
+      })
     }
     return new HttpResponse(null, { status: 204 })
   }),
@@ -1205,6 +1254,82 @@ function normalizeText(value: string): string {
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim()
+}
+
+/**
+ * El catálogo real devuelve `localidad`, no `ciudad`; el mock deriva una ciudad razonable para
+ * poder ejercitar el filtro sin inventar un campo en el contrato público.
+ */
+const CIUDAD_POR_LOCALIDAD: Record<string, string> = {
+  'Jesús María': 'Jesús María',
+  'Río Ceballos': 'Río Ceballos',
+  'Córdoba Capital': 'Córdoba',
+}
+
+type PropuestaMock = PropuestaResumenResponse & { ciudad: string | null }
+
+function ciudadDe(localidad: string | null): string | null {
+  if (localidad === null) return null
+  return CIUDAD_POR_LOCALIDAD[localidad] ?? localidad
+}
+
+function estadoNombre(value: PropuestaResumenResponse['estadoPropuesta']): string | null {
+  if (value === null) return null
+  return typeof value === 'object' ? value.nombre : value
+}
+
+function propuestasMock(): PropuestaMock[] {
+  return allEventos().map((evento) => ({
+    ...evento,
+    tipo: 'EVENTO' as const,
+    duracionMinutos: null,
+    ciudad: ciudadDe(evento.localidad),
+  }))
+}
+
+/** Réplica del filtrado server-side de `/api/propuestas` para que los tests usen la URL real. */
+function filtrarPropuestas(
+  searchParams: URLSearchParams,
+  { conTipo = true }: { conTipo?: boolean } = {},
+): PropuestaMock[] {
+  const tipo = conTipo ? searchParams.get('tipo') : null
+  const publicadorId = searchParams.get('publicadorId')
+  const q = searchParams.get('q')
+  const ciudad = searchParams.get('ciudad')
+  const localidad = searchParams.get('localidad')
+  const estado = searchParams.get('estado')
+  const tipoPropuesta = searchParams.get('tipoPropuesta')
+  const categoria = searchParams.get('categoria')
+  const fechaDesde = searchParams.get('fechaDesde')
+  const fechaHasta = searchParams.get('fechaHasta')
+  const incluirCanceladas = searchParams.get('incluirCanceladas') === 'true'
+
+  return propuestasMock().filter((p) => {
+    if (tipo && p.tipo !== tipo) return false
+    if (publicadorId && p.publicadorId !== Number(publicadorId)) return false
+    if (ciudad && normalizeText(p.ciudad ?? '') !== normalizeText(ciudad)) return false
+    if (localidad && normalizeText(p.localidad ?? '') !== normalizeText(localidad)) return false
+    if (estado && estadoNombre(p.estadoPropuesta) !== estado) return false
+    if (tipoPropuesta && p.tipoPropuesta !== tipoPropuesta) return false
+    if (categoria && p.categoria !== categoria) return false
+    if (!incluirCanceladas && estado === null && estadoNombre(p.estadoPropuesta) === 'CANCELADO') {
+      return false
+    }
+    if (q) {
+      const texto = normalizeText(
+        [p.nombre, p.descripcion ?? '', p.lugarRecinto ?? '', p.localidad ?? ''].join(' '),
+      )
+      if (!texto.includes(normalizeText(q))) return false
+    }
+    if (fechaDesde || fechaHasta) {
+      const inicio = p.fechaInicio
+      const fin = p.fechaFin ?? p.fechaInicio
+      if (inicio === null || fin === null) return false
+      if (fechaDesde && fin < fechaDesde) return false
+      if (fechaHasta && inicio > fechaHasta) return false
+    }
+    return true
+  })
 }
 
 function paginate<T>(items: T[], url: string) {

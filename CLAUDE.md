@@ -191,11 +191,36 @@ publicador). Por eso:
 - Un cambio de forma en una respuesta de la API va en los dos lados a la vez: el DTO de Java, los
   tipos de `src/types/api.ts`, los fixtures/handlers de MSW y los tests.
 
+## Implementado (22/11/2026)
+
+- **Filtros de `/propuestas` en el servidor**: `usePropuestas` manda `q`, `ciudad`, `estado`,
+  `tipoPropuesta`, `categoria`, fechas e `incluirCanceladas`; el paginado y los contadores son
+  reales. Nuevos endpoints `GET /api/propuestas/resumen` y `GET /api/propuestas/zonas`. Las
+  fechas ya aplican a eventos y actividades y `CANCELADO` se oculta salvo que el publicador lo
+  pida.
+- **Sugerencias**: respetan `fechaInicio/fechaFin` de la actividad, la ventana 06:00–23:59 y el
+  cruce de medianoche; no se devuelven en días pasados ni con “Dejarlo así”. Se ofrecen también
+  las de tus intereses (`DE_TUS_INTERESES`) y `noEntran[]` explica radio/día/horario.
+- **Cancelar viaje**: `useCancelarViaje` usa el `DELETE /api/viajes/{id}` (baja lógica) con
+  confirmación desde Mis Viajes y desde la página del circuito. Solo para `PLANIFICADO`.
+- **Exportar PDF estilo Stitch**: `pdfmake` en el front (UMD cargado sólo al exportar). El resumen
+  va en una **sección A4 horizontal** con hero compuesto (foto del Stitch + degradado + textos),
+  timeline con todas las paradas y footer del Stitch. Las **páginas por día** son A4 vertical con
+  micro-header, título de ruta, badge coral, mapa grande (MapLibre capturado + overlay de ruta,
+  pines numerados, etiquetas, norte, leyenda y escala) y timeline con píldoras de hora, círculos
+  outline y línea ondulada. Sin fotos de paradas. Fuentes Caveat/Montserrat/Inter; si el mapa falla
+  cae al SVG esquemático (`circuito-svg.ts`). La definición pura está en
+  `src/lib/circuito-pdf.ts` + `src/lib/circuito-pdf-day.ts`; el hero y los badges se componen con
+  canvas en `src/lib/circuito-pdf-hero.ts`, y el mapa del día en
+  `src/lib/circuito-pdf-day-map.ts`. El fondo de página lo pinta la definición (oscuro en el
+  resumen, papel en los días).
+
 ## Estado y pendientes (al 20/11/2026)
 
 - Backend: compila y pasan los tests de generador, servicio, controlador y repositorios.
-- Frontend: **285 tests en 34 archivos, 282 en verde**. Los 3 que fallan son de
-  `evento-detail-page.test.tsx` y ya fallaban antes (no son del circuito).
+- Frontend: **328 tests en 41 archivos, 324 en verde** en la corrida completa. Los 3 que fallan son
+  de `evento-detail-page.test.tsx` y ya fallaban antes (no son del circuito); el de
+  `planificador-page` de la URL es flaky bajo carga y pasa solo.
 - Pendientes conocidos, todavía no pedidos:
   - El mínimo de paradas por ritmo no coincide: backend `dayMinimum` usa 2/4/5 y el frontend
     `RITMO_MIN_PARADAS` (en `circuito-dia-split-view.tsx` y `circuito-detalle-view.tsx`) usa

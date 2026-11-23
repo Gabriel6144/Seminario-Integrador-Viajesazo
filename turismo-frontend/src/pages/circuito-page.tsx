@@ -15,9 +15,10 @@ import {
   useSeleccionarCircuito,
   useSugerenciasDia,
 } from '@/api/circuitos'
-import { useViaje } from '@/api/viajes'
+import { useCancelarViaje, useViaje } from '@/api/viajes'
 import { CircuitoDiaSplitView } from '@/components/planificador/circuito-dia-split-view'
 import { CircuitoMapaGeneralView } from '@/components/planificador/circuito-mapa-general-view'
+import { CircuitoPdfPreviewDialog } from '@/components/planificador/circuito-pdf-preview-dialog'
 import { CompletarDiaDialog } from '@/components/planificador/completar-dia-dialog'
 import {
   enrichCircuitoConSeleccionado,
@@ -30,6 +31,12 @@ import { PARAM_DIA, Paso10Circuito } from '@/components/planificador/paso-10-cir
 import type { ParadaCircuitoDetalle } from '@/components/planificador/types'
 import { PlanificadorRegenerateModal } from '@/components/planificador/planificador-regenerate-modal'
 import { ErrorState } from '@/components/query-state'
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toUserMessage } from '@/lib/http'
@@ -86,12 +93,15 @@ export function CircuitoPage() {
   const circuitoGenerado = useCircuito(viajeId)
   const viajeQuery = useViaje(viajeId)
   const regenerar = useGenerarCircuito()
+  const cancelarViaje = useCancelarViaje()
   const eliminar = useEliminarParadaCircuito()
   const reemplazar = useReemplazarParadaCircuito()
   const seleccionar = useSeleccionarCircuito()
   const agregarSugerida = useAgregarParadaSugerida()
   const descartarAviso = useDescartarAvisoDia()
   const [isRegenerateModalOpen, setIsRegenerateModalOpen] = useState(false)
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
+  const [isPdfPreviewOpen, setIsPdfPreviewOpen] = useState(false)
   const [stopToDelete, setStopToDelete] = useState<ParadaCircuitoDetalle | null>(null)
   const [stopToReplace, setStopToReplace] = useState<ParadaCircuitoDetalle | null>(null)
   const [sugerenciasFecha, setSugerenciasFecha] = useState<string | null>(null)
@@ -119,6 +129,20 @@ export function CircuitoPage() {
         toast.error(toUserMessage(error) || 'No pudimos regenerar el circuito')
       },
     )
+  }
+
+  const handleCancelarViaje = () => {
+    if (viajeId === null) return
+    cancelarViaje.mutate(viajeId, {
+      onSuccess: () => {
+        setIsCancelModalOpen(false)
+        toast.success('Viaje cancelado correctamente')
+        navigate('/borradores')
+      },
+      onError: (error: unknown) => {
+        toast.error(toUserMessage(error) || 'No pudimos cancelar el viaje')
+      },
+    })
   }
 
   const circuito = query.data
@@ -397,13 +421,37 @@ export function CircuitoPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Link
-        to="/borradores"
-        className="flex w-fit items-center gap-2 text-sm font-semibold text-sky-700 transition-colors hover:text-sky-900"
-      >
-        <ArrowLeftIcon className="size-4" aria-hidden />
-        Volver a Mis viajes
-      </Link>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Link
+          to="/borradores"
+          className="flex w-fit items-center gap-2 text-sm font-semibold text-sky-700 transition-colors hover:text-sky-900"
+        >
+          <ArrowLeftIcon className="size-4" aria-hidden />
+          Volver a Mis viajes
+        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setIsPdfPreviewOpen(true)}
+            className="rounded-xl"
+          >
+            <span className="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+            Exportar PDF
+          </Button>
+          {viajeQuery.data?.estado === 'PLANIFICADO' ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsCancelModalOpen(true)}
+              className="rounded-xl border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+            >
+              <span className="material-symbols-outlined text-[18px]">cancel</span>
+              Cancelar viaje
+            </Button>
+          ) : null}
+        </div>
+      </div>
 
       {circuito.advertencia && (
         <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
@@ -495,6 +543,65 @@ export function CircuitoPage() {
         onClose={() => setIsRegenerateModalOpen(false)}
         onConfirm={handleRegenerate}
       />
+
+      {richCircuito ? (
+        <CircuitoPdfPreviewDialog
+          abierto={isPdfPreviewOpen}
+          circuito={richCircuito}
+          viaje={viajeQuery.data ?? null}
+          onClose={() => setIsPdfPreviewOpen(false)}
+        />
+      ) : null}
+
+      <AlertDialog
+        open={isCancelModalOpen}
+        onOpenChange={(open) => {
+          if (!open && !cancelarViaje.isPending) setIsCancelModalOpen(false)
+        }}
+      >
+        <AlertDialogContent className="max-w-[380px] gap-5 rounded-3xl">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#ffdad6]">
+              <span className="material-symbols-outlined text-[28px] text-[#bb0413]">
+                warning
+              </span>
+            </div>
+            <div className="flex flex-col text-left">
+              <AlertDialogTitle className="font-heading text-[22px] font-bold leading-tight text-[#191c1e]">
+                ¿Cancelar este viaje?
+              </AlertDialogTitle>
+              <span className="mt-1 text-[11px] font-bold uppercase tracking-wider text-[#bb0413]">
+                ACCIÓN IRREVERSIBLE
+              </span>
+            </div>
+          </div>
+
+          <AlertDialogDescription className="text-left text-[15px] leading-relaxed text-[#3f484e]">
+            Vas a dejar de figurar como inscripto en las propuestas de este circuito. El viaje
+            deja de aparecer en Mis viajes y no se puede recuperar.
+          </AlertDialogDescription>
+
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsCancelModalOpen(false)}
+              disabled={cancelarViaje.isPending}
+              className="h-14 rounded-2xl"
+            >
+              Mantener viaje
+            </Button>
+            <Button
+              type="button"
+              onClick={handleCancelarViaje}
+              disabled={cancelarViaje.isPending}
+              className="h-14 rounded-2xl bg-[#bb0413] text-white hover:bg-[#93000b]"
+            >
+              {cancelarViaje.isPending ? 'Cancelando...' : 'Sí, cancelar'}
+            </Button>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
