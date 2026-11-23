@@ -7,8 +7,8 @@
   --pale: #efefea;
   --blue: #007fa7;
   --blue-pale: #edf6f7;
-  --serif: "Nunito", sans-serif;
-  --sans: "DM Sans", sans-serif;
+  --serif: "Bricolage Grotesque", sans-serif;
+  --sans: "Nunito", sans-serif;
 }
 :where(.viajezaso-page) * {
   box-sizing: border-box;
@@ -34,8 +34,9 @@
 :where(.viajezaso-page) h1,
 :where(.viajezaso-page) h2,
 :where(.viajezaso-page) h3 {
-  font-weight: 400;
+  font-weight: 700;
   font-family: var(--serif);
+  letter-spacing: -0.02em;
   line-height: 1.2;
 }
 :where(.viajezaso-page) a {
@@ -230,14 +231,14 @@
   line-height: 1.6;
 }
 :where(.viajezaso-page) .inline-roman {
-  font-family: var(--serif);
+  font-family: var(--sans);
   letter-spacing: 0;
   margin-right: 7px;
 }
 :where(.viajezaso-page) .cover-copy h2 {
-  font-size: 43px;
-  letter-spacing: -1.3px;
-  line-height: 1.23;
+  font-size: 38px;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
   margin-top: 20px;
 }
 :where(.viajezaso-page) .cover-description {
@@ -1198,10 +1199,35 @@
   font-size: 7px;
   letter-spacing: 2.2px;
 }
+:where(.viajezaso-page) .footer-social {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+}
+:where(.viajezaso-page) .footer-social-link {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+:where(.viajezaso-page) .footer-social-link:hover {
+  color: var(--blue);
+}
+:where(.viajezaso-page) .footer-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  gap: 10px;
+}
 :where(.viajezaso-page) .footer-top p {
   font-size: 12px;
   color: var(--muted);
-  line-height: 1.8;
+  line-height: 1.65;
 }
 :where(.viajezaso-page) .back-top {
   font-size: 8px;
@@ -2448,6 +2474,10 @@
   :where(.viajezaso-page) .footer-top {
     gap: 24px;
   }
+  :where(.viajezaso-page) .footer-right {
+    align-items: flex-start;
+    text-align: left;
+  }
   :where(.viajezaso-page) .footer-top p {
     font-size: 11px;
   }
@@ -2598,30 +2628,62 @@
   flex-shrink: 0;
 }
 :where(.viajezaso-page) .masthead-caption {
-  font-size: 10px;
-  letter-spacing: 1px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 1.4px;
   color: #617b89;
   border-color: #dae6e9;
-  padding: 13px 10px;
+  padding: 14px 10px;
 }
 :where(.viajezaso-page) .masthead-caption:after {
   display: none;
 }
 :where(.viajezaso-page) .cover-grid {
-  grid-template-columns: 0.78fr 1.35fr;
-  gap: 60px;
-  padding: 42px 0 40px;
+  grid-template-columns: 0.9fr 1.25fr;
+  align-items: center;
+  gap: 56px;
+  padding: 48px 0 52px;
+  background: #eef2f6;
+  box-shadow: 0 0 0 100vmax #eef2f6;
+  clip-path: inset(0 -100vmax);
 }
 :where(.viajezaso-page) .cover-copy h2 {
   font-weight: 800;
-  font-size: 46px;
-  letter-spacing: -1.8px;
-  line-height: 1.18;
+  font-size: 44px;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
 }
 :where(.viajezaso-page) .cover-description {
-  font-size: 15px;
-  line-height: 1.85;
-  color: #647985;
+  font-size: 16px;
+  line-height: 1.75;
+  color: #475569;
+}
+:where(.viajezaso-page) .cover-highlights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  margin: 20px 0 0;
+  padding: 0;
+}
+:where(.viajezaso-page) .cover-highlights li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid #dbe8ee;
+  color: #00658d;
+  font-size: 13px;
+  font-weight: 600;
+}
+:where(.viajezaso-page) .cover-highlights li::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #008ab7;
 }
 :where(.viajezaso-page) .cover-note {
   font-size: 11px;
@@ -2648,7 +2710,17 @@
 :where(.viajezaso-page) .cover-index a + a {
   border-color: #dce7e9;
 }
-:where(.viajezaso-page) .deco-button,
+:where(.viajezaso-page) .deco-button {
+  clip-path: none;
+  border-radius: 16px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0;
+  padding: 14px 28px;
+  min-height: 52px;
+  --edge: #cbd5e1;
+  --fill: #fff;
+}
 :where(.viajezaso-page) .stamp {
   clip-path: none;
   border-radius: 12px;
@@ -2657,12 +2729,17 @@
   padding: 17px 25px;
   --fill: #fff;
 }
-:where(.viajezaso-page) .deco-button:before,
+:where(.viajezaso-page) .deco-button:before {
+  clip-path: none;
+  border-radius: 15px;
+}
 :where(.viajezaso-page) .stamp:before {
   clip-path: none;
   border-radius: 11px;
 }
-:where(.viajezaso-page) .deco-button:after,
+:where(.viajezaso-page) .deco-button:after {
+  display: none;
+}
 :where(.viajezaso-page) .stamp:after {
   clip-path: none;
   border-radius: 7px;
@@ -2681,9 +2758,13 @@
   filter: none;
 }
 :where(.viajezaso-page) .product-stage {
-  min-height: 545px;
+  min-height: 460px;
   width: 100%;
   max-width: none;
+}
+:where(.viajezaso-page) .product-stage .guide-demo,
+:where(.viajezaso-page) .product-stage .agenda-demo {
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
 }
 :where(.viajezaso-page) .product-stage:before,
 :where(.viajezaso-page) .product-stage:after {
@@ -3616,8 +3697,8 @@
     height: 82px;
   }
   :where(.viajezaso-page) .masthead-caption {
-    font-size: 8px;
-    letter-spacing: 0.7px;
+    font-size: 12px;
+    letter-spacing: 1px;
   }
   :where(.viajezaso-page) .edition-line {
     font-size: 6px;
@@ -3826,8 +3907,8 @@
     max-width: 144px;
   }
   :where(.viajezaso-page) .masthead-caption {
-    font-size: 7px;
-    letter-spacing: 0.6px;
+    font-size: 11px;
+    letter-spacing: 0.8px;
     line-height: 1.7;
     padding: 10px 5px;
   }
@@ -4585,8 +4666,10 @@
 :where(.viajezaso-page) .andes-cover {
   position: relative;
   isolation: isolate;
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
   min-height: 286px;
-  border-radius: 20px;
+  border-radius: 0;
   overflow: hidden;
   display: grid;
   place-items: center;
@@ -4598,8 +4681,79 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center 48%;
+  object-position: center center;
   z-index: -2;
+  opacity: 0;
+  transition: opacity 0.9s ease-in-out;
+}
+:where(.viajezaso-page) .andes-photo.is-active {
+  opacity: 1;
+}
+:where(.viajezaso-page) .cover-dots {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(4px);
+}
+:where(.viajezaso-page) .cover-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.55);
+  transition: width 0.25s ease, background-color 0.25s ease;
+}
+:where(.viajezaso-page) .cover-dot.is-active {
+  width: 22px;
+  background: #ffffff;
+}
+:where(.viajezaso-page) .cover-hero-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(15, 23, 42, 0.76) 0%, rgba(15, 23, 42, 0.48) 28%, rgba(15, 23, 42, 0.16) 52%, rgba(15, 23, 42, 0) 74%),
+    linear-gradient(0deg, rgba(15, 23, 42, 0.68) 0%, rgba(15, 23, 42, 0.28) 32%, rgba(15, 23, 42, 0) 62%);
+}
+:where(.viajezaso-page) .cover-hero-overlay {
+  position: relative;
+  z-index: 2;
+  align-self: end;
+  justify-self: stretch;
+  text-align: left;
+  padding-top: 40px;
+  padding-bottom: 64px;
+}
+:where(.viajezaso-page) .cover-hero-title {
+  font-family: var(--serif);
+  font-size: clamp(28px, 4.1vw, 50px);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  max-width: 680px;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+}
+:where(.viajezaso-page) .cover-hero-subtitle {
+  font-family: var(--sans);
+  font-size: clamp(16px, 1.7vw, 21px);
+  font-weight: 600;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.94);
+  margin-top: 14px;
+  max-width: 540px;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.35);
 }
 :where(.viajezaso-page) .andes-cover:after {
   content: "";
@@ -4734,7 +4888,7 @@
   white-space: nowrap;
 }
 :where(.viajezaso-page) .cover {
-  padding-top: 25px;
+  padding-top: 0;
 }
 /* Recreated trip-management reference, including exactly two drafts and one planned trip. */
 :where(.viajezaso-page) .mini-trip-dashboard {
@@ -5375,8 +5529,8 @@
 }
 @media (max-width: 600px) {
   :where(.viajezaso-page) .andes-cover {
-    min-height: 210px;
-    border-radius: 15px;
+    min-height: 360px;
+    border-radius: 0;
   }
   :where(.viajezaso-page) .travel-wordmark {
     font-size: 74px;
@@ -5541,13 +5695,13 @@
   border: 0 !important;
 }
 :where(.viajezaso-page) .andes-cover {
-  min-height: 320px;
+  min-height: clamp(480px, 72vh, 720px);
 }
 :where(.viajezaso-page) .andes-cover:after {
   display: none;
 }
 :where(.viajezaso-page) .andes-photo {
-  object-position: 35% 60%;
+  object-position: center center;
 }
 :where(.viajezaso-page) .glossary {
   display: block;
@@ -6337,7 +6491,7 @@
 }
 @media (max-width: 720px) {
   :where(.viajezaso-page) .andes-cover {
-    min-height: 250px;
+    min-height: 380px;
   }
   :where(.viajezaso-page) .guide-progress-header {
     padding-inline: 17px;
@@ -6393,10 +6547,10 @@
 }
 @media (max-width: 480px) {
   :where(.viajezaso-page) .andes-cover {
-    min-height: 220px;
+    min-height: 330px;
   }
   :where(.viajezaso-page) .andes-photo {
-    object-position: 35% 60%;
+    object-position: center center;
   }
   :where(.viajezaso-page) .guide-step {
     min-height: 340px;
@@ -6615,13 +6769,14 @@
 .viajezaso-page {
   min-height: 100vh;
   width: 100%;
+  overflow-x: clip;
   isolation: isolate;
   background: #f7fafb;
   color: #27383f;
-  font-family: "DM Sans", sans-serif;
+  font-family: "Nunito", sans-serif;
   line-height: 1.65;
-  --serif: "Nunito", sans-serif;
-  --sans: "DM Sans", sans-serif;
+  --serif: "Bricolage Grotesque", sans-serif;
+  --sans: "Nunito", sans-serif;
 }
 .viajezaso-page *,
 .viajezaso-page *::before,

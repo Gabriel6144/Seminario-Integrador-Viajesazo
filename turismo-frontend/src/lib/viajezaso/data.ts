@@ -26,9 +26,9 @@ export interface AgendaEvent {
 
 export const translations: Record<Language, Copy> = {
   es: {
-    pageTitle: "Viajezaso · Cada lugar tiene algo que contar",
+    pageTitle: "Viajesazo · Cada lugar tiene algo que contar",
     description:
-      "Descubra Viajezaso: una idea nacida en Córdoba para conectar cada etapa del viaje, organizar itinerarios y dar lugar a las actividades locales.",
+      "Descubra Viajesazo: una idea nacida en Córdoba para conectar cada etapa del viaje, organizar itinerarios y dar lugar a las actividades locales.",
     skip: "Saltar al contenido",
     edition: "DESDE CÓRDOBA, PARA DONDE LO LLEVEN LAS GANAS",
     editionRight: "BUENOS VIAJES, MEJORES HISTORIAS",
@@ -43,10 +43,10 @@ export const translations: Record<Language, Copy> = {
     menuClose: "Cerrar menú",
     heroEyebrow: "EL ARTE DE SALIR A DESCUBRIR",
     heroTitle:
-      'Menos vueltas.<br>Más <span class="circled">viajezasos.<svg viewBox="0 0 600 100" preserveAspectRatio="none" aria-hidden="true"><path d="M18 37C104-8 515-3 579 38S489 102 186 89 11 37 30 28M42 74C162 107 484 106 581 66"/></svg></span>',
+      'Menos vueltas.<br>Más <span class="circled">viajesazos.<svg viewBox="0 0 600 100" preserveAspectRatio="none" aria-hidden="true"><path d="M18 37C104-8 515-3 579 38S489 102 186 89 11 37 30 28M42 74C162 107 484 106 581 66"/></svg></span>',
     heroDesc:
       "De la primera idea a la última anécdota.\nTodo lo que hace a un buen viaje, en un mismo lugar.",
-    heroCta: "DESCUBRA VIAJEZASO",
+    heroCta: "Descubrí Viajesazo",
     heroFootnote: "Hecho en Córdoba. Con ganas de ir más lejos.",
     heroNote: "Por acá hay<br>una buena historia.",
     heroCaption: "SIERRAS, CAMINOS Y OTRAS BUENAS EXCUSAS.",
@@ -57,7 +57,7 @@ export const translations: Record<Language, Copy> = {
     ideaEyebrow: "SOBRE NOSOTROS",
     ideaTitle: "Una idea local.<br>Un viaje compartido.",
     ideaNote: "Turistas y publicadores, conectados.",
-    ideaLead: "Viajezaso nace en Córdoba para reunir lo que hoy está disperso.",
+    ideaLead: "Viajesazo nace en Córdoba para reunir lo que hoy está disperso.",
     ideaBody:
       "Organizar un viaje suele exigir saltar entre búsquedas, redes y mensajes. Creamos esta idea para conectar las etapas del viaje y acompañar las decisiones, desde el primer plan hasta el regreso.",
     ideaBody2:
@@ -92,8 +92,8 @@ export const translations: Record<Language, Copy> = {
     localBody:
       "Hay propuestas que no aparecen en las primeras búsquedas. Merecen estar en el mapa. Merecen ser parte del recorrido.",
     localBody2:
-      "Viajezaso conecta la curiosidad de quien viaja con el oficio de quienes dan vida a cada lugar.",
-    localCta: "COMIENCE AHORA",
+      "Viajesazo conecta la curiosidad de quien viaja con el oficio de quienes dan vida a cada lugar.",
+    localCta: "Comience ahora",
     publisherEyebrow: "DEL OTRO LADO DEL MOSTRADOR",
     publisherTitle: "Usted pone el plan.\nNosotros, la conexión.",
     publisherBody:
@@ -103,16 +103,16 @@ export const translations: Record<Language, Copy> = {
     followEyebrow: "SEGUIMOS CONECTADOS",
     followTitle: "Síganos en<br>nuestras redes.",
     followBody:
-      "Descubra novedades de Viajezaso, propuestas locales e ideas para preparar su próximo viaje. Conozca historias de destinos y a quienes crean experiencias. Acompañe el desarrollo de la aplicación y comparta los lugares que le gustaría descubrir.",
-    followCta: "SÍGANOS EN REDES",
+      "Descubra novedades de Viajesazo, propuestas locales e ideas para preparar su próximo viaje. Conozca historias de destinos y a quienes crean experiencias. Acompañe el desarrollo de la aplicación y comparta los lugares que le gustaría descubrir.",
+    followCta: "Síganos en redes",
     followNote: "Nacido en Córdoba. Con la mirada abierta.",
     footerPlace:
       "Nacido en Córdoba, Argentina.\nPara viajar con los ojos bien abiertos.",
     backTop: "VOLVER AL PRINCIPIO",
-    footerBottom: "Viajezaso · La curiosidad es un buen punto de partida.",
+    footerBottom: "Viajesazo · La curiosidad es un buen punto de partida.",
     footerClosing: "HECHO CON OFICIO Y UN POCO DE FERNE… FE.",
     dialogTitle: "La próxima parada:\nnuestras redes.",
-    dialogBody: "El perfil oficial de Viajezaso se agregará aquí.",
+    dialogBody: "El perfil oficial de Viajesazo se agregará aquí.",
     profilePlaceholder: "[EDITAR: enlace al perfil oficial]",
     dialogBack: "VOLVER AL VIAJE",
     close: "Cerrar",
@@ -123,10 +123,10 @@ export const translations: Record<Language, Copy> = {
     editionRightNew: "UNA FORMA DE MIRAR. MUCHAS FORMAS DE VIAJAR.",
     coverCaption: "VIAJAR SE DISFRUTA MÁS CUANDO TODO CONECTA.",
     coverEyebrow: "TU PRÓXIMA HISTORIA EMPIEZA ACÁ.",
-    coverHeadline: "Un buen plan.\nUn camino propio.\nUn viajezaso.",
+    coverHeadline: "Un buen plan.\nUn camino propio.\nUn viajesazo.",
     coverDescription:
       "Actividades que inspiran. Circuitos que conectan.\nUna agenda que reúne todo para disfrutar\nmás de cada experiencia.",
-    coverCta: "DESCUBRÍ VIAJEZASO",
+    coverCta: "Descubrí Viajesazo",
     coverNote: "Hecho en Córdoba. Pensado para encontrarnos.",
     circuitHeader: "Un recorrido para descubrir",
     example: "EJEMPLO",
@@ -150,17 +150,17 @@ export const translations: Record<Language, Copy> = {
     indexIdea: "Una idea nacida en Córdoba.",
     publisherNewEyebrow: "EL PUBLICADOR",
     publisherNewTitle: "Su propuesta merece\nser parte del viaje.",
-    publisherNewLead: "Usted crea la experiencia.\nViajezaso le da un lugar.",
+    publisherNewLead: "Usted crea la experiencia.\nViajesazo le da un lugar.",
     publisherNewBody:
       "Un taller. Una feria. Un encuentro que vale la pena. Reúna sus publicaciones, ordene su agenda y acerque su propuesta a quienes buscan descubrir algo distinto.",
     publisherNewManifesto: "Menos dispersión. Más conexión.",
-    publisherNewCta: "CONOZCA SU ESPACIO",
+    publisherNewCta: "Conozca su espacio",
     beforeLabel: "EL PROBLEMA",
     afterLabel: "LA SOLUCIÓN",
     publisherProblemAlt:
       "Publicaciones de actividades y eventos dispersas entre sitios, redes y mensajes.",
     publisherMascotAlt:
-      "El personaje de Viajezaso como publicador, con lentes, chaleco azul y una planilla organizada.",
+      "El personaje de Viajesazo como publicador, con lentes, chaleco azul y una planilla organizada.",
     publisherSolutionAlt:
       "Panel del publicador con propuestas, eventos, actividades e inscriptos organizados.",
     publisherProblem: "Todo en distintos lugares.",
@@ -174,11 +174,11 @@ export const translations: Record<Language, Copy> = {
     touristBody:
       "Descubra actividades cercanas. Dé forma a su circuito. Ajuste el recorrido a sus ganas. Desde la primera idea hasta el regreso, con espacio para lo que no estaba en los planes.",
     touristManifesto: "Lo memorable también está cerca.",
-    touristCta: "IMAGINE SU RECORRIDO",
+    touristCta: "Imagine su recorrido",
     touristProblemAlt:
       "Rumbi busca dónde y cómo viajar entre distintas páginas, mapas, actividades y horarios.",
     touristMascotAlt:
-      "Rumbi, el personaje viajero de Viajezaso con su sombrero de explorador y mapa.",
+      "Rumbi, el personaje viajero de Viajesazo con su sombrero de explorador y mapa.",
     touristSolutionAlt:
       "Panel del publicador con propuestas, eventos, actividades e inscriptos organizados.",
     touristProblem: "Muchas pestañas. Poco viaje.",
@@ -191,17 +191,17 @@ export const translations: Record<Language, Copy> = {
       "Lugares que, juntos, cuentan una historia. Su recorrido, con sentido.",
     term2: "Publicador",
     definition2: "Quien conoce su lugar y crea una buena razón para visitarlo.",
-    term3: "Viajezaso",
+    term3: "Viajesazo",
     definition3:
       "Ese viaje que termina, pero se queda. El que dan ganas de contar.",
     footerClosingNew: "CADA LUGAR MERECE SER DESCUBIERTO.",
     loginTitle: "Su próxima experiencia\nempieza aquí.",
-    loginBody: "El acceso a su cuenta de Viajezaso estará disponible aquí.",
+    loginBody: "El acceso a su cuenta de Viajesazo estará disponible aquí.",
     loginPlaceholder: "[EDITAR: enlace de ingreso a la aplicación]",
     weatherTitle: "Clima de referencia del encabezado",
     circuitTab: "Tu próximo circuito",
     agendaTab: "Agenda del publicador",
-    showcaseLabel: "Descubrí las funciones de Viajezaso",
+    showcaseLabel: "Descubrí las funciones de Viajesazo",
     mapLoading: "Preparando tu recorrido…",
     mapFallback:
       "No se pudo cargar el mapa. Las paradas del recorrido siguen disponibles abajo.",
@@ -255,7 +255,7 @@ export const translations: Record<Language, Copy> = {
       "Vista de ejemplo de Mis viajes con tres viajes: dos borradores y un viaje planificado.",
     socialTitle: "Encuéntrenos en nuestras redes",
     socialBody:
-      "Elija Facebook, Instagram o TikTok para seguir las novedades, descubrir propuestas locales y acompañar a Viajezaso.",
+      "Elija Facebook, Instagram o TikTok para seguir las novedades, descubrir propuestas locales y acompañar a Viajesazo.",
     myTripsTitle: "Mis Viajes",
     myTripsSubtitle: "Tus viajes y los borradores que todavía podés retomar.",
     planNewTrip: "+ Planificar un viaje nuevo",
@@ -357,9 +357,9 @@ export const translations: Record<Language, Copy> = {
       "Fecha actualizada. Aviso de ejemplo generado para 1 turista.",
   },
   en: {
-    pageTitle: "Viajezaso · Every place has a story to tell",
+    pageTitle: "Viajesazo · Every place has a story to tell",
     description:
-      "Discover Viajezaso: an idea born in Córdoba to connect every stage of your trip, bring itineraries together and make room for local activities.",
+      "Discover Viajesazo: an idea born in Córdoba to connect every stage of your trip, bring itineraries together and make room for local activities.",
     skip: "Skip to content",
     edition: "FROM CÓRDOBA, TO WHEREVER CURIOSITY TAKES YOU",
     editionRight: "GOOD TRIPS, EVEN BETTER STORIES",
@@ -374,10 +374,10 @@ export const translations: Record<Language, Copy> = {
     menuClose: "Close menu",
     heroEyebrow: "THE FINE ART OF GETTING OUT THERE",
     heroTitle:
-      'Less fuss.<br>More <span class="circled">viajezasos.<svg viewBox="0 0 600 100" preserveAspectRatio="none" aria-hidden="true"><path d="M18 37C104-8 515-3 579 38S489 102 186 89 11 37 30 28M42 74C162 107 484 106 581 66"/></svg></span>',
+      'Less fuss.<br>More <span class="circled">viajesazos.<svg viewBox="0 0 600 100" preserveAspectRatio="none" aria-hidden="true"><path d="M18 37C104-8 515-3 579 38S489 102 186 89 11 37 30 28M42 74C162 107 484 106 581 66"/></svg></span>',
     heroDesc:
       "From the first idea to the last story.\nEverything that makes a great trip, all in one place.",
-    heroCta: "DISCOVER VIAJEZASO",
+    heroCta: "Discover Viajesazo",
     heroFootnote: "Made in Córdoba. Eager to go further.",
     heroNote: "A good story<br>starts around here.",
     heroCaption: "HILLS, WINDING ROADS AND OTHER GOOD EXCUSES.",
@@ -389,7 +389,7 @@ export const translations: Record<Language, Copy> = {
     ideaTitle: "A local idea.<br>A shared journey.",
     ideaNote: "Travellers and publishers, connected.",
     ideaLead:
-      "Viajezaso was imagined in Córdoba to bring scattered information together.",
+      "Viajesazo was imagined in Córdoba to bring scattered information together.",
     ideaBody:
       "Planning a trip often means moving between searches, social networks and messages. Our idea connects each stage and helps with the decisions, from the first plan to the return home.",
     ideaBody2:
@@ -424,8 +424,8 @@ export const translations: Record<Language, Copy> = {
     localBody:
       "Some experiences do not appear at the top of a search. They deserve to be on the map. They deserve a place on your route.",
     localBody2:
-      "Viajezaso connects curious travellers with the people who bring each place to life.",
-    localCta: "START NOW",
+      "Viajesazo connects curious travellers with the people who bring each place to life.",
+    localCta: "Start now",
     publisherEyebrow: "ON THE OTHER SIDE OF THE COUNTER",
     publisherTitle: "You bring the plan.\nWe make the connection.",
     publisherBody:
@@ -435,16 +435,16 @@ export const translations: Record<Language, Copy> = {
     followEyebrow: "LET’S STAY CONNECTED",
     followTitle: "Follow us<br>on social media.",
     followBody:
-      "Discover Viajezaso news, local experiences and ideas for your next trip. Meet the stories behind destinations and the people who create experiences. Follow the app’s development and share the places you would like to discover.",
-    followCta: "FOLLOW US",
+      "Discover Viajesazo news, local experiences and ideas for your next trip. Meet the stories behind destinations and the people who create experiences. Follow the app’s development and share the places you would like to discover.",
+    followCta: "Follow us",
     followNote: "Born in Córdoba. Open to the world.",
     footerPlace:
       "Born in Córdoba, Argentina.\nFor travelling with your eyes wide open.",
     backTop: "BACK TO THE BEGINNING",
-    footerBottom: "Viajezaso · Curiosity is a good place to start.",
+    footerBottom: "Viajesazo · Curiosity is a good place to start.",
     footerClosing: "MADE WITH CARE AND A LITTLE LOCAL SPIRIT.",
     dialogTitle: "Next stop:\nour social channels.",
-    dialogBody: "The official Viajezaso profile will be added here.",
+    dialogBody: "The official Viajesazo profile will be added here.",
     profilePlaceholder: "[EDIT: official social profile URL]",
     dialogBack: "BACK TO THE JOURNEY",
     close: "Close",
@@ -458,7 +458,7 @@ export const translations: Record<Language, Copy> = {
     coverHeadline: "A good plan.\nYour own path.\nA great journey.",
     coverDescription:
       "Activities that inspire. Routes that connect.\nAn agenda that brings everything together\nto enjoy every experience.",
-    coverCta: "DISCOVER VIAJEZASO",
+    coverCta: "Discover Viajesazo",
     coverNote: "Made in Córdoba. Made to bring us together.",
     circuitHeader: "A route worth discovering",
     example: "EXAMPLE",
@@ -481,17 +481,17 @@ export const translations: Record<Language, Copy> = {
     indexIdea: "An idea born in Córdoba.",
     publisherNewEyebrow: "THE PUBLISHER",
     publisherNewTitle: "Your experience deserves\na place on the journey.",
-    publisherNewLead: "You create the experience.\nViajezaso gives it a place.",
+    publisherNewLead: "You create the experience.\nViajesazo gives it a place.",
     publisherNewBody:
       "A workshop. A fair. A gathering worth finding. Bring your listings together, organise your agenda and connect your experience with curious travellers.",
     publisherNewManifesto: "Less scattered. More connected.",
-    publisherNewCta: "EXPLORE YOUR SPACE",
+    publisherNewCta: "Explore your space",
     beforeLabel: "THE PROBLEM",
     afterLabel: "THE SOLUTION",
     publisherProblemAlt:
       "Activity and event listings scattered across websites, social posts and messages.",
     publisherMascotAlt:
-      "The Viajezaso character as a local publisher, with round glasses, a blue vest and an organised clipboard.",
+      "The Viajesazo character as a local publisher, with round glasses, a blue vest and an organised clipboard.",
     publisherSolutionAlt:
       "Publisher dashboard organising listings, events, activities and participants.",
     publisherProblem: "Everything in different places.",
@@ -505,11 +505,11 @@ export const translations: Record<Language, Copy> = {
     touristBody:
       "Discover nearby activities. Shape your route. Adjust the journey to your interests. From the first idea to the return home, with room for the unexpected.",
     touristManifesto: "Memorable things can be close.",
-    touristCta: "IMAGINE YOUR ROUTE",
+    touristCta: "Imagine your route",
     touristProblemAlt:
       "Rumbi searches for where and how to travel across different pages, maps, activities and schedules.",
     touristMascotAlt:
-      "Rumbi, the Viajezaso explorer character wearing a safari hat and carrying a map.",
+      "Rumbi, the Viajesazo explorer character wearing a safari hat and carrying a map.",
     touristSolutionAlt:
       "Publisher dashboard organising listings, events, activities and participants.",
     touristProblem: "More tabs. Less travel.",
@@ -523,17 +523,17 @@ export const translations: Record<Language, Copy> = {
     term2: "Publisher",
     definition2:
       "Someone who knows their place and creates a good reason to visit.",
-    term3: "Viajezaso",
+    term3: "Viajesazo",
     definition3:
       "A trip that ends but stays with you. The kind you want to talk about.",
     footerClosingNew: "EVERY PLACE DESERVES TO BE DISCOVERED.",
     loginTitle: "Your next experience\nstarts here.",
-    loginBody: "Access to your Viajezaso account will be available here.",
+    loginBody: "Access to your Viajesazo account will be available here.",
     loginPlaceholder: "[EDIT: application sign-in URL]",
     weatherTitle: "Reference weather from the header design",
     circuitTab: "Your next route",
     agendaTab: "Publisher agenda",
-    showcaseLabel: "Explore Viajezaso features",
+    showcaseLabel: "Explore Viajesazo features",
     mapLoading: "Getting your route ready…",
     mapFallback:
       "The map could not load. The route stops are still available below.",
@@ -585,7 +585,7 @@ export const translations: Record<Language, Copy> = {
       "Illustrative My Trips view with three trips: two drafts and one planned trip.",
     socialTitle: "Find us on social media",
     socialBody:
-      "Choose Facebook, Instagram or TikTok for news, local discoveries and the Viajezaso story.",
+      "Choose Facebook, Instagram or TikTok for news, local discoveries and the Viajesazo story.",
     myTripsTitle: "My Trips",
     myTripsSubtitle: "Your trips and the drafts you can still return to.",
     planNewTrip: "+ Plan a new trip",
