@@ -327,6 +327,7 @@ export function Paso10Circuito({
     return (
       <CircuitoMapaGeneralView
         circuito={mapCircuit}
+        viajeId={viajeId}
         onBack={() => setMapCircuit(null)}
       />
     )

@@ -432,7 +432,11 @@ export function CircuitoPage() {
   if (showMap && richCircuito) {
     return (
       <div className="flex flex-col gap-4">
-        <CircuitoMapaGeneralView circuito={richCircuito} onBack={() => setShowMap(false)} />
+        <CircuitoMapaGeneralView
+          circuito={richCircuito}
+          viajeId={viajeId}
+          onBack={() => setShowMap(false)}
+        />
       </div>
     )
   }

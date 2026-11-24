@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRutaDia } from '@/api/rutas'
 import { linksDiaCompleto, type PuntoGoogleMaps } from '@/lib/google-maps'
 import { geometriaLineaRecta, type ParadaCoord } from '@/lib/rutas'
-import { routeMetrics, sampleRoute } from '@/lib/viajezaso/route-geometry'
+import { routeMetrics, sampleRoute, animationDurationMs, stopDistancesAlongRoute } from '@/lib/viajezaso/route-geometry'
 import type { CircuitStrategy } from '@/types/api'
 import {
   guardarModoMapa,
@@ -34,44 +34,6 @@ interface CircuitoRutaMapaProps {
 }
 
 type TourState = 'idle' | 'playing' | 'done'
-
-function animationDurationMs(totalMetros: number): number {
-  const clamped = Math.min(Math.max(totalMetros, 500), 8000)
-  const t = (clamped - 500) / (8000 - 500)
-  return Math.round(6000 + t * (14000 - 6000))
-}
-
-/** Distancia acumulada sobre la geometría hasta el vértice más cercano a cada parada. */
-function stopDistancesAlongRoute(
-  geom: [number, number][],
-  stops: ParadaCircuitoDetalle[],
-): { index: number; meters: number }[] {
-  if (geom.length === 0) return []
-  const metrics = routeMetrics(geom)
-  const cum: number[] = [0]
-  for (const len of metrics.lengths) {
-    cum.push(cum[cum.length - 1] + len)
-  }
-
-  return stops
-    .map((stop, index) => {
-      if (stop.latitud == null || stop.longitud == null) return null
-      let best = 0
-      let bestDist = Infinity
-      for (let i = 0; i < geom.length; i++) {
-        const dLat = geom[i][0] - stop.latitud
-        const dLng = geom[i][1] - stop.longitud
-        const d = dLat * dLat + dLng * dLng
-        if (d < bestDist) {
-          bestDist = d
-          best = cum[i] ?? 0
-        }
-      }
-      return { index, meters: best }
-    })
-    .filter((x): x is { index: number; meters: number } => x != null)
-    .sort((a, b) => a.meters - b.meters)
-}
 
 function toPunto(stop: ParadaCircuitoDetalle): PuntoGoogleMaps {
   return {
@@ -284,7 +246,14 @@ export function CircuitoRutaMapa({
     const metrics = routeMetrics(path)
     const duration = animationDurationMs(metrics.total)
     const start = performance.now()
-    const along = stopDistancesAlongRoute(path, stops)
+    const along = stopDistancesAlongRoute(
+      path,
+      stops.map((stop) =>
+        stop.latitud != null && stop.longitud != null
+          ? { lat: stop.latitud, lng: stop.longitud }
+          : null,
+      ),
+    )
     const total = metrics.total || 1
     let lastSynced = -1
 

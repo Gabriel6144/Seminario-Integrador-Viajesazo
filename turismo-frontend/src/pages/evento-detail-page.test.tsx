@@ -7,6 +7,7 @@ import { FOLKLORE, GASTRONOMIA_ESTANCIA, errorBody } from '../test/fixtures'
 import { findEvento, resetStore } from '../test/store'
 import { server } from '../test/server'
 import { renderRoute, user } from '../test/utils'
+import type { UsuarioResponse } from '@/types/api'
 
 /**
  * Leaflet no se banca jsdom: no hay layout ni tiles. El detalle se testea con el mapa mockeado y
@@ -17,11 +18,25 @@ vi.mock('@/components/evento-mapa', () => ({
   EventoMapa: ({ nombre }: { nombre: string }) => <div>Mapa de {nombre}</div>,
 }))
 
-function renderDetalle(id: string) {
+/** `EventoActions` solo se pinta para publicadores: los tests de baja necesitan esa sesión. */
+const PUBLICADOR: UsuarioResponse = {
+  id: 9,
+  nombre: 'Publicador Demo',
+  email: 'publicador@test.com',
+  telefono: null,
+  roles: ['PUBLICADOR'],
+  publicadorId: 1,
+}
+
+function renderDetalle(
+  id: string,
+  options: { user?: UsuarioResponse | null; authenticated?: boolean } = {},
+) {
   return renderRoute({
     route: '/eventos/:id',
     initialEntry: `/eventos/${id}`,
     children: <EventoDetailPage />,
+    ...options,
   })
 }
 
@@ -39,19 +54,30 @@ describe('EventoDetailPage', () => {
   it('muestra el evento completo', async () => {
     renderDetalle('1')
 
-    expect(await screen.findByText(FOLKLORE.nombre)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: FOLKLORE.nombre })).toBeInTheDocument()
     expect(screen.getByText(FOLKLORE.descripcion as string)).toBeInTheDocument()
-    // La ubicación aparece en el hero image y en la ficha: se espera al menos una coincidencia.
+    // La ubicación aparece en el hero y en la franja de datos: se espera al menos una coincidencia.
     expect((await screen.findAllByText(FOLKLORE.localidad as string)).length).toBeGreaterThan(0)
-    // El lugar aparece en el hero image y en la ficha: se espera al menos una coincidencia.
     expect((await screen.findAllByText(FOLKLORE.lugarRecinto as string)).length).toBeGreaterThan(0)
+  })
+
+  it('muestra la franja con cuándo, dónde y entradas', async () => {
+    renderDetalle('1')
+
+    expect(await screen.findByText('Cuándo')).toBeInTheDocument()
+    expect(screen.getByText('Dónde')).toBeInTheDocument()
+    expect(screen.getByText('Entradas')).toBeInTheDocument()
+    expect(screen.getByText('Entrada libre y gratuita')).toBeInTheDocument()
+    // Gratuito: la franja no debe mostrar el monto ni el link de entradas.
+    expect(screen.queryByText('Entradas desde')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Sitio oficial de entradas/ })).not.toBeInTheDocument()
   })
 
   it('muestra el rango horario recortado a HH:mm', async () => {
     // La API devuelve "20:00:00" y "23:30:00"; en pantalla van sin segundos.
     renderDetalle('1')
 
-    expect(await screen.findByText('20:00 a 23:30')).toBeInTheDocument()
+    expect(await screen.findByText(/20:00 a 23:30/)).toBeInTheDocument()
   })
 
   it('muestra el tipo de acceso del evento', async () => {
@@ -64,6 +90,7 @@ describe('EventoDetailPage', () => {
     renderDetalle('3')
 
     expect(await screen.findByText('Arancelado')).toBeInTheDocument()
+    expect(screen.getByText('Entradas desde')).toBeInTheDocument()
     // `Intl.NumberFormat` de es-AR: 1500 → "$ 1.500,00".
     expect(screen.getByText(/1\.500,00/)).toBeInTheDocument()
     expect(screen.getByText(/Entrada general/)).toBeInTheDocument()
@@ -71,6 +98,21 @@ describe('EventoDetailPage', () => {
       'href',
       GASTRONOMIA_ESTANCIA.sitioOficial,
     )
+  })
+
+  it('muestra las píldoras de modalidad y tipo de propuesta', async () => {
+    renderDetalle('1')
+
+    expect(await screen.findByText('Ecuestre')).toBeInTheDocument()
+    expect(screen.getByText('Festival')).toBeInTheDocument()
+  })
+
+  it('ofrece un link de Cómo llegar con las coordenadas del evento', async () => {
+    renderDetalle('1')
+
+    const link = await screen.findByRole('link', { name: /Cómo llegar/ })
+    expect(link).toHaveAttribute('href', expect.stringContaining('google.com/maps'))
+    expect(link).toHaveAttribute('href', expect.stringContaining('-30.9816'))
   })
 
   it('muestra el mapa cuando el evento tiene coordenadas', async () => {
@@ -156,7 +198,7 @@ describe('EventoDetailPage', () => {
 
 describe('borrado de eventos desde el detalle', () => {
   it('no borra nada hasta que se confirma en el diálogo', async () => {
-    renderDetalle('1')
+    renderDetalle('1', { user: PUBLICADOR })
     await user().click(await screen.findByRole('button', { name: 'Dar de baja' }))
     await user().click(await screen.findByRole('button', { name: 'Cancelar' }))
 
@@ -166,7 +208,7 @@ describe('borrado de eventos desde el detalle', () => {
   })
 
   it('borra el evento al confirmar', async () => {
-    renderDetalle('1')
+    renderDetalle('1', { user: PUBLICADOR })
     await user().click(await screen.findByRole('button', { name: 'Dar de baja' }))
     await user().click(await screen.findByRole('button', { name: 'Confirmar baja' }))
 
@@ -178,7 +220,7 @@ describe('borrado de eventos desde el detalle', () => {
     // Tras una operación exitosa quedarse en `/eventos/1` mostraría un 404 del backend. Es el
     // error más confuso posible después de borrar: la app parece haber fallado cuando todo salió
     // bien.
-    const { unmount } = renderDetalle('1')
+    const { unmount } = renderDetalle('1', { user: PUBLICADOR })
     await user().click(await screen.findByRole('button', { name: 'Dar de baja' }))
     await user().click(await screen.findByRole('button', { name: 'Confirmar baja' }))
 

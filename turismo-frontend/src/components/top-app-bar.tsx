@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, NavLink, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '@/components/auth-provider'
 import { NotificacionesBell } from '@/components/notificaciones-bell'
@@ -20,6 +20,8 @@ const navClass = ({ isActive }: { isActive: boolean }) =>
 export function TopAppBar() {
   const { isAuthenticated, hasRole, logout, user } = useAuth()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const esDescubrir = pathname === '/descubrir'
   const [clima, setClima] = useState<ClimaActualCordoba>({
     temperatura: 18,
     icono: 'partly_cloudy_day',
@@ -50,8 +52,16 @@ export function TopAppBar() {
   }, [])
 
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-[#f7f9fb]">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-2">
+    <header
+      className={`sticky top-0 z-40 border-b border-slate-200/80 ${
+        esDescubrir ? 'bg-[#F7F6F2]' : 'bg-[#f7f9fb]'
+      }`}
+    >
+      <div
+        className={`mx-auto flex items-center justify-between py-2 ${
+          esDescubrir ? 'w-full px-5 md:px-10 xl:px-16' : 'max-w-7xl px-5'
+        }`}
+      >
         <div className="flex items-center gap-2">
           <Link
             to={

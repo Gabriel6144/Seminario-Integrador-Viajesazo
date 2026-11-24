@@ -7,6 +7,9 @@
 @theme inline {
     --font-sans: 'Nunito', sans-serif;
     --font-heading: 'Bricolage Grotesque', sans-serif;
+    --font-syne: 'Syne', sans-serif;
+    --font-jakarta: 'Plus Jakarta Sans', sans-serif;
+    --font-display: 'Oswald', sans-serif;
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -170,4 +173,16 @@
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+.vz-vertical-counter {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
+.vz-dashed-rail {
+  background-image: linear-gradient(to bottom, #c9c6bd 40%, rgba(255, 255, 255, 0) 0%);
+  background-position: left;
+  background-size: 1.5px 8px;
+  background-repeat: repeat-y;
 }

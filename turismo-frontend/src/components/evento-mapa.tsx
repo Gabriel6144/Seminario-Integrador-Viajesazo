@@ -5,7 +5,8 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 
 maplibregl.setWorkerUrl(workerUrl)
 
-const STYLE_URL = 'https://tiles.openfreemap.org/styles/bright'
+// Positron 2D: base clara y neutra que deja el marcador como protagonista.
+const STYLE_URL = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'
 
 export interface EventoMapaProps {
   nombre: string

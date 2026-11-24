@@ -1,19 +1,31 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it } from 'vitest'
+import { useSearchParams } from 'react-router-dom'
 
 import { DescubrirPage } from './descubrir-page'
 import { FOLKLORE, page } from '../test/fixtures'
 import { server } from '../test/server'
 import { renderRoute, user } from '../test/utils'
 
+import { CATEGORIAS } from '@/types/api'
 import type { Categoria, PropuestaResumenResponse } from '@/types/api'
+
+function LocationProbe() {
+  const [params] = useSearchParams()
+  return <div data-testid="location">{params.toString()}</div>
+}
 
 function renderDescubrir(initialEntry = '/descubrir', authenticated = false) {
   return renderRoute({
     route: '/descubrir',
     initialEntry,
-    children: <DescubrirPage />,
+    children: (
+      <>
+        <DescubrirPage />
+        <LocationProbe />
+      </>
+    ),
     authenticated,
   })
 }
@@ -55,29 +67,80 @@ describe('DescubrirPage', () => {
     expect(screen.queryByText('Propuesta 4')).not.toBeInTheDocument()
   })
 
-  it('cambia de categoría con las flechas del teclado', async () => {
+  it('renderiza una sección por categoría', async () => {
     server.use(handlerPropuestasCategoria())
 
     renderDescubrir()
-    await screen.findByText('Propuesta 1')
 
-    fireEvent.keyDown(window, { key: 'ArrowRight' })
-
-    expect(await screen.findByRole('heading', { name: 'Gastronomía' })).toBeInTheDocument()
-    expect(screen.getByText('Colonia Caroya · Calamuchita · Traslasierra')).toBeInTheDocument()
+    const secciones = await screen.findAllByRole('heading', { level: 2 })
+    expect(secciones).toHaveLength(CATEGORIAS.length)
+    expect(screen.getByRole('heading', { name: 'Vida nocturna' })).toBeInTheDocument()
   })
 
-  it('cambia de categoría con los botones anterior y siguiente', async () => {
+  it('el rail lleva a la categoría y actualiza la URL', async () => {
     server.use(handlerPropuestasCategoria())
 
-    renderDescubrir()
-    await screen.findByText('Propuesta 1')
+    const pedidas: string[] = []
+    server.events.on('request:start', ({ request }) => {
+      const url = new URL(request.url)
+      if (url.pathname === '/api/propuestas') {
+        pedidas.push(url.searchParams.get('categoria') ?? '')
+      }
+    })
 
-    await user().click(screen.getByRole('button', { name: 'Categoría siguiente' }))
-    expect(await screen.findByRole('heading', { name: 'Gastronomía' })).toBeInTheDocument()
+    try {
+      renderDescubrir()
+      await screen.findByText('Propuesta 1')
 
-    await user().click(screen.getByRole('button', { name: 'Categoría anterior' }))
-    expect(await screen.findByRole('heading', { name: 'Naturaleza' })).toBeInTheDocument()
+      const rail = screen.getByTestId('rail-mobile')
+      await user().click(within(rail).getByRole('button', { name: 'Ir a Gastronomía' }))
+
+      await waitFor(() => expect(pedidas).toContain('GASTRONOMIA'))
+      expect(screen.getByTestId('location')).toHaveTextContent('categoria=GASTRONOMIA')
+    } finally {
+      server.events.removeAllListeners()
+    }
+  })
+
+  it('avanza de categoría con la rueda hacia abajo', async () => {
+    server.use(handlerPropuestasCategoria())
+
+    const pedidas: string[] = []
+    server.events.on('request:start', ({ request }) => {
+      const url = new URL(request.url)
+      if (url.pathname === '/api/propuestas') {
+        pedidas.push(url.searchParams.get('categoria') ?? '')
+      }
+    })
+
+    try {
+      renderDescubrir()
+      await screen.findByText('Propuesta 1')
+
+      fireEvent.wheel(window, { deltaY: 120 })
+
+      await waitFor(() =>
+        expect(screen.getByTestId('location')).toHaveTextContent('categoria=GASTRONOMIA'),
+      )
+      await waitFor(() => expect(pedidas).toContain('GASTRONOMIA'))
+    } finally {
+      server.events.removeAllListeners()
+    }
+  })
+
+  it('retrocede de categoría con la rueda hacia arriba', async () => {
+    server.use(handlerPropuestasCategoria())
+
+    renderDescubrir('/descubrir?categoria=GASTRONOMIA')
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent('categoria=GASTRONOMIA'),
+    )
+
+    fireEvent.wheel(window, { deltaY: -120 })
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent('categoria=NATURALEZA'),
+    )
   })
 
   it('navega el carrusel de a una tarjeta', async () => {

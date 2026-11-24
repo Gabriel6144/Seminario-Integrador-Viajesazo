@@ -45,3 +45,51 @@ export function sampleRoute(metrics: RouteMetrics, progress: number): RouteSampl
   ]
   return { position, path: [...points.slice(0, i + 1), position] }
 }
+
+/** Duración del recorrido según el largo de la ruta (entre 6 s y 14 s). */
+export function animationDurationMs(totalMetros: number): number {
+  const clamped = Math.min(Math.max(totalMetros, 500), 8000)
+  const t = (clamped - 500) / (8000 - 500)
+  return Math.round(6000 + t * (14000 - 6000))
+}
+
+export interface ParadaEnRuta {
+  index: number
+  /** Metros recorridos sobre la geometría hasta el vértice más cercano a la parada. */
+  meters: number
+}
+
+/**
+ * Distancia acumulada sobre la geometría hasta el vértice más cercano a cada parada.
+ * Las paradas sin coordenadas se ignoran y el resultado queda ordenado por avance.
+ */
+export function stopDistancesAlongRoute(
+  geom: RoutePoint[],
+  paradas: Array<{ lat: number; lng: number } | null | undefined>,
+): ParadaEnRuta[] {
+  if (geom.length === 0) return []
+  const metrics = routeMetrics(geom)
+  const cum: number[] = [0]
+  for (const len of metrics.lengths) {
+    cum.push(cum[cum.length - 1] + len)
+  }
+
+  return paradas
+    .map((parada, index) => {
+      if (parada == null) return null
+      let best = 0
+      let bestDist = Infinity
+      for (let i = 0; i < geom.length; i++) {
+        const dLat = geom[i][0] - parada.lat
+        const dLng = geom[i][1] - parada.lng
+        const d = dLat * dLat + dLng * dLng
+        if (d < bestDist) {
+          bestDist = d
+          best = cum[i] ?? 0
+        }
+      }
+      return { index, meters: best }
+    })
+    .filter((x): x is ParadaEnRuta => x != null)
+    .sort((a, b) => a.meters - b.meters)
+}

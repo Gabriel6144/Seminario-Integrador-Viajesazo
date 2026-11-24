@@ -313,6 +313,7 @@ export function buildMapStops(
   img: string
   lat: number
   lng: number
+  trasladoKm: number
 }> {
   return (circuito.stopsByDay[day] ?? []).map((stop) => ({
     id: stop.id,
@@ -329,6 +330,7 @@ export function buildMapStops(
     img: stop.image,
     lat: stop.latitud ?? -31.4254,
     lng: stop.longitud ?? -64.1873,
+    trasladoKm: stop.trasladoKm,
   }))
 }
 
