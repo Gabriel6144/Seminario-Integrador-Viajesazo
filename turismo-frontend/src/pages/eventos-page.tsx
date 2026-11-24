@@ -107,17 +107,30 @@ export function EventosPage() {
     : ESTADOS_PROPUESTA.filter((estado) => estado !== 'CANCELADO')
 
   const fechas = rangoFecha(filtroFecha)
-  const filtros: PropuestaFiltros = {
-    tipo: filtroTipo === 'TODAS' ? undefined : filtroTipo,
-    publicadorId: publicadorIdFiltro,
-    q: busqueda.trim() === '' ? undefined : busqueda.trim(),
-    ciudad: filtroZona === 'TODAS' ? undefined : filtroZona,
-    estado: filtroEstado === 'TODOS' ? undefined : filtroEstado,
-    tipoPropuesta: filtroTipoPropuesta === 'TODOS' ? undefined : filtroTipoPropuesta,
-    fechaDesde: fechas.desde,
-    fechaHasta: fechas.hasta,
-    incluirCanceladas,
-  }
+  const filtros: PropuestaFiltros = useMemo(
+    () => ({
+      tipo: filtroTipo === 'TODAS' ? undefined : filtroTipo,
+      publicadorId: publicadorIdFiltro,
+      q: busqueda.trim() === '' ? undefined : busqueda.trim(),
+      ciudad: filtroZona === 'TODAS' ? undefined : filtroZona,
+      estado: filtroEstado === 'TODOS' ? undefined : filtroEstado,
+      tipoPropuesta: filtroTipoPropuesta === 'TODOS' ? undefined : filtroTipoPropuesta,
+      fechaDesde: fechas.desde,
+      fechaHasta: fechas.hasta,
+      incluirCanceladas,
+    }),
+    [
+      filtroTipo,
+      publicadorIdFiltro,
+      busqueda,
+      filtroZona,
+      filtroEstado,
+      filtroTipoPropuesta,
+      fechas.desde,
+      fechas.hasta,
+      incluirCanceladas,
+    ],
+  )
 
   const query = usePropuestas(page, filtros)
   const resumen = useResumenPropuestas(filtros)
@@ -231,14 +244,16 @@ export function EventosPage() {
           </p>
         </div>
 
-        {canCreate ? (
-          <Button asChild size="sm" className="h-12 rounded-xl bg-[#00658d] px-6 text-white shadow-md hover:bg-[#65b7e8]">
-            <Link to="/eventos/nuevo">
-              <PlusIcon className="h-5 w-5" aria-hidden />
-              Nueva propuesta
-            </Link>
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-3">
+          {canCreate ? (
+            <Button asChild size="sm" className="h-12 rounded-xl bg-[#00658d] px-6 text-white shadow-md hover:bg-[#65b7e8]">
+              <Link to="/eventos/nuevo">
+                <PlusIcon className="h-5 w-5" aria-hidden />
+                Nueva propuesta
+              </Link>
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {/* Barra de píldoras permanentes + buscador + menú desplegable colapsable */}

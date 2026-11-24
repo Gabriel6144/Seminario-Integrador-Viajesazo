@@ -37,7 +37,11 @@ import {
 import { PlanificadorExitModal } from '@/components/planificador/planificador-exit-modal'
 import { PlanificadorHeader } from '@/components/planificador/planificador-header'
 import { PlanificadorRegenerateModal } from '@/components/planificador/planificador-regenerate-modal'
-import type { DestinoSeleccionado, LoadingStep } from '@/components/planificador/types'
+import type {
+  DestinoSeleccionado,
+  LoadingStep,
+  ViajeResumenCircuito,
+} from '@/components/planificador/types'
 import { apiGet, toUserMessage } from '@/lib/http'
 import type {
   CircuitStrategy,
@@ -571,7 +575,7 @@ export function PlanificadorPage() {
 
   const handleDiscardExit = () => {
     setIsExitModalOpen(false)
-    navigate('/propuestas')
+    navigate('/descubrir')
   }
 
   if (restaurando) {
@@ -586,6 +590,18 @@ export function PlanificadorPage() {
         <p className="text-sm font-medium">Recuperando tu circuito…</p>
       </div>
     )
+  }
+
+  const viajeResumen: ViajeResumenCircuito = {
+    nombre: tripName || null,
+    zona: destino?.nombre ?? null,
+    fechaInicio: dateFrom || null,
+    fechaFin: dateTo || null,
+    rangoInteresKm: radiusKm,
+    intereses: interests
+      .map((item) => INTEREST_MAP[item])
+      .filter((item): item is InteresCategoria => Boolean(item)),
+    ritmoLabel: rhythm || null,
   }
 
   return (
@@ -715,6 +731,7 @@ export function PlanificadorPage() {
               }}
               onRegenerate={() => setIsRegenerateModalOpen(true)}
               onCircuitoChange={setCircuito}
+              viajeResumen={viajeResumen}
             />
           )}
         </main>

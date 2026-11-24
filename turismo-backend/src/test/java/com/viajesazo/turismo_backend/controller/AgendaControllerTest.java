@@ -62,6 +62,7 @@ class AgendaControllerTest {
 						.param("categoria", "CULTURA")
 						.param("tipoAcceso", "DE_PAGO")
 						.param("ubicacion", "Cosquín")
+						.param("publicadorId", "3")
 						.param("fechaDesde", "2026-10-01")
 						.param("fechaHasta", "2026-10-31")
 						.param("page", "0")
@@ -79,6 +80,7 @@ class AgendaControllerTest {
 		org.assertj.core.api.Assertions.assertThat(filtro.categoria()).isEqualTo(InteresCategoria.CULTURA);
 		org.assertj.core.api.Assertions.assertThat(filtro.tipoAcceso()).isEqualTo(TipoAcceso.DE_PAGO);
 		org.assertj.core.api.Assertions.assertThat(filtro.ubicacion()).isEqualTo("Cosquín");
+		org.assertj.core.api.Assertions.assertThat(filtro.publicadorId()).isEqualTo(3L);
 		org.assertj.core.api.Assertions.assertThat(filtro.fechaDesde()).isEqualTo(LocalDate.parse("2026-10-01"));
 		org.assertj.core.api.Assertions.assertThat(filtro.fechaHasta()).isEqualTo(LocalDate.parse("2026-10-31"));
 	}

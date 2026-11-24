@@ -22,7 +22,7 @@ export interface ViajezasoPaths {
 
 export const defaultPaths: Readonly<ViajezasoPaths> = Object.freeze({
   inicio: '/',
-  propuestas: '/propuestas',
+  propuestas: '/descubrir',
   publicaciones: '/publicaciones',
   ingresar: '/login',
   sobreNosotros: '/sobre-nosotros',

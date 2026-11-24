@@ -11,6 +11,8 @@ export interface AgendaFilters {
   categoria: Categoria | ''
   ubicacion: string
   tipoAcceso: TipoAcceso | ''
+  /** Id del publicador como string; `''` significa "todos". */
+  publicadorId: string
 }
 
 export const AGENDA_FILTERS_DEFAULT: AgendaFilters = {
@@ -20,6 +22,7 @@ export const AGENDA_FILTERS_DEFAULT: AgendaFilters = {
   categoria: '',
   ubicacion: '',
   tipoAcceso: '',
+  publicadorId: '',
 }
 
 function buildAgendaQueryParams(page: number, size: number, filters?: AgendaFilters): {
@@ -56,6 +59,10 @@ function buildAgendaQueryParams(page: number, size: number, filters?: AgendaFilt
     if (filters.tipoAcceso !== '') {
       params.set('tipoAcceso', filters.tipoAcceso)
       activeParams.tipoAcceso = filters.tipoAcceso
+    }
+    if (filters.publicadorId.trim() !== '') {
+      params.set('publicadorId', filters.publicadorId.trim())
+      activeParams.publicadorId = filters.publicadorId.trim()
     }
   }
 

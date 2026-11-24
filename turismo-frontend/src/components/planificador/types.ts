@@ -1,5 +1,6 @@
 import type {
   CircuitStrategy,
+  InteresCategoria,
   LocalDate,
   OrigenCircuitoItem,
   ResumenDiaCircuito,
@@ -64,6 +65,21 @@ export interface CircuitoChip {
   icon: string
   label: string
   variant: 'sky' | 'amber' | 'slate'
+}
+
+/**
+ * Datos del viaje que se muestran en la ficha del detalle del circuito. Se arma desde
+ * `ViajeResponse` en el circuito confirmado y desde el estado del wizard en el planificador.
+ * Todos los campos son opcionales para que la ficha no rompa si faltan datos.
+ */
+export interface ViajeResumenCircuito {
+  nombre?: string | null
+  zona?: string | null
+  fechaInicio?: string | null
+  fechaFin?: string | null
+  rangoInteresKm?: number | null
+  intereses?: InteresCategoria[]
+  ritmoLabel?: string | null
 }
 
 export interface CircuitoDia {

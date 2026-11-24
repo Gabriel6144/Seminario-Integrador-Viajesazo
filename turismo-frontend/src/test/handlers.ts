@@ -1099,6 +1099,7 @@ export const handlers = [
     const categoria = params.get('categoria')
     const tipoAcceso = params.get('tipoAcceso')
     const ubicacion = normalizeText(params.get('ubicacion') ?? '')
+    const publicadorId = params.get('publicadorId')
     const fechaDesde = params.get('fechaDesde')
     const fechaHasta = params.get('fechaHasta')
 
@@ -1115,6 +1116,7 @@ export const handlers = [
         if (tipoPropuesta !== null && evento.tipoPropuesta !== tipoPropuesta) return false
         if (categoria !== null && evento.categoria !== categoria) return false
         if (tipoAcceso !== null && evento.tipoAcceso !== tipoAcceso) return false
+        if (publicadorId !== null && String(evento.publicadorId) !== publicadorId) return false
         if (ubicacion !== '') {
           const camposUbicacion = normalizeText(
             [evento.localidad ?? '', evento.lugarRecinto ?? '', evento.direccion ?? ''].join(' '),

@@ -26,7 +26,7 @@ export function NotFoundPage() {
       </EmptyHeader>
       <EmptyContent>
         <Button asChild size="sm">
-          <Link to="/propuestas">Ir al listado de propuestas</Link>
+          <Link to="/descubrir">Ir al catálogo</Link>
         </Button>
       </EmptyContent>
     </Empty>

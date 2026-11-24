@@ -67,6 +67,31 @@ export function usePropuestas(page: number, filtros: PropuestaFiltros = {}) {
   })
 }
 
+/** Tope de propuestas que trae la vista `/descubrir` por categoría. */
+export const DESCUBRIR_MAX = 100
+
+/**
+ * `GET /api/propuestas?categoria=…` para la vista inmersiva.
+ *
+ * Trae hasta `DESCUBRIR_MAX` propuestas de una categoría en una sola página: el carrusel necesita
+ * conocer el total para navegar entre todas. El backend ordena por nombre e id.
+ */
+export function usePropuestasCategoria(categoria: Categoria | null, enabled = true) {
+  const query = new URLSearchParams({
+    page: '0',
+    size: String(DESCUBRIR_MAX),
+    ...(categoria ? { categoria } : {}),
+  })
+
+  return useQuery({
+    queryKey: queryKeys.propuestasDescubrirCategoria(categoria ?? ''),
+    queryFn: ({ signal }) =>
+      getPage<PropuestaResumenResponse>(`/api/propuestas?${query.toString()}`, signal),
+    placeholderData: keepPreviousData,
+    enabled: enabled && categoria !== null,
+  })
+}
+
 /**
  * `GET /api/propuestas/resumen` — contadores por tipo para las píldoras del catálogo.
  *

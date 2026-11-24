@@ -114,7 +114,7 @@ export function PublicadorForm({ defaultValues, onSubmit, isPending, serverError
           {isPending ? 'Guardando…' : 'Crear publicador'}
         </Button>
         <Button asChild variant="ghost">
-          <Link to="/publicadores">Cancelar</Link>
+          <Link to="/admin">Cancelar</Link>
         </Button>
       </div>
     </form>

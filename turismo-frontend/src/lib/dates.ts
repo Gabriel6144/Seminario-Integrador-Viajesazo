@@ -72,6 +72,34 @@ export function formatDateRange(inicio: LocalDate, fin: LocalDate): string {
 }
 
 /**
+ * Etiqueta de mes y año que cubre el rango del viaje.
+ *
+ *   mismo mes y año   → "Diciembre de 2026"
+ *   meses distintos   → "Noviembre – Diciembre de 2026"
+ *   años distintos    → "Diciembre de 2026 – Enero de 2027"
+ */
+export function formatTripMonth(inicio: LocalDate, fin: LocalDate): string {
+  const from = toLocalDate(inicio)
+  const to = toLocalDate(fin)
+
+  if (from.getFullYear() === to.getFullYear()) {
+    const fromMonth = from.toLocaleDateString('es-AR', { month: 'long' })
+    const toMonth = to.toLocaleDateString('es-AR', { month: 'long' })
+    const year = to.getFullYear()
+    if (fromMonth === toMonth) return `${capitalize(fromMonth)} de ${year}`
+    return `${capitalize(fromMonth)} – ${capitalize(toMonth)} de ${year}`
+  }
+
+  const fromLabel = `${capitalize(from.toLocaleDateString('es-AR', { month: 'long' }))} de ${from.getFullYear()}`
+  const toLabel = `${capitalize(to.toLocaleDateString('es-AR', { month: 'long' }))} de ${to.getFullYear()}`
+  return `${fromLabel} – ${toLabel}`
+}
+
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1)
+}
+
+/**
  * Rango horario, o `null` si no hay horario.
  *
  * Jackson 3 serializa `LocalTime` **siempre con segundos**: contra la API real, `"20:00"` sale

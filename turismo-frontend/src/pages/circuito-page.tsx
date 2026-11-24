@@ -28,7 +28,10 @@ import {
 import { EliminarParadaDialog } from '@/components/planificador/parada-dialogs'
 import { SustituirParadaPanel } from '@/components/planificador/sustituir-parada-panel'
 import { PARAM_DIA, Paso10Circuito } from '@/components/planificador/paso-10-circuito'
-import type { ParadaCircuitoDetalle } from '@/components/planificador/types'
+import type {
+  ParadaCircuitoDetalle,
+  ViajeResumenCircuito,
+} from '@/components/planificador/types'
 import { PlanificadorRegenerateModal } from '@/components/planificador/planificador-regenerate-modal'
 import { ErrorState } from '@/components/query-state'
 import {
@@ -175,6 +178,20 @@ export function CircuitoPage() {
     viajeQuery.data?.fechaFin,
   ])
 
+  const viajeResumen = useMemo<ViajeResumenCircuito | null>(() => {
+    if (!viajeQuery.data) return null
+    const viaje = viajeQuery.data
+    return {
+      nombre: viaje.nombre,
+      zona: viaje.ubicacion?.nombre ?? viaje.ubicacion?.ciudad ?? null,
+      fechaInicio: viaje.fechaInicio,
+      fechaFin: viaje.fechaFin,
+      rangoInteresKm: viaje.rangoInteresKm,
+      intereses: viaje.interesesCategoria,
+      ritmoLabel: viaje.ritmo ? RHYTHM_LABELS[viaje.ritmo] : null,
+    }
+  }, [viajeQuery.data])
+
   // El día que se está viendo vive en la URL (`?dia=2`): un F5 vuelve al mismo día y, después de
   // sustituir o eliminar una parada, la vista se queda donde estaba en lugar de saltar al primero.
   const [searchParams, setSearchParams] = useSearchParams()
@@ -289,6 +306,7 @@ export function CircuitoPage() {
             onGoToTrips={() => navigate('/borradores')}
             onRestart={() => navigate('/borradores')}
             onRegenerate={() => setIsRegenerateModalOpen(true)}
+            viajeResumen={viajeResumen}
           />
 
           <PlanificadorRegenerateModal
@@ -500,6 +518,7 @@ export function CircuitoPage() {
           onVerSugerencias={setSugerenciasFecha}
           onDejarloAsi={handleDejarloAsi}
           descartandoAviso={descartarAviso.isPending}
+          viaje={viajeResumen}
         />
       ) : circuitoGenerado.isPending ? (
         <CircuitoSkeleton />

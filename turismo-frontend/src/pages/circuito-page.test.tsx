@@ -59,6 +59,16 @@ describe('CircuitoPage', () => {
     expect(await screen.findByText('Sin actividades programadas.')).toBeInTheDocument()
     expect(screen.getByText(/Este circuito quedó desactualizado/i)).toBeInTheDocument()
     expect(screen.getByText(/fechas del viaje/i)).toBeInTheDocument()
+
+    // Ficha con los datos propios del viaje y las preferencias elegidas al generarlo.
+    const ficha = screen.getByRole('region', { name: /datos del viaje/i })
+    expect(within(ficha).getByText('Diciembre de 2026')).toBeInTheDocument()
+    expect(within(ficha).getByText('Circuito confirmado de ejemplo')).toBeInTheDocument()
+    expect(within(ficha).getByText('Villa Carlos Paz')).toBeInTheDocument()
+    expect(within(ficha).getByText('A 25 km a la redonda')).toBeInTheDocument()
+    expect(within(ficha).getByText('Tranquilo')).toBeInTheDocument()
+    expect(within(ficha).getByText('Cultura')).toBeInTheDocument()
+    expect(within(ficha).getByText('Gastronomía')).toBeInTheDocument()
   })
 
   it('regenera el circuito después de confirmar el reemplazo', async () => {

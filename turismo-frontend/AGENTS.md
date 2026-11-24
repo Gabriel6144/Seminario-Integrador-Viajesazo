@@ -77,11 +77,17 @@ Cosas que se olvidan fácil y ya están resueltas en el código, para no volver 
   `tipoPropuesta`, `categoria`, `ubicacion`, `tipoAcceso`, `page` y `size` a `GET /api/agenda`.
   El cliente no vuelve a filtrar ni a ordenar: el backend ya devuelve solo eventos no cancelados,
   ordenados por fecha/hora, y pagina. `keepPreviousData` evita el parpadeo al cambiar de página.
-- **El catálogo (`/propuestas`) también filtra en el servidor.** `usePropuestas` manda `q`,
-  `ciudad`, `localidad`, `estado`, `tipoPropuesta`, `categoria`, `fechaDesde/Hasta`,
-  `publicadorId` e `incluirCanceladas`; el cliente no vuelve a filtrar la página. Los contadores
-  de las píldoras salen de `GET /api/propuestas/resumen` y las zonas del selector de
-  `GET /api/propuestas/zonas`. Al cambiar cualquier filtro se vuelve a `page=0`.
+- **`/propuestas` es la gestión del publicador.** La ruta vive bajo `RequireRole(['PUBLICADOR'])`
+  y conserva la grilla con filtros del servidor (`usePropuestas`, resumen, zonas y paginado). Un
+  turista o invitado que entre ahí es redirigido a `/descubrir`; un admin, a `/admin`.
+- **`/descubrir` es el catálogo del turista y el invitado.** Vive dentro del `Layout` estándar
+  (top bar + bottom nav), con fondo claro `#f7f9fb`, sin foto de fondo y sin filtros: se navega
+  por las 9 categorías. Usa `usePropuestasCategoria` (`GET /api/propuestas` con `categoria` y
+  `size=100`), la categoría activa viaja en `?categoria=` y el carrusel muestra 3 tarjetas grandes
+  iguales a la derecha del hero, con flechas primarias. El copy editorial está en
+  `src/lib/descubrir-categorias.ts`; sus degradés quedan como respaldo de las imágenes. Los links
+  de catálogo (`login`, `registro`, `not-found`, top bar, bottom nav, portada pública y detalle)
+  apuntan a `/descubrir` para turista/invitado.
 - **`/api/agenda` no es la agenda semanal**: la semanal (`/api/agenda/semanal`, US6) va de hoy al
   domingo y no acepta filtros; su cantidad de eventos depende del día en que se corre la app. La
   agenda turística (VZ-18) usa una ventana abierta y filtros explícitos.

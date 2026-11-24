@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 
 import { useAuth } from '@/components/auth-provider'
@@ -84,32 +83,14 @@ export function RequireGuest() {
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/propuestas" replace />
+    return <Navigate to="/descubrir" replace />
   }
 
   return <Outlet />
 }
 
-/**
- * Index de propuestas (`/propuestas`): admin → dashboard. PUBLICADOR y TURISTA ven el
- * listado (el panel del publicador vive en `/publicador`). `/` queda como portada pública.
- */
-export function HomeEntry({ children }: { children: ReactNode }) {
-  const { hasRole, isBootstrapping, isAuthenticated } = useAuth()
-
-  if (isBootstrapping) {
-    return <GridSkeleton />
-  }
-
-  if (isAuthenticated && hasRole('ADMINISTRADOR')) {
-    return <Navigate to="/admin" replace />
-  }
-
-  return children
-}
-
 function homeForRoles(hasRole: (...roles: RolUsuario[]) => boolean): string {
   if (hasRole('ADMINISTRADOR')) return '/admin'
   if (hasRole('PUBLICADOR')) return '/publicador'
-  return '/propuestas'
+  return '/descubrir'
 }

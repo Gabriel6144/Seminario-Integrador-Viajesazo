@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  Building2Icon,
   CalendarDaysIcon,
   CheckIcon,
   CompassIcon,
@@ -17,6 +18,7 @@ import {
   useAgenda,
   type AgendaFilters,
 } from '@/api/agenda'
+import { PUBLICADORES_MAX_SIZE, usePublicadores } from '@/api/publicadores'
 import { DayHeading } from '@/components/day-heading'
 import { EventoCard } from '@/components/evento-card'
 import { PaginationBar } from '@/components/pagination-bar'
@@ -24,6 +26,13 @@ import { EmptyState, ErrorState, GridSkeleton } from '@/components/query-state'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { groupByDay } from '@/lib/group-by-day'
 import { usePageParam } from '@/lib/use-page-param'
@@ -41,7 +50,7 @@ import {
  *
  * Cumple los criterios de aceptación de la historia de usuario:
  * - CA1: Eventos ordenados cronológicamente por fecha (los más próximos primero) y agrupados por día.
- * - CA2: Filtrado opcional en un panel lateral deslizable (Drawer / Sheet) por fecha, tipo de propuesta, categoría, ubicación y acceso (gratuito/arancelado).
+ * - CA2: Filtrado opcional en un panel lateral deslizable (Drawer / Sheet) por publicador, fecha, tipo de propuesta, categoría, ubicación y acceso (gratuito/arancelado).
  * - CA3: Selección de cualquier evento para consultar su información en detalle (`/eventos/:id`).
  *
  * El orden y los filtros los resuelve el backend: la página solo refleja la página recibida.
@@ -52,6 +61,11 @@ export function AgendaPage() {
   const [drawerAbierto, setDrawerAbierto] = useState(false)
 
   const query = useAgenda(page, filters)
+  const publicadoresQuery = usePublicadores(0, PUBLICADORES_MAX_SIZE)
+
+  const publicadorSeleccionado = publicadoresQuery.data?.content.find(
+    (publicador) => String(publicador.id) === filters.publicadorId,
+  )
 
   // Cerrar el drawer con Escape para accesibilidad
   useEffect(() => {
@@ -71,6 +85,7 @@ export function AgendaPage() {
     if (filters.tipoPropuesta !== '') count++
     if (filters.categoria !== '') count++
     if (filters.tipoAcceso !== '') count++
+    if (filters.publicadorId !== '') count++
     return count
   }, [filters])
 
@@ -135,6 +150,13 @@ export function AgendaPage() {
       {/* Píldoras de filtros activos debajo del encabezado */}
       {hayFiltrosActivos ? (
         <div className="flex flex-wrap items-center gap-2">
+          {filters.publicadorId !== '' ? (
+            <ActiveFilterPill
+              label={publicadorSeleccionado?.nombre ?? `Publicador #${filters.publicadorId}`}
+              onRemove={() => updateFilter('publicadorId', '')}
+            />
+          ) : null}
+
           {filters.ubicacion.trim() !== '' ? (
             <ActiveFilterPill
               label={filters.ubicacion.trim()}
@@ -228,6 +250,37 @@ export function AgendaPage() {
 
             {/* Cuerpo scrollable con controles y chips interactivos */}
             <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
+              {/* 0. Publicador */}
+              <div className="space-y-2.5">
+                <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-600">
+                  <Building2Icon className="h-4 w-4 text-[#00658d]" aria-hidden />
+                  Publicador
+                </span>
+                <Select
+                  value={filters.publicadorId === '' ? 'todos' : filters.publicadorId}
+                  onValueChange={(value) =>
+                    updateFilter('publicadorId', value === 'todos' ? '' : value)
+                  }
+                >
+                  <SelectTrigger
+                    aria-label="Publicador"
+                    className="h-11 w-full rounded-xl border-slate-200 bg-slate-50/70 text-sm focus:bg-white"
+                  >
+                    <SelectValue placeholder="Todos los publicadores" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos los publicadores</SelectItem>
+                    {(publicadoresQuery.data?.content ?? []).map((publicador) => (
+                      <SelectItem key={publicador.id} value={String(publicador.id)}>
+                        {publicador.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Separator />
+
               {/* 1. Ubicación */}
               <div className="space-y-2.5">
                 <Label

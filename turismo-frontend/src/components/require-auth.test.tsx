@@ -6,7 +6,6 @@ import { render } from '@testing-library/react'
 
 import { AuthProvider } from '@/components/auth-provider'
 import {
-  HomeEntry,
   RequireAuth,
   RequireGuest,
   RequireNotAdmin,
@@ -61,15 +60,7 @@ function renderGuarded({
         <MemoryRouter initialEntries={[initialEntry]}>
           <Routes>
             <Route path="/login" element={<div>Página de login</div>} />
-            <Route
-              path="/"
-              element={
-                <HomeEntry>
-                  <div>Inicio</div>
-                </HomeEntry>
-              }
-            />
-            <Route path="/propuestas" element={<div>Inicio</div>} />
+            <Route path="/descubrir" element={<div>Inicio</div>} />
             <Route element={<RequireGuest />}>
               <Route path="/sobre-nosotros" element={<div>Sobre nosotros</div>} />
             </Route>
@@ -119,16 +110,6 @@ describe('RequireAuth / RequireRole', () => {
   it('permite alta de evento con rol PUBLICADOR', () => {
     renderGuarded({ user: PUBLICADOR, initialEntry: '/eventos/nuevo' })
     expect(screen.getByText('Alta de evento')).toBeInTheDocument()
-  })
-
-  it('redirige al admin desde index', () => {
-    renderGuarded({ user: ADMIN, initialEntry: '/' })
-    expect(screen.getByText('Dashboard admin')).toBeInTheDocument()
-  })
-
-  it('deja al publicador ver propuestas en index', () => {
-    renderGuarded({ user: PUBLICADOR, initialEntry: '/' })
-    expect(screen.getByText('Inicio')).toBeInTheDocument()
   })
 
   it('deja ver Sobre nosotros a un visitante', () => {

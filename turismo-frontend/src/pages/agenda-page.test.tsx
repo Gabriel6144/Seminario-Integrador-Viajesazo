@@ -2,7 +2,13 @@ import { screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { AgendaPage } from './agenda-page'
-import { ARTESANIAS, FOLKLORE, GASTRONOMIA_ESTANCIA, SIN_CATEGORIA } from '@/test/fixtures'
+import {
+  ARTESANIAS,
+  ARTESANOS,
+  FOLKLORE,
+  GASTRONOMIA_ESTANCIA,
+  SIN_CATEGORIA,
+} from '@/test/fixtures'
 import { resetStore } from '@/test/store'
 import { renderRoute, user } from '@/test/utils'
 
@@ -83,6 +89,21 @@ describe('AgendaPage', () => {
       expect(screen.queryByRole('link', { name: FOLKLORE.nombre })).not.toBeInTheDocument(),
     ) // terminó el 2026-10-04
   }, 15_000)
+
+  it('CA2: filtra por publicador desde el drawer', async () => {
+    renderAgenda()
+
+    expect(await screen.findByRole('link', { name: FOLKLORE.nombre })).toBeInTheDocument()
+
+    await user().click(screen.getByRole('button', { name: /Filtrar eventos/i }))
+    await user().click(screen.getByRole('combobox', { name: 'Publicador' }))
+    await user().click(await screen.findByRole('option', { name: ARTESANOS.nombre }))
+
+    expect(await screen.findByRole('link', { name: ARTESANIAS.nombre })).toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.queryByRole('link', { name: FOLKLORE.nombre })).not.toBeInTheDocument(),
+    )
+  })
 
   it('CA3: permite seleccionar un evento para consultar su información en detalle', async () => {
     renderAgenda()

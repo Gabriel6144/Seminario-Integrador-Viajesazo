@@ -24,7 +24,11 @@ import { firstDayWithStops, toCircuitoRecomendado } from './circuito-view-model'
 import { CompletarDiaDialog } from './completar-dia-dialog'
 import { EliminarParadaDialog } from './parada-dialogs'
 import { SustituirParadaPanel } from './sustituir-parada-panel'
-import type { CircuitoRecomendado, ParadaCircuitoDetalle } from './types'
+import type {
+  CircuitoRecomendado,
+  ParadaCircuitoDetalle,
+  ViajeResumenCircuito,
+} from './types'
 
 /**
  * El detalle abierto vive en la URL (`?alternativa=CERCANIA&dia=2`) y no en un estado de React:
@@ -90,6 +94,8 @@ interface Paso10CircuitoProps {
    * TanStack ya queda al día; el planificador guarda el circuito en su propio estado y lo necesita.
    */
   onCircuitoChange?: (circuito: GeneracionCircuitoResponse) => void
+  /** Datos del viaje para la ficha bajo el hero del detalle. */
+  viajeResumen?: ViajeResumenCircuito | null
 }
 
 export function Paso10Circuito({
@@ -110,6 +116,7 @@ export function Paso10Circuito({
   onBackToResumen,
   onRegenerate,
   onCircuitoChange,
+  viajeResumen = null,
 }: Paso10CircuitoProps) {
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
@@ -348,6 +355,7 @@ export function Paso10Circuito({
           onDeleteStop={puedeEditar ? setParadaAEliminar : undefined}
           onVerSugerencias={puedeEditar ? setFechaACompletar : undefined}
           onDejarloAsi={puedeEditar ? dejarDiaAsi : undefined}
+          viaje={viajeResumen}
         />
 
         <CompletarDiaDialog

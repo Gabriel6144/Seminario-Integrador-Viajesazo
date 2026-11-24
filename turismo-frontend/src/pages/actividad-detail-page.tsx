@@ -163,15 +163,7 @@ export function ActividadDetailPage() {
               {actividad.nombre}
             </h2>
           )}
-          <CardDescription>
-            Publicado por{' '}
-            <Link
-              to={`/publicadores/${actividad.publicadorId}`}
-              className="underline-offset-4 hover:underline"
-            >
-              {actividad.publicadorNombre}
-            </Link>
-          </CardDescription>
+          <CardDescription>Publicado por {actividad.publicadorNombre}</CardDescription>
         </CardHeader>
 
         <CardContent className="flex flex-col gap-6">
@@ -411,9 +403,11 @@ function ActividadActions({
 }
 
 function Volver() {
+  const { hasRole } = useAuth()
+  const destino = hasRole('PUBLICADOR') ? '/propuestas' : '/descubrir'
   return (
     <Button asChild variant="ghost" size="sm" className="self-start">
-      <Link to="/propuestas">
+      <Link to={destino}>
         <ArrowLeftIcon className="h-4 w-4" aria-hidden />
         Volver al listado
       </Link>

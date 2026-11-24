@@ -35,9 +35,9 @@ export function PublicadorNuevoPage() {
         onSubmit={(values) => {
           setServerError(null)
           crear.mutate(toPublicadorRequest(values), {
-            onSuccess: (publicador) => {
+            onSuccess: () => {
               toast.success('Publicador creado')
-              navigate(`/publicadores/${publicador.id}`)
+              navigate('/admin')
             },
             onError: (error) => setServerError(toUserMessage(error)),
           })

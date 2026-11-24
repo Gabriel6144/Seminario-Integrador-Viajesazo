@@ -45,11 +45,12 @@ public class AgendaController {
 			@RequestParam(required = false) InteresCategoria categoria,
 			@RequestParam(required = false) TipoAcceso tipoAcceso,
 			@RequestParam(required = false) String ubicacion,
+			@RequestParam(required = false) Long publicadorId,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaDesde,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaHasta,
 			@PageableDefault(size = 20) Pageable pageable) {
 		PropuestaFiltro filtro = new PropuestaFiltro(TipoRegistro.EVENTO, tipoPropuesta, categoria, null,
-				tipoAcceso, null, null, null, null, ubicacion, null, fechaDesde, fechaHasta, false);
+				tipoAcceso, null, publicadorId, null, null, ubicacion, null, fechaDesde, fechaHasta, false);
 		return new PagedModel<>(propuestaQueryService.searchAgenda(filtro, pageable));
 	}
 

@@ -11,6 +11,7 @@ import {
 import { Link, useParams } from 'react-router-dom'
 
 import { useEvento } from '@/api/eventos'
+import { useAuth } from '@/components/auth-provider'
 import { CategoriaBadge } from '@/components/categoria-badge'
 import { EventoActions } from '@/components/evento-actions'
 import { EventoImagen } from '@/components/evento-imagen'
@@ -157,15 +158,7 @@ export function EventoDetailPage() {
               {evento.nombre}
             </h2>
           )}
-          <CardDescription>
-            Publicado por{' '}
-            <Link
-              to={`/publicadores/${evento.publicadorId}`}
-              className="underline-offset-4 hover:underline"
-            >
-              {evento.publicadorNombre}
-            </Link>
-          </CardDescription>
+          <CardDescription>Publicado por {evento.publicadorNombre}</CardDescription>
         </CardHeader>
 
         <CardContent className="flex flex-col gap-6">
@@ -299,9 +292,11 @@ export function EventoDetailPage() {
 }
 
 function Volver() {
+  const { hasRole } = useAuth()
+  const destino = hasRole('PUBLICADOR') ? '/propuestas' : '/descubrir'
   return (
     <Button asChild variant="ghost" size="sm" className="self-start">
-      <Link to="/propuestas">
+      <Link to={destino}>
         <ArrowLeftIcon className="h-4 w-4" aria-hidden />
         Volver al listado
       </Link>

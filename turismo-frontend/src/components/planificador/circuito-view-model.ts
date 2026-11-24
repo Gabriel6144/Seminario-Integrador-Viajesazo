@@ -18,7 +18,7 @@ import type {
 const FALLBACK_IMAGE =
   'https://placehold.co/800x500/e2e8f0/64748b?text=Viajesazo'
 
-const CATEGORY_META: Record<
+export const CATEGORY_META: Record<
   InteresCategoria,
   { icon: string; badgeClass: string }
 > = {
@@ -46,21 +46,21 @@ const STRATEGY_META: Record<
   CERCANIA: {
     categoryTag: 'Ruta compacta',
     categoryIcon: 'near_me',
-    image: 'https://placehold.co/800x500/0ea5e9/ffffff?text=Cerca+de+todo',
+    image: '/viajezaso/assets/cordoba-hd-portada.avif',
     ventajas: ['Minimiza los traslados', 'Ideal si tenés poco tiempo'],
     consideraciones: ['Prioriza la cercanía sobre la afinidad'],
   },
   INTERESES: {
     categoryTag: 'A tu medida',
     categoryIcon: 'tune',
-    image: 'https://placehold.co/800x500/0369a1/ffffff?text=Segun+tus+intereses',
+    image: '/viajezaso/assets/sierras-cordoba-portada.avif',
     ventajas: ['Prioriza tus categorías favoritas', 'Mayor afinidad con tu viaje'],
     consideraciones: ['Puede requerir traslados más largos'],
   },
   DESCUBRIMIENTO: {
     categoryTag: 'Nuevas experiencias',
     categoryIcon: 'explore',
-    image: 'https://placehold.co/800x500/075985/ffffff?text=Para+descubrir',
+    image: '/viajezaso/assets/los-gigantes-portada.avif',
     ventajas: ['Incluye propuestas variadas', 'Evita repetir categorías'],
     consideraciones: ['Algunas paradas pueden estar fuera de tu zona habitual'],
   },

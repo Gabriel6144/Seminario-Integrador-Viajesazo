@@ -40,6 +40,8 @@ export const queryKeys = {
       },
     ] as const,
   propuestasAll: () => ['propuestas'] as const,
+  propuestasDescubrirCategoria: (categoria: string) =>
+    ['propuestas', 'descubrir', categoria] as const,
   propuestasResumen: (filtros: Record<string, string>) =>
     ['propuestas', 'resumen', filtros] as const,
   propuestasZonas: (filtros: Record<string, string>) =>
@@ -48,9 +50,6 @@ export const queryKeys = {
   actividadesAll: () => ['actividades'] as const,
   publicadores: (page: number, size: number) => ['publicadores', { page, size }] as const,
   publicadoresAll: () => ['publicadores'] as const,
-  publicador: (id: number) => ['publicador', id] as const,
-  publicadorEventos: (id: number, page: number, size: number) =>
-    ['publicador', id, 'eventos', { page, size }] as const,
   borradores: (page: number, size: number) => ['borradores', { page, size }] as const,
   borradoresAll: () => ['borradores'] as const,
   borrador: (id: number) => ['borrador', id] as const,

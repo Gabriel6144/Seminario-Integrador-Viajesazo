@@ -43,7 +43,7 @@ describe('toCircuitoRecomendado', () => {
 
     expect(circuito.stopsByDay[1][0].disponible).toBe(false)
     expect(circuito.stopsByDay[1][0].motivoNoDisponible).toContain('pasó')
-    expect(circuito.image).toContain('placehold')
+    expect(circuito.image).toBe('/viajezaso/assets/los-gigantes-portada.avif')
   })
 })
 

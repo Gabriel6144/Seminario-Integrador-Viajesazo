@@ -2,12 +2,8 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 
 import { PAGE_SIZE } from '@/api/eventos'
 import { getPage, pageParams, queryKeys } from '@/api/queries'
-import { apiGet, apiPost } from '@/lib/http'
-import type {
-  PropuestaResumenResponse,
-  PublicadorRequest,
-  PublicadorResponse,
-} from '@/types/api'
+import { apiPost } from '@/lib/http'
+import type { PublicadorRequest, PublicadorResponse } from '@/types/api'
 
 /**
  * Tope de página que acepta el backend (`spring.data.web.pageable.max-page-size=100`).
@@ -27,31 +23,6 @@ export function usePublicadores(page: number, size: number = PAGE_SIZE) {
     queryFn: ({ signal }) =>
       getPage<PublicadorResponse>(`/api/publicadores${pageParams(page, size)}`, signal),
     placeholderData: keepPreviousData,
-  })
-}
-
-/** `GET /api/publicadores/{id}` — detalle. Misma validación de id que `useEvento`. */
-export function usePublicador(id: number | null) {
-  return useQuery({
-    queryKey: queryKeys.publicador(id ?? 0),
-    queryFn: ({ signal }) => apiGet<PublicadorResponse>(`/api/publicadores/${id}`, signal),
-    enabled: id !== null,
-  })
-}
-
-/**
- * `GET /api/propuestas?publicadorId=&page=&size=` — propuestas turísticas (eventos y actividades) de un publicador.
- */
-export function useEventosDePublicador(id: number | null, page: number) {
-  return useQuery({
-    queryKey: queryKeys.publicadorEventos(id ?? 0, page, PAGE_SIZE),
-    queryFn: ({ signal }) =>
-      getPage<PropuestaResumenResponse>(
-        `/api/propuestas${pageParams(page, PAGE_SIZE)}&publicadorId=${id}`,
-        signal,
-      ),
-    placeholderData: keepPreviousData,
-    enabled: id !== null,
   })
 }
 

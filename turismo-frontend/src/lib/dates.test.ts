@@ -7,6 +7,7 @@ import {
   formatDateRange,
   formatLocalDate,
   formatTimeRange,
+  formatTripMonth,
   formatWeekdayAndDate,
   formatWeekdayDay,
 } from './dates'
@@ -52,6 +53,20 @@ describe('formatDateRange', () => {
     expect(formatDateRange('2026-09-28', '2026-10-04')).toBe(
       'Del 28 de septiembre de 2026 al 4 de octubre de 2026',
     )
+  })
+})
+
+describe('formatTripMonth', () => {
+  it('muestra un solo mes cuando el rango cae en el mismo mes y año', () => {
+    expect(formatTripMonth('2026-12-05', '2026-12-07')).toBe('Diciembre de 2026')
+  })
+
+  it('muestra los dos meses cuando el rango los cruza dentro del mismo año', () => {
+    expect(formatTripMonth('2026-11-28', '2026-12-02')).toBe('Noviembre – Diciembre de 2026')
+  })
+
+  it('muestra los dos años cuando el rango cruza de año', () => {
+    expect(formatTripMonth('2026-12-30', '2027-01-02')).toBe('Diciembre de 2026 – Enero de 2027')
   })
 })
 

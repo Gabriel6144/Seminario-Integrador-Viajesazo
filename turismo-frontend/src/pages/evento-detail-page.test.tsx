@@ -87,13 +87,13 @@ describe('EventoDetailPage', () => {
     expect(screen.queryByText(/Mapa de/)).not.toBeInTheDocument()
   })
 
-  it('enlaza al publicador', async () => {
+  it('muestra el nombre del publicador como texto', async () => {
     renderDetalle('1')
 
-    expect(await screen.findByRole('link', { name: FOLKLORE.publicadorNombre })).toHaveAttribute(
-      'href',
-      `/publicadores/${FOLKLORE.publicadorId}`,
-    )
+    expect(await screen.findByText(`Publicado por ${FOLKLORE.publicadorNombre}`)).toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: FOLKLORE.publicadorNombre }),
+    ).not.toBeInTheDocument()
   })
 
   it('rechaza un id no numérico sin pegarle al backend', async () => {

@@ -13,8 +13,13 @@ import { CircuitoGuardadoModal } from './circuito-guardado-modal'
 import { CircuitoParadaCard } from './circuito-parada-card'
 import { CircuitoParadaDetalleModal } from './circuito-parada-detalle-modal'
 import { CircuitoRutaMapa } from './circuito-ruta-mapa'
+import { FichaViajeCircuito } from './ficha-viaje-circuito'
 import { ParadaUbicacionMapaView } from './parada-ubicacion-mapa-view'
-import type { CircuitoRecomendado, ParadaCircuitoDetalle } from './types'
+import type {
+  CircuitoRecomendado,
+  ParadaCircuitoDetalle,
+  ViajeResumenCircuito,
+} from './types'
 
 export type CircuitoDiaModo = 'recomendado' | 'confirmado'
 
@@ -62,6 +67,8 @@ interface CircuitoDiaSplitViewProps {
   onRestart?: () => void
   showHeroBadge?: boolean
   ritmo?: TipoRitmo | null
+  /** Datos del viaje y preferencias del turista; la ficha se oculta si no vienen. */
+  viaje?: ViajeResumenCircuito | null
 }
 
 export function CircuitoDiaSplitView({
@@ -88,6 +95,7 @@ export function CircuitoDiaSplitView({
   onRestart,
   showHeroBadge = true,
   ritmo = null,
+  viaje = null,
 }: CircuitoDiaSplitViewProps) {
   const esRecomendado = modo === 'recomendado'
   const resolvedHeader =
@@ -283,6 +291,8 @@ export function CircuitoDiaSplitView({
           </div>
         </div>
       </section>
+
+      <FichaViajeCircuito viaje={viaje} />
 
       <nav className="mt-5 border-b border-slate-200/70 pb-3">
         <ul className="flex gap-2.5 overflow-x-auto">

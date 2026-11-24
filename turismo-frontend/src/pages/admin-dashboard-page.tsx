@@ -1,5 +1,8 @@
+import { Link } from 'react-router-dom'
+
 import { useAdminDashboard } from '@/api/admin'
 import { ErrorState, GridSkeleton } from '@/components/query-state'
+import { Button } from '@/components/ui/button'
 
 function MetricCard({
   label,
@@ -36,14 +39,19 @@ export function AdminDashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h2 className="font-heading text-2xl font-bold tracking-tight text-[#191c1e]">
-          Dashboard de administración de la plataforma
-        </h2>
-        <p className="text-sm text-[#3f484e]">
-          Métricas globales de usuarios activos, nuevos registros, viajes creados y popularidad de
-          propuestas según inscriptos en circuitos seleccionados.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="font-heading text-2xl font-bold tracking-tight text-[#191c1e]">
+            Dashboard de administración de la plataforma
+          </h2>
+          <p className="text-sm text-[#3f484e]">
+            Métricas globales de usuarios activos, nuevos registros, viajes creados y popularidad de
+            propuestas según inscriptos en circuitos seleccionados.
+          </p>
+        </div>
+        <Button asChild className="h-11 rounded-xl bg-[#00658d] px-5 font-semibold text-white hover:bg-[#005273]">
+          <Link to="/publicadores/nuevo">Nuevo publicador</Link>
+        </Button>
       </div>
 
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
